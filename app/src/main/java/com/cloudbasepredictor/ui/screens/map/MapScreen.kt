@@ -19,10 +19,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.model.SavedPlace
+import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import kotlinx.coroutines.flow.collectLatest
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
@@ -199,4 +202,15 @@ private fun emptyFeatureCollection(): String {
           "features": []
         }
     """.trimIndent()
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SelectedPointCardPreview() {
+    CloudbasePredictorTheme {
+        SelectedPointCard(
+            selectedPlace = PreviewData.mapUiState.selectedPlace ?: PreviewData.savedPlace,
+            onOpenForecast = {},
+        )
+    }
 }

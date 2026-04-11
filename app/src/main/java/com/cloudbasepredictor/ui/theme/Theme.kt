@@ -2,10 +2,13 @@ package com.cloudbasepredictor.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.material3.Text
 
 private val LightColors = lightColorScheme(
     primary = DeepBlue,
@@ -38,4 +41,14 @@ fun CloudbasePredictorTheme(
         typography = AppTypography,
         content = content,
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun CloudbasePredictorThemePreview() {
+    CloudbasePredictorTheme {
+        Surface {
+            Text(text = "Cloudbase theme preview")
+        }
+    }
 }
