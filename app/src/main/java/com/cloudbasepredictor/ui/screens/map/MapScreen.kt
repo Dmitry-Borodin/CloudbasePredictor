@@ -73,17 +73,7 @@ fun MapScreen(
             zoom = 5.5,
         )
     )
-    val markerSource = rememberGeoJsonSource(
-        data = GeoJsonData.JsonString(emptyFeatureCollection()),
-    )
-
-    LaunchedEffect(uiState.selectedPlace) {
-        markerSource.setData(
-            GeoJsonData.JsonString(
-                uiState.selectedPlace?.let(::buildMarkerFeatureCollection) ?: emptyFeatureCollection()
-            )
-        )
-    }
+    val markerData = uiState.selectedPlace?.let(::buildMarkerFeatureCollection) ?: emptyFeatureCollection()
 
     Column(
         modifier = modifier
@@ -116,6 +106,9 @@ fun MapScreen(
                     ClickResult.Consume
                 },
             ) {
+                val markerSource = rememberGeoJsonSource(
+                    data = GeoJsonData.JsonString(markerData),
+                )
                 CircleLayer(
                     id = "selected-point",
                     source = markerSource,
