@@ -10,11 +10,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,7 +31,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
+import java.net.InetAddress
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.expressions.dsl.const
@@ -37,6 +46,9 @@ import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.util.ClickResult
 import org.maplibre.spatialk.geojson.Position
+
+private const val MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
+private const val MAP_STYLE_HOST = "tiles.openfreemap.org"
 
 @Composable
 fun MapRoute(
@@ -67,6 +79,14 @@ fun MapScreen(
     onOpenForecast: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var availabilityProbeKey by remember { mutableIntStateOf(0) }
+    val isStyleHostReachable by produceState<Boolean?>(
+        initialValue = null,
+        key1 = availabilityProbeKey,
+    ) {
+        value = isMapStyleHostReachable()
+    }
+
     val cameraState = rememberCameraState(
         firstPosition = CameraPosition(
             target = Position(longitude = 13.4050, latitude = 52.5200),
@@ -86,7 +106,11 @@ fun MapScreen(
             style = MaterialTheme.typography.headlineMedium,
         )
         Text(
-            text = "Tap anywhere on the OpenFreeMap map to place a marker.",
+            text = if (isStyleHostReachable == false) {
+                "Map is temporarily unavailable. Check network and DNS."
+            } else {
+                "Tap anywhere on the OpenFreeMap map to place a marker."
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -97,26 +121,48 @@ fun MapScreen(
                 .weight(1f)
                 .clip(RoundedCornerShape(28.dp)),
         ) {
-            MaplibreMap(
-                modifier = Modifier.fillMaxSize(),
-                baseStyle = BaseStyle.Uri("https://tiles.openfreemap.org/styles/liberty"),
-                cameraState = cameraState,
-                onMapClick = { position, _ ->
-                    onMapTapped(position.latitude, position.longitude)
-                    ClickResult.Consume
-                },
-            ) {
-                val markerSource = rememberGeoJsonSource(
-                    data = GeoJsonData.JsonString(markerData),
-                )
-                CircleLayer(
-                    id = "selected-point",
-                    source = markerSource,
-                    color = const(Color(0xFFE64A5B)),
-                    radius = const(9.dp),
-                    strokeColor = const(Color.White),
-                    strokeWidth = const(3.dp),
-                )
+            when (isStyleHostReachable) {
+                null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+                false -> {
+                    MapUnavailableCard(
+                        onRetry = {
+                            availabilityProbeKey++
+                        },
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(16.dp),
+                    )
+                }
+                true -> {
+                    MaplibreMap(
+                        modifier = Modifier.fillMaxSize(),
+                        baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
+                        cameraState = cameraState,
+                        onMapClick = { position, _ ->
+                            onMapTapped(position.latitude, position.longitude)
+                            ClickResult.Consume
+                        },
+                    ) {
+                        val markerSource = rememberGeoJsonSource(
+                            data = GeoJsonData.JsonString(markerData),
+                        )
+                        CircleLayer(
+                            id = "selected-point",
+                            source = markerSource,
+                            color = const(Color(0xFFE64A5B)),
+                            radius = const(9.dp),
+                            strokeColor = const(Color.White),
+                            strokeWidth = const(3.dp),
+                        )
+                    }
+                }
             }
 
             uiState.selectedPlace?.let { selectedPlace ->
@@ -127,6 +173,36 @@ fun MapScreen(
                         .align(Alignment.BottomCenter)
                         .padding(16.dp),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MapUnavailableCard(
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Map provider is unavailable right now.",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = "Unable to resolve tiles.openfreemap.org. Retry when network is available.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = onRetry) {
+                Text(text = "Retry")
             }
         }
     }
@@ -195,6 +271,17 @@ private fun emptyFeatureCollection(): String {
           "features": []
         }
     """.trimIndent()
+}
+
+private suspend fun isMapStyleHostReachable(): Boolean {
+    val resolution = withTimeoutOrNull(2_000L) {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                InetAddress.getByName(MAP_STYLE_HOST)
+            }.isSuccess
+        }
+    }
+    return resolution == true
 }
 
 @Preview(showBackground = true)
