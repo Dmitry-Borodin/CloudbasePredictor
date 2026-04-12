@@ -19,7 +19,6 @@ internal fun StuveForecastView(
     ForecastGridCard(
         uiState = uiState,
         mode = ForecastMode.STUVE,
-        title = "Stuve profile",
         minAltitudeKm = 0.6f,
         onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
         modifier = modifier.testTag(STUVE_VIEW),

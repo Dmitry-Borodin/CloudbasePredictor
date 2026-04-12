@@ -16,7 +16,7 @@ data class SavedPlace(
         ): SavedPlace {
             val normalizedLatitude = String.format(Locale.US, "%.4f", latitude)
             val normalizedLongitude = String.format(Locale.US, "%.4f", longitude)
-            val displayName = "Pinned $normalizedLatitude, $normalizedLongitude"
+            val displayName = "$normalizedLatitude, $normalizedLongitude"
 
             return SavedPlace(
                 id = "place:$normalizedLatitude:$normalizedLongitude",

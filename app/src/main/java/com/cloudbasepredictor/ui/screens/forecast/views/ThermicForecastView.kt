@@ -43,7 +43,6 @@ internal fun ThermicForecastView(
 ) {
     ForecastChartCard(
         uiState = uiState,
-        title = "Thermic forecast",
         modifier = modifier.testTag(THERMIC_VIEW),
     ) { chartModifier ->
         ThermicForecastGrid(
@@ -117,10 +116,10 @@ private fun ThermicForecastGrid(
         }
 
         val axisWidth = with(density) { 60.dp.toPx() }
-        val outerHorizontalPadding = with(density) { 12.dp.toPx() }
-        val axisToPlotSpacing = with(density) { 2.dp.toPx() }
+        val outerHorizontalPadding = 0f
+        val axisToPlotSpacing = 0f
         val bottomAxisHeight = with(density) { 38.dp.toPx() }
-        val plotCornerRadius = with(density) { 18.dp.toPx() }
+        val plotCornerRadius = 0f
         val tileInset = with(density) { 1.dp.toPx() }
 
         val plotLeft = outerHorizontalPadding + axisWidth + axisToPlotSpacing

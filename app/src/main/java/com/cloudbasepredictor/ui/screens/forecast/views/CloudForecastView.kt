@@ -19,7 +19,6 @@ internal fun CloudForecastView(
     ForecastGridCard(
         uiState = uiState,
         mode = ForecastMode.CLOUD,
-        title = "Cloud layers",
         minAltitudeKm = 1.0f,
         onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
         modifier = modifier.testTag(CLOUD_VIEW),

@@ -4,19 +4,15 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -29,7 +25,6 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,14 +44,12 @@ import kotlin.math.sin
 internal fun ForecastGridCard(
     uiState: ForecastUiState,
     mode: ForecastMode,
-    title: String,
     minAltitudeKm: Float,
     onVisibleTopAltitudeChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     ForecastChartCard(
         uiState = uiState,
-        title = title,
         modifier = modifier,
     ) { chartModifier ->
         ForecastRiskGrid(
@@ -72,50 +65,20 @@ internal fun ForecastGridCard(
 @Composable
 internal fun ForecastChartCard(
     uiState: ForecastUiState,
-    title: String,
     modifier: Modifier = Modifier,
     chartContent: @Composable (Modifier) -> Unit,
 ) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    Box(
+        modifier = modifier.fillMaxSize(),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (uiState.isLoading) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
+        chartContent(Modifier.fillMaxSize())
 
-            Text(
-                text = uiState.selectedPlace?.name ?: "No location selected",
-                style = MaterialTheme.typography.headlineSmall,
-            )
-
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            uiState.errorMessage?.let { message ->
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-
-            chartContent(
-                Modifier
+        if (uiState.isLoading) {
+            LinearProgressIndicator(
+                modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .height(3.dp)
+                    .align(Alignment.TopCenter),
             )
         }
     }
@@ -176,10 +139,10 @@ private fun ForecastRiskGrid(
         },
     ) {
         val axisWidth = with(density) { 60.dp.toPx() }
-        val outerHorizontalPadding = with(density) { 12.dp.toPx() }
-        val axisToPlotSpacing = with(density) { 2.dp.toPx() }
+        val outerHorizontalPadding = 0f
+        val axisToPlotSpacing = 0f
         val bottomAxisHeight = with(density) { 38.dp.toPx() }
-        val plotCornerRadius = with(density) { 18.dp.toPx() }
+        val plotCornerRadius = 0f
 
         val plotLeft = outerHorizontalPadding + axisWidth + axisToPlotSpacing
         val plotTop = outerHorizontalPadding
@@ -496,7 +459,6 @@ private fun ForecastGridCardPreview() {
         ForecastGridCard(
             uiState = PreviewData.forecastUiStateForMode(ForecastMode.CLOUD),
             mode = ForecastMode.CLOUD,
-            title = "Cloud layers",
             minAltitudeKm = 0.5f,
             onVisibleTopAltitudeChange = {},
         )

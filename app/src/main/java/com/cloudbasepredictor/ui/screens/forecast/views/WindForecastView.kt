@@ -19,7 +19,6 @@ internal fun WindForecastView(
     ForecastGridCard(
         uiState = uiState,
         mode = ForecastMode.WIND,
-        title = "Wind layers",
         minAltitudeKm = 0.4f,
         onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
         modifier = modifier.testTag(WIND_VIEW),
