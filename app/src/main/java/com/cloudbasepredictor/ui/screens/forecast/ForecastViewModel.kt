@@ -37,6 +37,7 @@ data class ForecastUiState(
     val selectedForecastMode: ForecastMode = ForecastMode.THERMIC,
     val selectedDayIndex: Int = 0,
     val chartViewport: ForecastChartViewport = ForecastChartViewport(),
+    val thermicChart: ThermicForecastChartUiModel = buildPlaceholderThermicForecastChart(dayIndex = 0),
     val dayChips: List<ForecastDayChipUiModel> = placeholderDayChips(),
     val forecastText: String = "Select a point on the map to open a forecast.",
     val isLoading: Boolean = false,
@@ -100,6 +101,7 @@ class ForecastViewModel @Inject constructor(
             selectedForecastMode = currentChartContext.selectedForecastMode,
             selectedDayIndex = safeDayIndex,
             chartViewport = currentChartContext.chartViewport,
+            thermicChart = buildPlaceholderThermicForecastChart(dayIndex = safeDayIndex),
             dayChips = dayChips,
             forecastText = buildForecastText(
                 mode = currentChartContext.selectedForecastMode,

@@ -1,11 +1,16 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.model.ForecastMode
@@ -51,35 +56,48 @@ fun ForecastScreen(
             onOpenMap = onOpenMap,
         )
 
-        when (uiState.selectedForecastMode) {
-            ForecastMode.THERMIC -> {
-                ThermicForecastView(
-                    uiState = uiState,
-                    onVisibleTopAltitudeChange = onForecastViewportTopChanged,
-                    modifier = Modifier.weight(1f),
-                )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+        ) {
+            when (uiState.selectedForecastMode) {
+                ForecastMode.THERMIC -> {
+                    ThermicForecastView(
+                        uiState = uiState,
+                        onVisibleTopAltitudeChange = onForecastViewportTopChanged,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                ForecastMode.STUVE -> {
+                    StuveForecastView(
+                        uiState = uiState,
+                        onVisibleTopAltitudeChange = onForecastViewportTopChanged,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                ForecastMode.WIND -> {
+                    WindForecastView(
+                        uiState = uiState,
+                        onVisibleTopAltitudeChange = onForecastViewportTopChanged,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                ForecastMode.CLOUD -> {
+                    CloudForecastView(
+                        uiState = uiState,
+                        onVisibleTopAltitudeChange = onForecastViewportTopChanged,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
-            ForecastMode.STUVE -> {
-                StuveForecastView(
-                    uiState = uiState,
-                    onVisibleTopAltitudeChange = onForecastViewportTopChanged,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            ForecastMode.WIND -> {
-                WindForecastView(
-                    uiState = uiState,
-                    onVisibleTopAltitudeChange = onForecastViewportTopChanged,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            ForecastMode.CLOUD -> {
-                CloudForecastView(
-                    uiState = uiState,
-                    onVisibleTopAltitudeChange = onForecastViewportTopChanged,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+
+            ForecastHelpOverlay(
+                uiState = uiState,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 24.dp, bottom = 24.dp),
+            )
         }
 
         ForecastDatePicker(
@@ -96,6 +114,18 @@ private fun ForecastScreenPreview() {
     CloudbasePredictorTheme {
         ForecastScreen(
             uiState = PreviewData.forecastReadyUiState,
+            onDateSelected = {},
+            onOpenMap = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ForecastScreenCloudPreview() {
+    CloudbasePredictorTheme {
+        ForecastScreen(
+            uiState = PreviewData.forecastUiStateForMode(ForecastMode.CLOUD),
             onDateSelected = {},
             onOpenMap = {},
         )

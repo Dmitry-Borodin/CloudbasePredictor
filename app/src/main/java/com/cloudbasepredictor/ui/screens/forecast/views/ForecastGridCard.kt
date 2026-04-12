@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
-import com.cloudbasepredictor.ui.screens.forecast.MAX_TOP_ALTITUDE_KM
 import com.cloudbasepredictor.ui.screens.forecast.zoomedTopAltitudeKm
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.util.Locale
@@ -55,6 +54,26 @@ internal fun ForecastGridCard(
     onVisibleTopAltitudeChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    ForecastChartCard(
+        uiState = uiState,
+        modifier = modifier,
+    ) { chartModifier ->
+        ForecastRiskGrid(
+            mode = mode,
+            minAltitudeKm = minAltitudeKm,
+            visibleTopAltitudeKm = uiState.chartViewport.visibleTopAltitudeKm,
+            onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
+            modifier = chartModifier,
+        )
+    }
+}
+
+@Composable
+internal fun ForecastChartCard(
+    uiState: ForecastUiState,
+    modifier: Modifier = Modifier,
+    chartContent: @Composable (Modifier) -> Unit,
+) {
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -72,11 +91,6 @@ internal fun ForecastGridCard(
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
 
-            Text(
-                text = uiState.selectedPlace?.name ?: "No location selected",
-                style = MaterialTheme.typography.headlineSmall,
-            )
-
             uiState.errorMessage?.let { message ->
                 Text(
                     text = message,
@@ -85,12 +99,8 @@ internal fun ForecastGridCard(
                 )
             }
 
-            ForecastRiskGrid(
-                mode = mode,
-                minAltitudeKm = minAltitudeKm,
-                visibleTopAltitudeKm = uiState.chartViewport.visibleTopAltitudeKm,
-                onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
-                modifier = Modifier
+            chartContent(
+                Modifier
                     .fillMaxWidth()
                     .weight(1f),
             )
