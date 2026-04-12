@@ -30,12 +30,15 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.model.ForecastMode
+import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.screens.forecast.MAX_TOP_ALTITUDE_KM
 import com.cloudbasepredictor.ui.screens.forecast.zoomedTopAltitudeKm
+import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.abs
@@ -74,12 +77,6 @@ internal fun ForecastGridCard(
                 style = MaterialTheme.typography.headlineSmall,
             )
 
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
             uiState.errorMessage?.let { message ->
                 Text(
                     text = message,
@@ -87,14 +84,6 @@ internal fun ForecastGridCard(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-
-            Text(
-                text = uiState.forecastText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
 
             ForecastRiskGrid(
                 mode = mode,
@@ -104,12 +93,6 @@ internal fun ForecastGridCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-            )
-
-            Text(
-                text = "Local time 06-22. Pinch with two fingers to zoom the shared altitude range out to ${MAX_TOP_ALTITUDE_KM.toInt()} km.",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -125,8 +108,13 @@ private fun ForecastRiskGrid(
 ) {
     val density = LocalDensity.current
     val axisLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val axisBackgroundColor = MaterialTheme.colorScheme.surfaceContainer
-    val plotBackgroundColor = MaterialTheme.colorScheme.surface
+    val gridBackgroundColor = lerp(
+        start = MaterialTheme.colorScheme.surface,
+        stop = MaterialTheme.colorScheme.onSurface,
+        fraction = 0.035f,
+    )
+    val axisBackgroundColor = gridBackgroundColor
+    val plotBackgroundColor = gridBackgroundColor
     val outlineColor = MaterialTheme.colorScheme.outlineVariant
 
     val axisLabelPaint = remember(density, axisLabelColor) {
@@ -165,13 +153,14 @@ private fun ForecastRiskGrid(
         },
     ) {
         val axisWidth = with(density) { 60.dp.toPx() }
-        val contentPadding = with(density) { 12.dp.toPx() }
+        val outerHorizontalPadding = with(density) { 12.dp.toPx() }
+        val axisToPlotSpacing = with(density) { 2.dp.toPx() }
         val bottomAxisHeight = with(density) { 38.dp.toPx() }
         val plotCornerRadius = with(density) { 18.dp.toPx() }
 
-        val plotLeft = axisWidth + contentPadding
-        val plotTop = contentPadding
-        val plotRight = size.width - contentPadding
+        val plotLeft = outerHorizontalPadding + axisWidth + axisToPlotSpacing
+        val plotTop = outerHorizontalPadding
+        val plotRight = size.width - outerHorizontalPadding
         val plotBottom = size.height - bottomAxisHeight
         val plotWidth = plotRight - plotLeft
         val plotHeight = plotBottom - plotTop
@@ -197,7 +186,7 @@ private fun ForecastRiskGrid(
 
         drawRoundRect(
             color = axisBackgroundColor,
-            topLeft = Offset(contentPadding, plotTop),
+            topLeft = Offset(outerHorizontalPadding, plotTop),
             size = Size(axisWidth, plotHeight),
             cornerRadius = CornerRadius(plotCornerRadius, plotCornerRadius),
         )
@@ -228,25 +217,6 @@ private fun ForecastRiskGrid(
             val bandHeight = bottomY - topY
             val bandCenterKm = (band.startKm + band.endKm) / 2f
 
-            val averageRisk = LOCAL_FORECAST_HOURS
-                .map { hour ->
-                    riskIntensity(
-                        mode = mode,
-                        hour = hour,
-                        altitudeKm = bandCenterKm,
-                        minAltitudeKm = minAltitudeKm,
-                        maxAltitudeKm = effectiveTopAltitudeKm,
-                    )
-                }
-                .average()
-                .toFloat()
-
-            drawRect(
-                color = riskColor(averageRisk, mode = mode).copy(alpha = 0.95f),
-                topLeft = Offset(contentPadding, topY),
-                size = Size(axisWidth, bandHeight),
-            )
-
             LOCAL_FORECAST_HOURS.forEachIndexed { index, hour ->
                 val risk = riskIntensity(
                     mode = mode,
@@ -256,7 +226,11 @@ private fun ForecastRiskGrid(
                     maxAltitudeKm = effectiveTopAltitudeKm,
                 )
                 drawRect(
-                    color = riskColor(risk, mode = mode).copy(alpha = 0.78f),
+                    color = lerp(
+                        start = gridBackgroundColor,
+                        stop = riskColor(risk, mode = mode),
+                        fraction = CELL_TINT_FRACTION,
+                    ),
                     topLeft = Offset(plotLeft + (index * columnWidth), topY),
                     size = Size(columnWidth, bandHeight),
                 )
@@ -300,7 +274,7 @@ private fun ForecastRiskGrid(
 
             drawLine(
                 color = outlineColor.copy(alpha = 0.45f),
-                start = Offset(contentPadding, y),
+                start = Offset(outerHorizontalPadding, y),
                 end = Offset(plotRight, y),
                 strokeWidth = 1.dp.toPx(),
             )
@@ -325,7 +299,7 @@ private fun ForecastRiskGrid(
                 )
                 canvas.nativeCanvas.drawText(
                     formatAltitudeLabel(altitudeKm),
-                    contentPadding + 8.dp.toPx(),
+                    outerHorizontalPadding + 8.dp.toPx(),
                     y + (axisLabelPaint.textSize * 0.35f),
                     axisLabelPaint,
                 )
@@ -333,7 +307,7 @@ private fun ForecastRiskGrid(
 
             canvas.nativeCanvas.drawText(
                 "km",
-                contentPadding + 8.dp.toPx(),
+                outerHorizontalPadding + 8.dp.toPx(),
                 plotBottom + unitLabelPaint.textSize + 12.dp.toPx(),
                 unitLabelPaint,
             )
@@ -489,4 +463,19 @@ private data class AltitudeBand(
 
 private const val MIN_VISIBLE_ALTITUDE_RANGE_KM = 0.75f
 private const val ALTITUDE_EPSILON = 0.001f
+private const val CELL_TINT_FRACTION = 0.18f
 private val LOCAL_FORECAST_HOURS = (6..22).toList()
+
+@Preview(name = "Forecast Grid Card", showBackground = true, widthDp = 420, heightDp = 720)
+@Composable
+private fun ForecastGridCardPreview() {
+    CloudbasePredictorTheme {
+        ForecastGridCard(
+            uiState = PreviewData.forecastUiStateForMode(ForecastMode.CLOUD),
+            mode = ForecastMode.CLOUD,
+            title = "Cloud layers",
+            minAltitudeKm = 0.5f,
+            onVisibleTopAltitudeChange = {},
+        )
+    }
+}

@@ -24,8 +24,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cloudbasepredictor.model.ForecastMode
+import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
 internal fun ForecastModePicker(
@@ -103,6 +105,17 @@ private fun ForecastModePickerItem(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = tintColor,
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ForecastModePickerPreview() {
+    CloudbasePredictorTheme {
+        ForecastModePicker(
+            selectedMode = ForecastMode.CLOUD,
+            onModeSelected = {},
         )
     }
 }

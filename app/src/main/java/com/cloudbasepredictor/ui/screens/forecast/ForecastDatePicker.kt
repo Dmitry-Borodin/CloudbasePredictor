@@ -12,7 +12,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
 internal fun ForecastDatePicker(
@@ -47,5 +50,17 @@ internal fun ForecastDatePicker(
                 )
             }
         }
+    }
+}
+
+@Preview(showBackground = true, widthDp = 420)
+@Composable
+private fun ForecastDatePickerPreview() {
+    CloudbasePredictorTheme {
+        ForecastDatePicker(
+            dayChips = PreviewData.forecastDayChips(),
+            selectedDayIndex = 2,
+            onDateSelected = {},
+        )
     }
 }
