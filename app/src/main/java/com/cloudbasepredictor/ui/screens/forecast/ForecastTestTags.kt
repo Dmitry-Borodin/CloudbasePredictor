@@ -12,4 +12,7 @@ object ForecastTestTags {
     const val CLOUD_VIEW = "forecast_view_cloud"
 
     const val HELP_BUTTON = "forecast_help_button"
+
+    const val MODEL_SELECTOR_BUTTON = "forecast_model_selector_button"
+    const val MODEL_OPTION_PREFIX = "forecast_model_option_"
 }

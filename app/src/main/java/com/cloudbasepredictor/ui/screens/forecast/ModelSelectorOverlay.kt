@@ -25,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cloudbasepredictor.model.ForecastModel
@@ -41,11 +42,17 @@ internal fun ModelSelectorOverlay(
     var showSheet by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
 
-    val label = resolvedModel?.displayName ?: selectedModel.displayName
+    val label = when {
+        selectedModel == ForecastModel.BEST_MATCH &&
+            resolvedModel != null &&
+            resolvedModel != ForecastModel.BEST_MATCH ->
+            "${selectedModel.displayName} (${resolvedModel.displayName})"
+        else -> selectedModel.displayName
+    }
 
     FilledTonalButton(
         onClick = { showSheet = true },
-        modifier = modifier,
+        modifier = modifier.testTag(ForecastTestTags.MODEL_SELECTOR_BUTTON),
     ) {
         Icon(
             imageVector = Icons.Outlined.Tune,
@@ -118,7 +125,9 @@ private fun ModelOptionRow(
 ) {
     androidx.compose.material3.Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ForecastTestTags.MODEL_OPTION_PREFIX + model.apiName),
         color = if (isSelected) {
             MaterialTheme.colorScheme.secondaryContainer
         } else {

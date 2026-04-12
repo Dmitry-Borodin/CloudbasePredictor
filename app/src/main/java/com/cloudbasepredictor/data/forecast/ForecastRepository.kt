@@ -15,7 +15,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 interface ForecastRepository {
-    fun observeForecast(placeId: String): Flow<ForecastSnapshot?>
+    fun observeForecast(placeId: String, model: ForecastModel): Flow<ForecastSnapshot?>
+
+    fun isCached(placeId: String, model: ForecastModel): Boolean
 
     suspend fun loadForecast(
         place: SavedPlace,
@@ -31,10 +33,14 @@ class InMemoryForecastRepository @Inject constructor(
 ) : ForecastRepository {
     private val cachedForecasts = MutableStateFlow<Map<String, ForecastSnapshot>>(emptyMap())
 
-    override fun observeForecast(placeId: String): Flow<ForecastSnapshot?> {
+    override fun observeForecast(placeId: String, model: ForecastModel): Flow<ForecastSnapshot?> {
         return cachedForecasts
-            .map { forecasts -> forecasts[placeId] }
+            .map { forecasts -> forecasts[cacheKey(placeId, model)] }
             .distinctUntilChanged()
+    }
+
+    override fun isCached(placeId: String, model: ForecastModel): Boolean {
+        return cachedForecasts.value.containsKey(cacheKey(placeId, model))
     }
 
     override suspend fun loadForecast(
@@ -42,7 +48,8 @@ class InMemoryForecastRepository @Inject constructor(
         forceRefresh: Boolean,
         model: ForecastModel,
     ) = withContext(ioDispatcher) {
-        if (!forceRefresh && cachedForecasts.value.containsKey(place.id)) {
+        val key = cacheKey(place.id, model)
+        if (!forceRefresh && cachedForecasts.value.containsKey(key)) {
             return@withContext
         }
 
@@ -59,6 +66,10 @@ class InMemoryForecastRepository @Inject constructor(
             resolvedModel = resolvedModel,
         )
 
-        cachedForecasts.value = cachedForecasts.value + (place.id to snapshot)
+        cachedForecasts.value = cachedForecasts.value + (key to snapshot)
+    }
+
+    private fun cacheKey(placeId: String, model: ForecastModel): String {
+        return "$placeId:${model.apiName}"
     }
 }

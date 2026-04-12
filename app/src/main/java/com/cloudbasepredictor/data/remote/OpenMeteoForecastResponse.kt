@@ -13,11 +13,11 @@ data class OpenMeteoForecastResponse(
 data class OpenMeteoDailyResponse(
     val time: List<String>,
     @SerialName("temperature_2m_max")
-    val temperatureMaxCelsius: List<Double>,
+    val temperatureMaxCelsius: List<Double?>,
     @SerialName("temperature_2m_min")
-    val temperatureMinCelsius: List<Double>,
+    val temperatureMinCelsius: List<Double?>,
     @SerialName("weather_code")
-    val weatherCodes: List<Int>,
+    val weatherCodes: List<Int?>,
 )
 
 fun OpenMeteoForecastResponse.toDomainModels(): List<DailyForecast> {
@@ -32,12 +32,15 @@ fun OpenMeteoForecastResponse.toDomainModels(): List<DailyForecast> {
         "Open-Meteo response contains mismatched weather code data."
     }
 
-    return List(itemsCount) { index ->
+    return (0 until itemsCount).mapNotNull { index ->
+        val maxTemp = daily.temperatureMaxCelsius[index] ?: return@mapNotNull null
+        val minTemp = daily.temperatureMinCelsius[index] ?: return@mapNotNull null
+        val weatherCode = daily.weatherCodes[index] ?: return@mapNotNull null
         DailyForecast(
             date = daily.time[index],
-            maxTemperatureCelsius = daily.temperatureMaxCelsius[index],
-            minTemperatureCelsius = daily.temperatureMinCelsius[index],
-            weatherCode = daily.weatherCodes[index],
+            maxTemperatureCelsius = maxTemp,
+            minTemperatureCelsius = minTemp,
+            weatherCode = weatherCode,
         )
     }
 }

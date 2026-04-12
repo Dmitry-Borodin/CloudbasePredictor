@@ -89,11 +89,16 @@ class ForecastViewModel @Inject constructor(
 
     private val selectedPlace = placeRepository.selectedPlace
 
-    private val selectedForecast = selectedPlace.flatMapLatest { place ->
+    private val selectedForecast = combine(
+        selectedPlace,
+        forecastModelRepository.selectedModel,
+    ) { place, model ->
+        place to model
+    }.flatMapLatest { (place, model) ->
         if (place == null) {
             flowOf(null)
         } else {
-            forecastRepository.observeForecast(place.id)
+            forecastRepository.observeForecast(place.id, model)
         }
     }
 
@@ -174,26 +179,32 @@ class ForecastViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            selectedPlace.collect { place ->
-                selectedDayIndex.value = 0
-                errorMessage.value = null
+            combine(
+                selectedPlace,
+                forecastModelRepository.selectedModel,
+            ) { place, model -> place to model }
+                .collect { (place, model) ->
+                    errorMessage.value = null
 
-                if (place == null) {
+                    if (place == null) {
+                        isLoading.value = false
+                        return@collect
+                    }
+
+                    if (forecastRepository.isCached(place.id, model)) {
+                        isLoading.value = false
+                        return@collect
+                    }
+
+                    isLoading.value = true
+                    runCatching {
+                        forecastRepository.loadForecast(place, model = model)
+                    }.onFailure { throwable ->
+                        errorMessage.value =
+                            throwable.message ?: "Unable to load forecast right now."
+                    }
                     isLoading.value = false
-                    return@collect
                 }
-
-                isLoading.value = true
-                runCatching {
-                    forecastRepository.loadForecast(
-                        place,
-                        model = forecastModelRepository.selectedModel.value,
-                    )
-                }.onFailure { throwable ->
-                    errorMessage.value = throwable.message ?: "Unable to load forecast right now."
-                }
-                isLoading.value = false
-            }
         }
     }
 
@@ -231,17 +242,6 @@ class ForecastViewModel @Inject constructor(
 
     fun selectModel(model: ForecastModel) {
         forecastModelRepository.selectModel(model)
-        val place = selectedPlace.value ?: return
-        errorMessage.value = null
-        viewModelScope.launch {
-            isLoading.value = true
-            runCatching {
-                forecastRepository.loadForecast(place, forceRefresh = true, model = model)
-            }.onFailure { throwable ->
-                errorMessage.value = throwable.message ?: "Unable to load forecast right now."
-            }
-            isLoading.value = false
-        }
     }
 
     fun retryLoad() {
