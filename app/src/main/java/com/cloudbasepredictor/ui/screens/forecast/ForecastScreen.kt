@@ -27,6 +27,7 @@ fun ForecastRoute(
         uiState = uiState,
         onDateSelected = viewModel::selectDay,
         onForecastModeSelected = viewModel::selectForecastMode,
+        onForecastViewportTopChanged = viewModel::updateChartTopAltitude,
         onOpenMap = onOpenMap,
     )
 }
@@ -36,6 +37,7 @@ fun ForecastScreen(
     uiState: ForecastUiState,
     onDateSelected: (Int) -> Unit,
     onForecastModeSelected: (ForecastMode) -> Unit = {},
+    onForecastViewportTopChanged: (Float) -> Unit = {},
     onOpenMap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -53,24 +55,28 @@ fun ForecastScreen(
             ForecastMode.THERMIC -> {
                 ThermicForecastView(
                     uiState = uiState,
+                    onVisibleTopAltitudeChange = onForecastViewportTopChanged,
                     modifier = Modifier.weight(1f),
                 )
             }
             ForecastMode.STUVE -> {
                 StuveForecastView(
                     uiState = uiState,
+                    onVisibleTopAltitudeChange = onForecastViewportTopChanged,
                     modifier = Modifier.weight(1f),
                 )
             }
             ForecastMode.WIND -> {
                 WindForecastView(
                     uiState = uiState,
+                    onVisibleTopAltitudeChange = onForecastViewportTopChanged,
                     modifier = Modifier.weight(1f),
                 )
             }
             ForecastMode.CLOUD -> {
                 CloudForecastView(
                     uiState = uiState,
+                    onVisibleTopAltitudeChange = onForecastViewportTopChanged,
                     modifier = Modifier.weight(1f),
                 )
             }

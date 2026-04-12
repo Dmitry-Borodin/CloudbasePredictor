@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class ForecastDayChipUiModel(
@@ -35,6 +36,7 @@ data class ForecastUiState(
     val selectedPlace: SavedPlace? = null,
     val selectedForecastMode: ForecastMode = ForecastMode.THERMIC,
     val selectedDayIndex: Int = 0,
+    val chartViewport: ForecastChartViewport = ForecastChartViewport(),
     val dayChips: List<ForecastDayChipUiModel> = placeholderDayChips(),
     val forecastText: String = "Select a point on the map to open a forecast.",
     val isLoading: Boolean = false,
@@ -49,6 +51,7 @@ class ForecastViewModel @Inject constructor(
     private val forecastModeRepository: ForecastModeRepository,
 ) : ViewModel() {
     private val selectedDayIndex = MutableStateFlow(0)
+    private val chartViewport = MutableStateFlow(ForecastChartViewport())
     private val isLoading = MutableStateFlow(false)
     private val errorMessage = MutableStateFlow<String?>(null)
 
@@ -69,26 +72,37 @@ class ForecastViewModel @Inject constructor(
         mode to dayIndex
     }
 
+    private val chartContext = combine(
+        selectedModeWithDayIndex,
+        chartViewport,
+    ) { selectedModeAndDayIndex, currentChartViewport ->
+        ForecastChartContext(
+            selectedForecastMode = selectedModeAndDayIndex.first,
+            selectedDayIndex = selectedModeAndDayIndex.second,
+            chartViewport = currentChartViewport,
+        )
+    }
+
     val uiState: StateFlow<ForecastUiState> = combine(
         selectedPlace,
         selectedForecast,
-        selectedModeWithDayIndex,
+        chartContext,
         isLoading,
         errorMessage,
-    ) { place, snapshot, selectedModeAndDayIndex, loading, currentError ->
-        val (selectedForecastMode, dayIndex) = selectedModeAndDayIndex
+    ) { place, snapshot, currentChartContext, loading, currentError ->
         val dayChips = snapshot?.days?.let(::buildDayChips)
             ?.takeIf { it.isNotEmpty() }
             ?: placeholderDayChips()
-        val safeDayIndex = dayIndex.coerceIn(0, dayChips.lastIndex)
+        val safeDayIndex = currentChartContext.selectedDayIndex.coerceIn(0, dayChips.lastIndex)
 
         ForecastUiState(
             selectedPlace = place,
-            selectedForecastMode = selectedForecastMode,
+            selectedForecastMode = currentChartContext.selectedForecastMode,
             selectedDayIndex = safeDayIndex,
+            chartViewport = currentChartContext.chartViewport,
             dayChips = dayChips,
             forecastText = buildForecastText(
-                mode = selectedForecastMode,
+                mode = currentChartContext.selectedForecastMode,
                 place = place,
                 snapshot = snapshot,
                 selectedDayIndex = safeDayIndex,
@@ -132,7 +146,19 @@ class ForecastViewModel @Inject constructor(
     fun selectForecastMode(mode: ForecastMode) {
         forecastModeRepository.selectMode(mode)
     }
+
+    fun updateChartTopAltitude(topAltitudeKm: Float) {
+        chartViewport.update { currentViewport ->
+            currentViewport.withVisibleTopAltitudeKm(topAltitudeKm)
+        }
+    }
 }
+
+private data class ForecastChartContext(
+    val selectedForecastMode: ForecastMode,
+    val selectedDayIndex: Int,
+    val chartViewport: ForecastChartViewport,
+)
 
 private fun buildForecastText(
     mode: ForecastMode,

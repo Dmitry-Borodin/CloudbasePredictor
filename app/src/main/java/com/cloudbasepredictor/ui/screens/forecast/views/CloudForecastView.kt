@@ -9,38 +9,38 @@ import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
-internal fun ThermicForecastView(
+internal fun CloudForecastView(
     uiState: ForecastUiState,
     onVisibleTopAltitudeChange: (Float) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     ForecastGridCard(
         uiState = uiState,
-        mode = ForecastMode.THERMIC,
-        title = "Thermic layers",
+        mode = ForecastMode.CLOUD,
+        title = "Cloud layers",
         minAltitudeKm = 1.0f,
         onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
         modifier = modifier,
     )
 }
 
-@Preview(name = "Thermic Default", showBackground = true, widthDp = 420, heightDp = 720)
+@Preview(name = "Cloud Default", showBackground = true, widthDp = 420, heightDp = 720)
 @Composable
-private fun ThermicForecastViewPreview() {
+private fun CloudForecastViewPreview() {
     CloudbasePredictorTheme {
-        ThermicForecastView(
-            uiState = PreviewData.forecastUiStateForMode(ForecastMode.THERMIC),
+        CloudForecastView(
+            uiState = PreviewData.forecastUiStateForMode(ForecastMode.CLOUD),
         )
     }
 }
 
-@Preview(name = "Thermic Zoomed Out", showBackground = true, widthDp = 420, heightDp = 720)
+@Preview(name = "Cloud Zoomed Out", showBackground = true, widthDp = 420, heightDp = 720)
 @Composable
-private fun ThermicForecastViewZoomedOutPreview() {
+private fun CloudForecastViewZoomedOutPreview() {
     CloudbasePredictorTheme {
-        ThermicForecastView(
+        CloudForecastView(
             uiState = PreviewData.forecastUiStateForMode(
-                mode = ForecastMode.THERMIC,
+                mode = ForecastMode.CLOUD,
                 topAltitudeKm = 6.5f,
             ),
         )

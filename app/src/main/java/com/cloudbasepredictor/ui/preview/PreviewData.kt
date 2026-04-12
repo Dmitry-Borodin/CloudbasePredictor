@@ -2,7 +2,9 @@ package com.cloudbasepredictor.ui.preview
 
 import com.cloudbasepredictor.model.DailyForecast
 import com.cloudbasepredictor.model.ForecastSnapshot
+import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.model.SavedPlace
+import com.cloudbasepredictor.ui.screens.forecast.ForecastChartViewport
 import com.cloudbasepredictor.ui.screens.forecast.ForecastDayChipUiModel
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.screens.map.MapUiState
@@ -59,6 +61,39 @@ object PreviewData {
         isLoading = true,
         errorMessage = null,
     )
+
+    val forecastZoomedOutUiState = forecastReadyUiState.copy(
+        chartViewport = ForecastChartViewport(visibleTopAltitudeKm = 6.5f),
+        forecastText = "Zoomed-out layered forecast preview with extended altitude range.",
+    )
+
+    val forecastErrorUiState = forecastReadyUiState.copy(
+        selectedDayIndex = 1,
+        forecastText = "Forecast content is unavailable.",
+        errorMessage = "Unable to refresh forecast layers right now.",
+    )
+
+    fun forecastUiStateForMode(
+        mode: ForecastMode,
+        topAltitudeKm: Float = ForecastChartViewport().visibleTopAltitudeKm,
+        isLoading: Boolean = false,
+        errorMessage: String? = null,
+    ): ForecastUiState {
+        val modeLabel = when (mode) {
+            ForecastMode.THERMIC -> "Thermic"
+            ForecastMode.STUVE -> "Stuve"
+            ForecastMode.WIND -> "Wind"
+            ForecastMode.CLOUD -> "Cloud"
+        }
+
+        return forecastReadyUiState.copy(
+            selectedForecastMode = mode,
+            chartViewport = ForecastChartViewport(visibleTopAltitudeKm = topAltitudeKm),
+            forecastText = "$modeLabel layered forecast preview for Interlaken.",
+            isLoading = isLoading,
+            errorMessage = errorMessage,
+        )
+    }
 
     val mapUiState = MapUiState(
         selectedPlace = savedPlace,
