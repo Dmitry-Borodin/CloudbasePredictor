@@ -3,6 +3,7 @@ package com.cloudbasepredictor.ui.preview
 import com.cloudbasepredictor.model.DailyForecast
 import com.cloudbasepredictor.model.ForecastSnapshot
 import com.cloudbasepredictor.model.ForecastMode
+import com.cloudbasepredictor.model.ForecastModel
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.screens.forecast.ForecastChartViewport
 import com.cloudbasepredictor.ui.screens.forecast.ForecastDayChipUiModel
@@ -80,6 +81,8 @@ object PreviewData {
         forecastText = "Sat in Interlaken. Partly cloudy. High 20.0°C, low 10.2°C.",
         isLoading = false,
         errorMessage = null,
+        selectedModel = ForecastModel.ICON_D2,
+        resolvedModel = ForecastModel.ICON_D2,
     )
 
     val forecastLoadingUiState = ForecastUiState(

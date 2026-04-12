@@ -18,23 +18,35 @@ import kotlin.math.sin
  * view just renders it — no atmospheric math in the view layer.
  */
 data class StuveForecastChartUiModel(
+    /** Pressure levels for the Y-axis, hPa (hectopascals), descending. */
     val pressureLevels: List<Float>,
+    /** Environmental temperature sounding (red line), °C at each pressure level. */
     val temperatureProfile: List<StuveProfilePoint>,
+    /** Environmental dewpoint sounding (blue line), °C at each pressure level. */
     val dewpointProfile: List<StuveProfilePoint>,
+    /** Theoretical parcel ascent path (dashed), dry then moist adiabat, °C. */
     val parcelAscentPath: List<StuveProfilePoint>,
+    /** Wind barbs drawn along the right side of the diagram. */
     val windBarbs: List<StuveWindBarb>,
+    /** Lifting Condensation Level pressure, hPa; null if not computed. */
     val lclPressureHpa: Float?,
+    /** Currently displayed hour of the day (local time, 6–22). */
     val selectedHour: Int,
 )
 
 data class StuveProfilePoint(
+    /** Pressure level, hPa. */
     val pressureHpa: Float,
+    /** Temperature at this pressure level, °C (degrees Celsius). */
     val temperatureC: Float,
 )
 
 data class StuveWindBarb(
+    /** Pressure level, hPa. */
     val pressureHpa: Float,
+    /** Wind speed, km/h. */
     val speedKmh: Float,
+    /** Wind direction, degrees (meteorological: 0/360=N, 90=E — direction FROM). */
     val directionDeg: Float,
 )
 

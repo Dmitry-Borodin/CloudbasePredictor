@@ -1,6 +1,7 @@
 package com.cloudbasepredictor.data.remote
 
 import com.cloudbasepredictor.model.DailyForecast
+import com.cloudbasepredictor.model.ForecastModel
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,5 +17,53 @@ class OpenMeteoRemoteDataSource @Inject constructor(
             latitude = latitude,
             longitude = longitude,
         ).toDomainModels()
+    }
+
+    /**
+     * Fetch hourly + pressure-level forecast for a specific weather model.
+     *
+     * If [model] is [ForecastModel.BEST_MATCH], the `models` query parameter is omitted
+     * so Open-Meteo auto-selects the best model for the location.
+     *
+     * @return [HourlyForecastData] ready for chart construction.
+     * @throws retrofit2.HttpException on API error (e.g. 400 if model unavailable for region).
+     */
+    suspend fun getHourlyForecast(
+        latitude: Double,
+        longitude: Double,
+        model: ForecastModel,
+    ): HourlyForecastData {
+        val modelParam = if (model == ForecastModel.BEST_MATCH) null else model.apiName
+        return openMeteoApi.getHourlyForecast(
+            latitude = latitude,
+            longitude = longitude,
+            models = modelParam,
+        ).toHourlyForecastData()
+    }
+
+    /**
+     * Fetch hourly forecast, falling back through the model's fallback chain
+     * if the requested model is not available for that location.
+     *
+     * Returns a pair of (actualModel, forecastData).
+     */
+    suspend fun getHourlyForecastWithFallback(
+        latitude: Double,
+        longitude: Double,
+        requestedModel: ForecastModel,
+    ): Pair<ForecastModel, HourlyForecastData> {
+        var currentModel = requestedModel
+        while (true) {
+            try {
+                val data = getHourlyForecast(latitude, longitude, currentModel)
+                return currentModel to data
+            } catch (e: retrofit2.HttpException) {
+                if (e.code() == 400 && currentModel != ForecastModel.BEST_MATCH) {
+                    currentModel = ForecastModel.fallbackFor(currentModel)
+                } else {
+                    throw e
+                }
+            }
+        }
     }
 }

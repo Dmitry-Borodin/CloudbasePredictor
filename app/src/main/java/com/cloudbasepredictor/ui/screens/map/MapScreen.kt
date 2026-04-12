@@ -129,113 +129,89 @@ fun MapScreen(
 
     var showFavoritesDialog by rememberSaveable { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    Box(
+        modifier = modifier.fillMaxSize(),
     ) {
-        Text(
-            text = "Map",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Text(
-            text = if (isStyleHostReachable == false) {
-                "Map is temporarily unavailable. Check network and DNS."
-            } else {
-                "Tap anywhere on the OpenFreeMap map to place a marker."
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .clip(RoundedCornerShape(28.dp)),
-        ) {
-            when (isStyleHostReachable) {
-                null -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-                false -> {
-                    MapUnavailableCard(
-                        onRetry = {
-                            availabilityProbeKey++
-                        },
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(16.dp),
-                    )
-                }
-                true -> {
-                    MaplibreMap(
-                        modifier = Modifier.fillMaxSize(),
-                        baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
-                        cameraState = cameraState,
-                        onMapClick = { position, _ ->
-                            onMapTapped(position.latitude, position.longitude)
-                            ClickResult.Consume
-                        },
-                    ) {
-                        val markerSource = rememberGeoJsonSource(
-                            data = GeoJsonData.JsonString(markerData),
-                        )
-                        CircleLayer(
-                            id = "selected-point",
-                            source = markerSource,
-                            color = const(Color(0xFFE64A5B)),
-                            radius = const(9.dp),
-                            strokeColor = const(Color.White),
-                            strokeWidth = const(3.dp),
-                        )
-
-                        val favoritesSource = rememberGeoJsonSource(
-                            data = GeoJsonData.JsonString(favoritesData),
-                        )
-                        CircleLayer(
-                            id = "favorite-points",
-                            source = favoritesSource,
-                            color = const(Color(0xFFFFD700)),
-                            radius = const(10.dp),
-                            strokeColor = const(Color.White),
-                            strokeWidth = const(2.dp),
-                        )
-                    }
+        when (isStyleHostReachable) {
+            null -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
                 }
             }
-
-            FloatingActionButton(
-                onClick = { showFavoritesDialog = true },
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .size(40.dp),
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                contentColor = Color(0xFFFFD700),
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = "Favorites",
-                )
-            }
-
-            uiState.selectedPlace?.let { selectedPlace ->
-                SelectedPointCard(
-                    selectedPlace = selectedPlace,
-                    onOpenForecast = onOpenForecast,
+            false -> {
+                MapUnavailableCard(
+                    onRetry = {
+                        availabilityProbeKey++
+                    },
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
+                        .align(Alignment.Center)
                         .padding(16.dp),
                 )
             }
+            true -> {
+                MaplibreMap(
+                    modifier = Modifier.fillMaxSize(),
+                    baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
+                    cameraState = cameraState,
+                    onMapClick = { position, _ ->
+                        onMapTapped(position.latitude, position.longitude)
+                        ClickResult.Consume
+                    },
+                ) {
+                    val markerSource = rememberGeoJsonSource(
+                        data = GeoJsonData.JsonString(markerData),
+                    )
+                    CircleLayer(
+                        id = "selected-point",
+                        source = markerSource,
+                        color = const(Color(0xFFE64A5B)),
+                        radius = const(9.dp),
+                        strokeColor = const(Color.White),
+                        strokeWidth = const(3.dp),
+                    )
+
+                    val favoritesSource = rememberGeoJsonSource(
+                        data = GeoJsonData.JsonString(favoritesData),
+                    )
+                    CircleLayer(
+                        id = "favorite-points",
+                        source = favoritesSource,
+                        color = const(Color(0xFFFFD700)),
+                        radius = const(10.dp),
+                        strokeColor = const(Color.White),
+                        strokeWidth = const(2.dp),
+                    )
+                }
+            }
+        }
+
+        FloatingActionButton(
+            onClick = { showFavoritesDialog = true },
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(12.dp)
+                .size(40.dp),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+            contentColor = Color(0xFFFFD700),
+            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = "Favorites",
+            )
+        }
+
+        uiState.selectedPlace?.let { selectedPlace ->
+            SelectedPointCard(
+                selectedPlace = selectedPlace,
+                onOpenForecast = onOpenForecast,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
+            )
         }
     }
 

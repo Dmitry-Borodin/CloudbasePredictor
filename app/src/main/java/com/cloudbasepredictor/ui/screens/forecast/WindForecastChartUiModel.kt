@@ -11,15 +11,22 @@ import kotlin.math.sin
  * 0/360 = N, 90 = E, 180 = S, 270 = W — the direction the wind is coming FROM).
  */
 data class WindForecastChartUiModel(
+    /** Local hours of day (e.g. 6..22). */
     val hours: List<Int>,
+    /** Altitude bands, km AGL (above ground level). */
     val altitudeBandsKm: List<Float>,
+    /** Grid cells with wind speed and direction per hour × altitude. */
     val cells: List<WindForecastCellUiModel>,
 )
 
 data class WindForecastCellUiModel(
+    /** Local hour of day (0–23). */
     val hour: Int,
+    /** Altitude, km AGL. */
     val altitudeKm: Float,
+    /** Wind speed, km/h (kilometres per hour). */
     val speedKmh: Float,
+    /** Wind direction, degrees (meteorological: 0/360=N, 90=E, 180=S, 270=W — FROM). */
     val directionDeg: Float,
 )
 

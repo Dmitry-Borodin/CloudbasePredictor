@@ -11,21 +11,31 @@ import kotlin.math.sin
  * plus precipitation probability and amount below the chart.
  */
 data class CloudForecastChartUiModel(
+    /** Local hours of day (e.g. 6..22). */
     val hours: List<Int>,
+    /** Cloud coverage per hour, split into low / mid / high layers. */
     val layers: List<CloudLayerUiModel>,
+    /** Precipitation forecast per hour. */
     val precipitation: List<CloudPrecipitationUiModel>,
 )
 
 data class CloudLayerUiModel(
+    /** Local hour of day (0–23). */
     val hour: Int,
+    /** Low cloud coverage (0–3 km AGL), percent (0–100). */
     val lowCloudPercent: Float,
+    /** Mid cloud coverage (3–8 km AGL), percent (0–100). */
     val midCloudPercent: Float,
+    /** High cloud coverage (above 8 km AGL), percent (0–100). */
     val highCloudPercent: Float,
 )
 
 data class CloudPrecipitationUiModel(
+    /** Local hour of day (0–23). */
     val hour: Int,
+    /** Probability of precipitation (>0.1 mm) in preceding hour, percent (0–100). */
     val probabilityPercent: Float,
+    /** Precipitation amount in preceding hour, mm (millimetres). */
     val amountMm: Float,
 )
 

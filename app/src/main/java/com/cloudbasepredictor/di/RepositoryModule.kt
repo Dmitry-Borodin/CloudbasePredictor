@@ -2,8 +2,10 @@ package com.cloudbasepredictor.di
 
 import com.cloudbasepredictor.data.forecast.ForecastRepository
 import com.cloudbasepredictor.data.forecast.ForecastModeRepository
+import com.cloudbasepredictor.data.forecast.ForecastModelRepository
 import com.cloudbasepredictor.data.forecast.InMemoryForecastRepository
 import com.cloudbasepredictor.data.forecast.InMemoryForecastModeRepository
+import com.cloudbasepredictor.data.forecast.InMemoryForecastModelRepository
 import com.cloudbasepredictor.data.place.DefaultPlaceRepository
 import com.cloudbasepredictor.data.place.PlaceRepository
 import dagger.Binds
@@ -32,4 +34,10 @@ abstract class RepositoryModule {
     abstract fun bindForecastModeRepository(
         repository: InMemoryForecastModeRepository,
     ): ForecastModeRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindForecastModelRepository(
+        repository: InMemoryForecastModelRepository,
+    ): ForecastModelRepository
 }

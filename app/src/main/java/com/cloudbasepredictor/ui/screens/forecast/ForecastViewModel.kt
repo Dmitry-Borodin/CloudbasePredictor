@@ -1,12 +1,14 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
 import com.cloudbasepredictor.data.forecast.ForecastModeRepository
+import com.cloudbasepredictor.data.forecast.ForecastModelRepository
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cloudbasepredictor.data.forecast.ForecastRepository
 import com.cloudbasepredictor.data.place.PlaceRepository
 import com.cloudbasepredictor.model.DailyForecast
 import com.cloudbasepredictor.model.ForecastMode
+import com.cloudbasepredictor.model.ForecastModel
 import com.cloudbasepredictor.model.ForecastSnapshot
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.model.WeatherCode
@@ -32,19 +34,43 @@ data class ForecastDayChipUiModel(
     val subtitle: String,
 )
 
+/**
+ * Complete UI state for the forecast screen.
+ *
+ * The screen has three visual states:
+ * - **Loading**: [isLoading] is true — shows progress indicator.
+ * - **Error**: [errorMessage] is non-null — shows error text with retry button.
+ * - **Ready**: neither loading nor error — shows the selected chart.
+ */
 data class ForecastUiState(
+    /** Currently selected place, or null when no location has been chosen. */
     val selectedPlace: SavedPlace? = null,
+    /** Active forecast visualisation mode (thermic / stuve / wind / cloud). */
     val selectedForecastMode: ForecastMode = ForecastMode.THERMIC,
+    /** Zero-based index of the selected forecast day (0 = today). */
     val selectedDayIndex: Int = 0,
+    /** Visible altitude range controlled by pinch-to-zoom. */
     val chartViewport: ForecastChartViewport = ForecastChartViewport(),
+    /** Thermic updraft strength chart data. */
     val thermicChart: ThermicForecastChartUiModel = buildPlaceholderThermicForecastChart(dayIndex = 0),
+    /** Stüve thermodynamic diagram data for the selected hour. */
     val stuveChart: StuveForecastChartUiModel = buildPlaceholderStuveChart(),
+    /** Wind speed & direction chart data. */
     val windChart: WindForecastChartUiModel = buildPlaceholderWindForecastChart(),
+    /** Cloud coverage & precipitation chart data. */
     val cloudChart: CloudForecastChartUiModel = buildPlaceholderCloudForecastChart(),
+    /** Day chips for the date picker (title + subtitle). */
     val dayChips: List<ForecastDayChipUiModel> = placeholderDayChips(),
+    /** Summary text shown at the bottom of the chart. */
     val forecastText: String = "Select a point on the map to open a forecast.",
+    /** True while the forecast is being fetched from the network. */
     val isLoading: Boolean = false,
+    /** Non-null when the last load attempt failed; displayed as error state. */
     val errorMessage: String? = null,
+    /** Weather model requested by the user. */
+    val selectedModel: ForecastModel = ForecastModel.BEST_MATCH,
+    /** Model actually used after fallback (may differ from [selectedModel]). */
+    val resolvedModel: ForecastModel? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -53,6 +79,7 @@ class ForecastViewModel @Inject constructor(
     private val forecastRepository: ForecastRepository,
     private val placeRepository: PlaceRepository,
     private val forecastModeRepository: ForecastModeRepository,
+    private val forecastModelRepository: ForecastModelRepository,
 ) : ViewModel() {
     private val selectedDayIndex = MutableStateFlow(0)
     private val chartViewport = MutableStateFlow(ForecastChartViewport())
@@ -96,7 +123,16 @@ class ForecastViewModel @Inject constructor(
         chartContext,
         isLoading,
         errorMessage,
-    ) { place, snapshot, currentChartContext, loading, currentError ->
+        forecastModelRepository.selectedModel,
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        val place = values[0] as SavedPlace?
+        val snapshot = values[1] as ForecastSnapshot?
+        val currentChartContext = values[2] as ForecastChartContext
+        val loading = values[3] as Boolean
+        val currentError = values[4] as String?
+        val currentModel = values[5] as ForecastModel
+
         val dayChips = snapshot?.days?.let(::buildDayChips)
             ?.takeIf { it.isNotEmpty() }
             ?: placeholderDayChips()
@@ -127,6 +163,8 @@ class ForecastViewModel @Inject constructor(
             ),
             isLoading = loading,
             errorMessage = currentError,
+            selectedModel = currentModel,
+            resolvedModel = snapshot?.resolvedModel,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -147,7 +185,10 @@ class ForecastViewModel @Inject constructor(
 
                 isLoading.value = true
                 runCatching {
-                    forecastRepository.loadForecast(place)
+                    forecastRepository.loadForecast(
+                        place,
+                        model = forecastModelRepository.selectedModel.value,
+                    )
                 }.onFailure { throwable ->
                     errorMessage.value = throwable.message ?: "Unable to load forecast right now."
                 }
@@ -186,6 +227,39 @@ class ForecastViewModel @Inject constructor(
 
     fun updateStuveHour(hour: Int) {
         stuveHour.value = hour.coerceIn(6, 22)
+    }
+
+    fun selectModel(model: ForecastModel) {
+        forecastModelRepository.selectModel(model)
+        val place = selectedPlace.value ?: return
+        errorMessage.value = null
+        viewModelScope.launch {
+            isLoading.value = true
+            runCatching {
+                forecastRepository.loadForecast(place, forceRefresh = true, model = model)
+            }.onFailure { throwable ->
+                errorMessage.value = throwable.message ?: "Unable to load forecast right now."
+            }
+            isLoading.value = false
+        }
+    }
+
+    fun retryLoad() {
+        val place = selectedPlace.value ?: return
+        errorMessage.value = null
+        viewModelScope.launch {
+            isLoading.value = true
+            runCatching {
+                forecastRepository.loadForecast(
+                    place,
+                    forceRefresh = true,
+                    model = forecastModelRepository.selectedModel.value,
+                )
+            }.onFailure { throwable ->
+                errorMessage.value = throwable.message ?: "Unable to load forecast right now."
+            }
+            isLoading.value = false
+        }
     }
 }
 

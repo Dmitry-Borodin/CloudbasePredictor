@@ -2,6 +2,7 @@ package com.cloudbasepredictor.data.forecast
 
 import com.cloudbasepredictor.data.remote.OpenMeteoRemoteDataSource
 import com.cloudbasepredictor.di.IoDispatcher
+import com.cloudbasepredictor.model.ForecastModel
 import com.cloudbasepredictor.model.ForecastSnapshot
 import com.cloudbasepredictor.model.SavedPlace
 import javax.inject.Inject
@@ -16,7 +17,11 @@ import kotlinx.coroutines.withContext
 interface ForecastRepository {
     fun observeForecast(placeId: String): Flow<ForecastSnapshot?>
 
-    suspend fun loadForecast(place: SavedPlace)
+    suspend fun loadForecast(
+        place: SavedPlace,
+        forceRefresh: Boolean = false,
+        model: ForecastModel = ForecastModel.BEST_MATCH,
+    )
 }
 
 @Singleton
@@ -32,18 +37,26 @@ class InMemoryForecastRepository @Inject constructor(
             .distinctUntilChanged()
     }
 
-    override suspend fun loadForecast(place: SavedPlace) = withContext(ioDispatcher) {
-        if (cachedForecasts.value.containsKey(place.id)) {
+    override suspend fun loadForecast(
+        place: SavedPlace,
+        forceRefresh: Boolean,
+        model: ForecastModel,
+    ) = withContext(ioDispatcher) {
+        if (!forceRefresh && cachedForecasts.value.containsKey(place.id)) {
             return@withContext
         }
 
-        val days = openMeteoRemoteDataSource.getForecast(
+        val (resolvedModel, hourlyData) = openMeteoRemoteDataSource.getHourlyForecastWithFallback(
             latitude = place.latitude,
             longitude = place.longitude,
+            requestedModel = model,
         )
+
         val snapshot = ForecastSnapshot(
-            days = days,
+            days = hourlyData.dailyForecasts,
             updatedAtUtcMillis = System.currentTimeMillis(),
+            hourlyData = hourlyData,
+            resolvedModel = resolvedModel,
         )
 
         cachedForecasts.value = cachedForecasts.value + (place.id to snapshot)
