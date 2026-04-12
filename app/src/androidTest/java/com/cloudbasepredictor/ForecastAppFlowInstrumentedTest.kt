@@ -139,6 +139,11 @@ class ForecastAppFlowInstrumentedTest {
     }
 }
 
+/**
+ * Deterministic test harness for forecast flow checks that need a selected place without relying
+ * on the production map provider. This complements, but does not replace, real `MainActivity`
+ * instrumentation coverage.
+ */
 @Composable
 private fun TestMapDestination(
     selectedPlace: SavedPlace?,
