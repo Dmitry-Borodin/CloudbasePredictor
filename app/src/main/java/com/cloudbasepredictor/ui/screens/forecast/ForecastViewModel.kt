@@ -148,16 +148,28 @@ class ForecastViewModel @Inject constructor(
             selectedForecastMode = currentChartContext.selectedForecastMode,
             selectedDayIndex = safeDayIndex,
             chartViewport = currentChartContext.chartViewport,
-            thermicChart = buildPlaceholderThermicForecastChart(dayIndex = safeDayIndex),
-            stuveChart = buildPlaceholderStuveChart(
+            thermicChart = snapshot?.hourlyData?.let {
+                buildThermicChartFromData(it, dayIndex = safeDayIndex)
+            } ?: buildPlaceholderThermicForecastChart(dayIndex = safeDayIndex),
+            stuveChart = snapshot?.hourlyData?.let {
+                buildStuveChartFromData(it, dayIndex = safeDayIndex, hour = currentChartContext.stuveHour)
+            } ?: buildPlaceholderStuveChart(
                 hour = currentChartContext.stuveHour,
                 dayIndex = safeDayIndex,
             ),
-            windChart = buildPlaceholderWindForecastChart(
+            windChart = snapshot?.hourlyData?.let {
+                buildWindChartFromData(
+                    it,
+                    dayIndex = safeDayIndex,
+                    maxAltitudeKm = currentChartContext.chartViewport.visibleTopAltitudeKm,
+                )
+            } ?: buildPlaceholderWindForecastChart(
                 dayIndex = safeDayIndex,
                 maxAltitudeKm = currentChartContext.chartViewport.visibleTopAltitudeKm,
             ),
-            cloudChart = buildPlaceholderCloudForecastChart(dayIndex = safeDayIndex),
+            cloudChart = snapshot?.hourlyData?.let {
+                buildCloudChartFromData(it, dayIndex = safeDayIndex)
+            } ?: buildPlaceholderCloudForecastChart(dayIndex = safeDayIndex),
             dayChips = dayChips,
             forecastText = buildForecastText(
                 mode = currentChartContext.selectedForecastMode,

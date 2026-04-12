@@ -169,13 +169,6 @@ private fun StuveDiagramCanvas(
             color = axisLabelColor.toArgb()
             textSize = with(density) { 10.sp.toPx() }
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
-        }
-    }
-    val heightLabelPaint = remember(density, axisLabelColor) {
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = axisLabelColor.toArgb()
-            textSize = with(density) { 9.sp.toPx() }
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
             textAlign = Paint.Align.RIGHT
         }
     }
@@ -205,7 +198,7 @@ private fun StuveDiagramCanvas(
     }
 
     Canvas(modifier = modifier) {
-        val leftAxisWidth = with(density) { 52.dp.toPx() }
+        val leftAxisWidth = with(density) { 40.dp.toPx() }
         val rightAltitudeWidth = with(density) { 40.dp.toPx() }
         val rightWindWidth = with(density) { 56.dp.toPx() }
         val bottomAxisHeight = with(density) { 28.dp.toPx() }
@@ -248,7 +241,7 @@ private fun StuveDiagramCanvas(
 
         // Isobars (horizontal lines)
         val pressureLabels = listOf(
-            1000f, 900f, 850f, 800f, 700f, 600f, 500f, 400f, 300f, 250f, 200f,
+            1000f, 900f, 850f, 800f, 700f, 600f,
         )
         pressureLabels.forEach { p ->
             val y = pressureToY(p, plotTop, plotBottom)
@@ -323,6 +316,8 @@ private fun StuveDiagramCanvas(
             plotBottom = plotBottom,
             color = Color(0xFFDD2222),
             strokeWidth = 2.5f.dp.toPx(),
+            drawDataDots = true,
+            dataDotRadius = 4.dp.toPx(),
         )
 
         // Dewpoint profile (blue)
@@ -336,6 +331,8 @@ private fun StuveDiagramCanvas(
             plotBottom = plotBottom,
             color = Color(0xFF2255CC),
             strokeWidth = 2f.dp.toPx(),
+            drawDataDots = true,
+            dataDotRadius = 4.dp.toPx(),
         )
 
         // Parcel ascent path (dashed black — thermal prediction line)
@@ -392,27 +389,15 @@ private fun StuveDiagramCanvas(
 
         // --- Axis labels ---
         drawIntoCanvas { canvas ->
-            // Pressure + height labels (left axis)
+            // Pressure labels (left axis — pressure only)
             pressureLabels.forEach { p ->
                 val y = pressureToY(p, plotTop, plotBottom)
                 if (y in plotTop..plotBottom) {
                     canvas.nativeCanvas.drawText(
                         "${p.toInt()}",
-                        leftAxisWidth - 30.dp.toPx(),
+                        leftAxisWidth - 4.dp.toPx(),
                         y + axisLabelPaint.textSize * 0.35f,
                         axisLabelPaint,
-                    )
-                    val heightM = pressureToApproxHeightMeters(p)
-                    val heightLabel = if (heightM >= 1000) {
-                        String.format(Locale.US, "%.1fk", heightM / 1000f)
-                    } else {
-                        "${heightM}m"
-                    }
-                    canvas.nativeCanvas.drawText(
-                        heightLabel,
-                        leftAxisWidth - 4.dp.toPx(),
-                        y + heightLabelPaint.textSize * 0.35f,
-                        heightLabelPaint,
                     )
                 }
             }
@@ -512,7 +497,7 @@ private fun StuveDiagramCanvas(
 
 // --- Coordinate mapping ---
 
-private const val STUVE_TOP_PRESSURE = 200f
+private const val STUVE_TOP_PRESSURE = 600f
 private const val STUVE_BOTTOM_PRESSURE = 1050f
 private const val STUVE_KAPPA = 0.286f
 
@@ -663,6 +648,8 @@ private fun DrawScope.drawProfile(
     strokeWidth: Float,
     dashOn: Float? = null,
     dashOff: Float? = null,
+    drawDataDots: Boolean = false,
+    dataDotRadius: Float = 0f,
 ) {
     val offsets = points.map { pt ->
         Offset(
@@ -688,6 +675,22 @@ private fun DrawScope.drawProfile(
                 strokeWidth = strokeWidth,
                 pathEffect = pathEffect,
             )
+        }
+    }
+
+    // Draw dots at real backend data points
+    if (drawDataDots && dataDotRadius > 0f) {
+        points.forEachIndexed { i, pt ->
+            if (pt.isRealData) {
+                val offset = offsets[i]
+                if (offset.x in plotLeft..plotRight && offset.y in plotTop..plotBottom) {
+                    drawCircle(
+                        color = color,
+                        radius = dataDotRadius,
+                        center = offset,
+                    )
+                }
+            }
         }
     }
 }

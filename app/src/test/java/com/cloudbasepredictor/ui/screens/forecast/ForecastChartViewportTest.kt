@@ -17,11 +17,11 @@ class ForecastChartViewportTest {
     @Test
     fun zoomedTopAltitudeKm_keepsDefaultUpperBoundWhenZoomingIn() {
         val zoomedInTop = zoomedTopAltitudeKm(
-            currentTopAltitudeKm = 3.4f,
+            currentTopAltitudeKm = 4.4f,
             zoomChange = 1.5f,
         )
 
-        assertEquals(3f, zoomedInTop)
+        assertEquals(4f, zoomedInTop)
     }
 
     @Test
@@ -29,7 +29,7 @@ class ForecastChartViewportTest {
         val viewport = ForecastChartViewport()
 
         assertEquals(
-            3f,
+            4f,
             viewport.withVisibleTopAltitudeKm(Float.NaN).visibleTopAltitudeKm,
         )
     }

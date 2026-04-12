@@ -33,7 +33,7 @@ data class WindForecastCellUiModel(
 internal fun buildPlaceholderWindForecastChart(
     dayIndex: Int = 0,
     minAltitudeKm: Float = 0.4f,
-    maxAltitudeKm: Float = 3f,
+    maxAltitudeKm: Float = 4f,
     altitudeStepKm: Float = 0.25f,
 ): WindForecastChartUiModel {
     val hours = (6..22).toList()

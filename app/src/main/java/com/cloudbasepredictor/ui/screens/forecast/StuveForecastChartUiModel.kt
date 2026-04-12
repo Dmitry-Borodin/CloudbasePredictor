@@ -39,6 +39,8 @@ data class StuveProfilePoint(
     val pressureHpa: Float,
     /** Temperature at this pressure level, °C (degrees Celsius). */
     val temperatureC: Float,
+    /** True when this point comes from real backend model data (not interpolated). */
+    val isRealData: Boolean = false,
 )
 
 data class StuveWindBarb(

@@ -216,19 +216,23 @@ fun MapScreen(
                     contentDescription = "Favorites",
                 )
             }
+        }
 
-            FloatingActionButton(
-                onClick = onOpenSettings,
-                modifier = Modifier.size(40.dp),
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = "Settings",
-                )
-            }
+        FloatingActionButton(
+            onClick = onOpenSettings,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(12.dp)
+                .size(40.dp),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Settings,
+                contentDescription = "Settings",
+            )
         }
 
         uiState.selectedPlace?.let { selectedPlace ->
