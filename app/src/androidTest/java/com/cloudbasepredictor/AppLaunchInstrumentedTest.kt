@@ -19,6 +19,25 @@ class AppLaunchInstrumentedTest {
 
     @Test
     fun appLaunches_andHomeScreenIsVisible() {
+        assertMapHomeVisible()
+    }
+
+    @Test
+    fun bottomNavigation_opensForecastScreen() {
+        composeRule.onNodeWithContentDescription("Forecast", useUnmergedTree = true).performClick()
+        composeRule.onNodeWithText("No location selected").assertIsDisplayed()
+    }
+
+    @Test
+    fun forecastTopBarMapButton_returnsToMapScreen() {
+        composeRule.onNodeWithContentDescription("Forecast", useUnmergedTree = true).performClick()
+        composeRule.onNodeWithText("No location selected").assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription("Open map", useUnmergedTree = true).performClick()
+        assertMapHomeVisible()
+    }
+
+    private fun assertMapHomeVisible() {
         composeRule.waitUntil(timeoutMillis = 8_000) {
             composeRule.onAllNodesWithText(
                 "Tap anywhere on the OpenFreeMap map to place a marker.",
@@ -37,11 +56,5 @@ class AppLaunchInstrumentedTest {
             useUnmergedTree = true,
         ).fetchSemanticsNodes().isNotEmpty()
         assertTrue(mapInstructionVisible || mapUnavailableVisible)
-    }
-
-    @Test
-    fun bottomNavigation_opensForecastScreen() {
-        composeRule.onNodeWithContentDescription("Forecast", useUnmergedTree = true).performClick()
-        composeRule.onNodeWithText("No location selected").assertIsDisplayed()
     }
 }

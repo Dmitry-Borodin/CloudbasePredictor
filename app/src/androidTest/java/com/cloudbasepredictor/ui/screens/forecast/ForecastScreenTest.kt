@@ -21,6 +21,7 @@ class ForecastScreenTest {
                 ForecastScreen(
                     uiState = PreviewData.forecastReadyUiState,
                     onDateSelected = {},
+                    onOpenMap = {},
                 )
             }
         }
@@ -49,6 +50,7 @@ class ForecastScreenTest {
                 ForecastScreen(
                     uiState = uiState,
                     onDateSelected = { selectedIndex = it },
+                    onOpenMap = {},
                 )
             }
         }
@@ -66,6 +68,7 @@ class ForecastScreenTest {
                 ForecastScreen(
                     uiState = PreviewData.forecastLoadingUiState,
                     onDateSelected = {},
+                    onOpenMap = {},
                 )
             }
         }

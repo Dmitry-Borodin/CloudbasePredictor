@@ -39,6 +39,7 @@ import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
 fun ForecastRoute(
+    onOpenMap: () -> Unit,
     viewModel: ForecastViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -46,6 +47,7 @@ fun ForecastRoute(
     ForecastScreen(
         uiState = uiState,
         onDateSelected = viewModel::selectDay,
+        onOpenMap = onOpenMap,
     )
 }
 
@@ -54,6 +56,7 @@ fun ForecastRoute(
 fun ForecastScreen(
     uiState: ForecastUiState,
     onDateSelected: (Int) -> Unit,
+    onOpenMap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -64,10 +67,10 @@ fun ForecastScreen(
                 Text(text = uiState.selectedPlace?.name ?: "Forecast")
             },
             actions = {
-                IconButton(onClick = {}) {
+                IconButton(onClick = onOpenMap) {
                     Icon(
                         imageVector = Icons.Outlined.Map,
-                        contentDescription = "Map",
+                        contentDescription = "Open map",
                     )
                 }
                 IconButton(onClick = {}) {
@@ -170,6 +173,7 @@ private fun ForecastScreenPreview() {
         ForecastScreen(
             uiState = PreviewData.forecastReadyUiState,
             onDateSelected = {},
+            onOpenMap = {},
         )
     }
 }

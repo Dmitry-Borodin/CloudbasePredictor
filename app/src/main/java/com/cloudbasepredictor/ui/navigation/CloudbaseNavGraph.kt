@@ -22,8 +22,8 @@ fun CloudbaseNavGraph(
     mapDestination: @Composable (onOpenForecast: () -> Unit) -> Unit = { onOpenForecast ->
         MapRoute(onOpenForecast = onOpenForecast)
     },
-    forecastDestination: @Composable () -> Unit = {
-        ForecastRoute()
+    forecastDestination: @Composable (onOpenMap: () -> Unit) -> Unit = { onOpenMap ->
+        ForecastRoute(onOpenMap = onOpenMap)
     },
 ) {
     NavHost(
@@ -39,7 +39,18 @@ fun CloudbaseNavGraph(
             }
         }
         composable(route = TopLevelDestination.Forecast.route) {
-            forecastDestination()
+            forecastDestination {
+                val popped = navController.popBackStack(
+                    route = TopLevelDestination.Map.route,
+                    inclusive = false,
+                )
+                if (!popped) {
+                    navController.navigate(TopLevelDestination.Map.route) {
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            }
         }
     }
 }
@@ -51,7 +62,7 @@ private fun CloudbaseNavGraphPreview() {
         val navController = rememberNavController()
         CloudbaseNavGraph(
             navController = navController,
-            mapDestination = {
+            mapDestination = { _ ->
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
@@ -59,7 +70,7 @@ private fun CloudbaseNavGraphPreview() {
                     Text(text = "Map destination preview")
                 }
             },
-            forecastDestination = {
+            forecastDestination = { _ ->
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
