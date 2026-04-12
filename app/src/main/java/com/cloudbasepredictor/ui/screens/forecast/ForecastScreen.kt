@@ -92,7 +92,7 @@ fun ForecastScreen(
                 }
             }
 
-            ForecastHelpOverlay(
+            HelpButtonOverlay(
                 uiState = uiState,
                 modifier = Modifier
                     .align(Alignment.BottomStart)

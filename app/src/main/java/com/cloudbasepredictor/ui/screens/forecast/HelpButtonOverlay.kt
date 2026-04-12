@@ -26,7 +26,7 @@ import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.HELP_BUTTON
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
-internal fun ForecastHelpOverlay(
+internal fun HelpButtonOverlay(
     uiState: ForecastUiState,
     modifier: Modifier = Modifier,
 ) {
@@ -146,9 +146,9 @@ private data class ForecastHelpContent(
 
 @Preview(name = "Forecast Help Overlay", showBackground = true)
 @Composable
-private fun ForecastHelpOverlayPreview() {
+private fun HelpButtonOverlayPreview() {
     CloudbasePredictorTheme {
-        ForecastHelpOverlay(
+        HelpButtonOverlay(
             uiState = PreviewData.forecastUiStateForMode(ForecastMode.THERMIC),
         )
     }
@@ -156,9 +156,9 @@ private fun ForecastHelpOverlayPreview() {
 
 @Preview(name = "Forecast Help Overlay Error", showBackground = true)
 @Composable
-private fun ForecastHelpOverlayErrorPreview() {
+private fun HelpButtonOverlayErrorPreview() {
     CloudbasePredictorTheme {
-        ForecastHelpOverlay(
+        HelpButtonOverlay(
             uiState = PreviewData.forecastUiStateForMode(
                 mode = ForecastMode.CLOUD,
                 errorMessage = "Unable to refresh forecast layers right now.",
