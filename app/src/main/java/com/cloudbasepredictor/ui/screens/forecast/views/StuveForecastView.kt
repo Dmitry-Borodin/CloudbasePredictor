@@ -13,8 +13,8 @@ import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 @Composable
 internal fun StuveForecastView(
     uiState: ForecastUiState,
-    onVisibleTopAltitudeChange: (Float) -> Unit = {},
     modifier: Modifier = Modifier,
+    onVisibleTopAltitudeChange: (Float) -> Unit = {},
 ) {
     ForecastGridCard(
         uiState = uiState,

@@ -38,8 +38,8 @@ import kotlin.math.max
 @Composable
 internal fun ThermicForecastView(
     uiState: ForecastUiState,
-    onVisibleTopAltitudeChange: (Float) -> Unit = {},
     modifier: Modifier = Modifier,
+    onVisibleTopAltitudeChange: (Float) -> Unit = {},
 ) {
     ForecastChartCard(
         uiState = uiState,
