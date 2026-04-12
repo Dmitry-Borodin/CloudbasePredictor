@@ -193,23 +193,61 @@ class ForecastViewModel @Inject constructor(
 
                     if (forecastRepository.isCached(place.id, model)) {
                         isLoading.value = false
+                        // Prefetch full range in background if only quick load was done.
+                        if (!forecastRepository.isFullyCached(place.id, model)) {
+                            prefetchFullForecast(place, model)
+                        }
                         return@collect
                     }
 
                     isLoading.value = true
                     runCatching {
-                        forecastRepository.loadForecast(place, model = model)
+                        forecastRepository.loadForecast(
+                            place, model = model, forecastDays = 2,
+                        )
                     }.onFailure { throwable ->
                         errorMessage.value =
                             throwable.message ?: "Unable to load forecast right now."
                     }
                     isLoading.value = false
+
+                    // Prefetch full range in background.
+                    if (errorMessage.value == null) {
+                        prefetchFullForecast(place, model)
+                    }
                 }
+        }
+    }
+
+    private fun prefetchFullForecast(place: SavedPlace, model: ForecastModel) {
+        viewModelScope.launch {
+            runCatching {
+                forecastRepository.loadForecast(
+                    place, model = model, forecastDays = 7,
+                )
+            }
         }
     }
 
     fun selectDay(index: Int) {
         selectedDayIndex.value = index
+        // If the selected day is beyond the currently loaded range, trigger a full load.
+        val place = selectedPlace.value ?: return
+        val model = forecastModelRepository.selectedModel.value
+        if (!forecastRepository.isFullyCached(place.id, model) && index >= 2) {
+            viewModelScope.launch {
+                isLoading.value = true
+                runCatching {
+                    forecastRepository.loadForecast(
+                        place, model = model, forecastDays = 7,
+                    )
+                }.onFailure { throwable ->
+                    errorMessage.value =
+                        throwable.message ?: "Unable to load forecast right now."
+                }
+                isLoading.value = false
+            }
+        }
     }
 
     fun selectForecastMode(mode: ForecastMode) {
@@ -246,6 +284,7 @@ class ForecastViewModel @Inject constructor(
 
     fun retryLoad() {
         val place = selectedPlace.value ?: return
+        val model = forecastModelRepository.selectedModel.value
         errorMessage.value = null
         viewModelScope.launch {
             isLoading.value = true
@@ -253,12 +292,17 @@ class ForecastViewModel @Inject constructor(
                 forecastRepository.loadForecast(
                     place,
                     forceRefresh = true,
-                    model = forecastModelRepository.selectedModel.value,
+                    model = model,
+                    forecastDays = 2,
                 )
             }.onFailure { throwable ->
                 errorMessage.value = throwable.message ?: "Unable to load forecast right now."
             }
             isLoading.value = false
+
+            if (errorMessage.value == null) {
+                prefetchFullForecast(place, model)
+            }
         }
     }
 }

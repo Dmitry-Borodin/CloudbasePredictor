@@ -1,5 +1,7 @@
 package com.cloudbasepredictor.di
 
+import com.cloudbasepredictor.data.datasource.DataSourceRepository
+import com.cloudbasepredictor.data.datasource.InMemoryDataSourceRepository
 import com.cloudbasepredictor.data.forecast.ForecastRepository
 import com.cloudbasepredictor.data.forecast.ForecastModeRepository
 import com.cloudbasepredictor.data.forecast.ForecastModelRepository
@@ -40,4 +42,10 @@ abstract class RepositoryModule {
     abstract fun bindForecastModelRepository(
         repository: InMemoryForecastModelRepository,
     ): ForecastModelRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDataSourceRepository(
+        repository: InMemoryDataSourceRepository,
+    ): DataSourceRepository
 }

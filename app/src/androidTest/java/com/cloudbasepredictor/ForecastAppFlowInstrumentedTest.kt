@@ -58,7 +58,7 @@ class ForecastAppFlowInstrumentedTest {
                     CloudbaseNavGraph(
                         navController = navController,
                         modifier = modifier,
-                        mapDestination = { onOpenForecast ->
+                        mapDestination = { onOpenForecast, _ ->
                             TestMapDestination(
                                 selectedPlace = selectedPlace,
                                 onSelectLocation = {

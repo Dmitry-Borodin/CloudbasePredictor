@@ -179,6 +179,14 @@ private fun StuveDiagramCanvas(
             textAlign = Paint.Align.RIGHT
         }
     }
+    val altitudeLabelPaint = remember(density, axisLabelColor) {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = axisLabelColor.toArgb()
+            textSize = with(density) { 9.sp.toPx() }
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
+            textAlign = Paint.Align.LEFT
+        }
+    }
     val tempLabelPaint = remember(density, axisLabelColor) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = axisLabelColor.toArgb()
@@ -198,13 +206,14 @@ private fun StuveDiagramCanvas(
 
     Canvas(modifier = modifier) {
         val leftAxisWidth = with(density) { 52.dp.toPx() }
+        val rightAltitudeWidth = with(density) { 40.dp.toPx() }
         val rightWindWidth = with(density) { 56.dp.toPx() }
         val bottomAxisHeight = with(density) { 28.dp.toPx() }
         val topPadding = with(density) { 16.dp.toPx() }
 
         val plotLeft = leftAxisWidth
         val plotTop = topPadding
-        val plotRight = size.width - rightWindWidth
+        val plotRight = size.width - rightAltitudeWidth - rightWindWidth
         val plotBottom = size.height - bottomAxisHeight
         val plotWidth = plotRight - plotLeft
         val plotHeight = plotBottom - plotTop
@@ -371,7 +380,7 @@ private fun StuveDiagramCanvas(
             val y = pressureToY(barb.pressureHpa, plotTop, plotBottom)
             if (y in plotTop..plotBottom) {
                 drawWindBarb(
-                    centerX = plotRight + rightWindWidth / 2f,
+                    centerX = plotRight + rightAltitudeWidth + rightWindWidth / 2f,
                     centerY = y,
                     speedKmh = barb.speedKmh,
                     directionDeg = barb.directionDeg,
@@ -472,9 +481,28 @@ private fun StuveDiagramCanvas(
                     }
                     canvas.nativeCanvas.drawText(
                         "${barb.speedKmh.toInt()}",
-                        plotRight + rightWindWidth / 2f,
+                        plotRight + rightAltitudeWidth + rightWindWidth / 2f,
                         y + with(density) { 22.dp.toPx() },
                         windLabelPaint,
+                    )
+                }
+            }
+
+            // Altitude labels (right axis, meters)
+            pressureLabels.forEach { p ->
+                val y = pressureToY(p, plotTop, plotBottom)
+                if (y in plotTop..plotBottom) {
+                    val heightM = pressureToApproxHeightMeters(p)
+                    val label = if (heightM >= 1000) {
+                        String.format(Locale.US, "%.1fk", heightM / 1000f)
+                    } else {
+                        "${heightM}m"
+                    }
+                    canvas.nativeCanvas.drawText(
+                        label,
+                        plotRight + 4.dp.toPx(),
+                        y + altitudeLabelPaint.textSize * 0.35f,
+                        altitudeLabelPaint,
                     )
                 }
             }
@@ -495,7 +523,7 @@ private fun pressureToY(
 ): Float {
     val pNorm = (pressureHpa.pow(STUVE_KAPPA) - STUVE_TOP_PRESSURE.pow(STUVE_KAPPA)) /
         (STUVE_BOTTOM_PRESSURE.pow(STUVE_KAPPA) - STUVE_TOP_PRESSURE.pow(STUVE_KAPPA))
-    return plotTop + (1f - pNorm) * (plotBottom - plotTop)
+    return plotTop + pNorm * (plotBottom - plotTop)
 }
 
 private fun temperatureToX(

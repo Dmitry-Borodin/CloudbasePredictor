@@ -32,12 +32,14 @@ class OpenMeteoRemoteDataSource @Inject constructor(
         latitude: Double,
         longitude: Double,
         model: ForecastModel,
+        forecastDays: Int = 7,
     ): HourlyForecastData {
         val modelParam = if (model == ForecastModel.BEST_MATCH) null else model.apiName
         return openMeteoApi.getHourlyForecast(
             latitude = latitude,
             longitude = longitude,
             models = modelParam,
+            forecastDays = forecastDays,
         ).toHourlyForecastData()
     }
 
@@ -51,11 +53,12 @@ class OpenMeteoRemoteDataSource @Inject constructor(
         latitude: Double,
         longitude: Double,
         requestedModel: ForecastModel,
+        forecastDays: Int = 7,
     ): Pair<ForecastModel, HourlyForecastData> {
         var currentModel = requestedModel
         while (true) {
             try {
-                val data = getHourlyForecast(latitude, longitude, currentModel)
+                val data = getHourlyForecast(latitude, longitude, currentModel, forecastDays)
                 return currentModel to data
             } catch (e: retrofit2.HttpException) {
                 if (e.code() == 400 && currentModel != ForecastModel.BEST_MATCH) {

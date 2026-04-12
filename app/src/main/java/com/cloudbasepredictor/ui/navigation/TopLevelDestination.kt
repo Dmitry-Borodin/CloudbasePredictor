@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.WbCloudy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -29,6 +31,16 @@ enum class TopLevelDestination(
         route = "forecast",
         label = "Forecast",
         iconVector = Icons.Outlined.WbCloudy,
+    ),
+    Settings(
+        route = "settings",
+        label = "Settings",
+        iconVector = Icons.Outlined.Settings,
+    ),
+    About(
+        route = "about",
+        label = "About",
+        iconVector = Icons.Outlined.Info,
     ),
     ;
 

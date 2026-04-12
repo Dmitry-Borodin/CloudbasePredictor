@@ -3,13 +3,19 @@ package com.cloudbasepredictor.ui.screens.map
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -63,6 +69,7 @@ private const val MAP_STYLE_HOST = "tiles.openfreemap.org"
 @Composable
 fun MapRoute(
     onOpenForecast: () -> Unit,
+    onOpenSettings: () -> Unit,
     viewModel: MapViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -81,6 +88,7 @@ fun MapRoute(
         onOpenForecast = viewModel::openSelectedForecast,
         onFavoriteClick = viewModel::openForecastForPlace,
         onSaveCameraPosition = viewModel::saveCameraPosition,
+        onOpenSettings = onOpenSettings,
     )
 }
 
@@ -91,6 +99,7 @@ fun MapScreen(
     onOpenForecast: () -> Unit,
     onFavoriteClick: (SavedPlace) -> Unit,
     onSaveCameraPosition: (Double, Double, Double) -> Unit,
+    onOpenSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var availabilityProbeKey by remember { mutableIntStateOf(0) }
@@ -188,20 +197,38 @@ fun MapScreen(
             }
         }
 
-        FloatingActionButton(
-            onClick = { showFavoritesDialog = true },
+        Row(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(12.dp)
-                .size(40.dp),
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-            contentColor = Color(0xFFFFD700),
-            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(
-                imageVector = Icons.Filled.Star,
-                contentDescription = "Favorites",
-            )
+            FloatingActionButton(
+                onClick = { showFavoritesDialog = true },
+                modifier = Modifier.size(40.dp),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                contentColor = Color(0xFFFFD700),
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "Favorites",
+                )
+            }
+
+            FloatingActionButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.size(40.dp),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = "Settings",
+                )
+            }
         }
 
         uiState.selectedPlace?.let { selectedPlace ->
@@ -210,6 +237,7 @@ fun MapScreen(
                 onOpenForecast = onOpenForecast,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(16.dp),
             )
         }
