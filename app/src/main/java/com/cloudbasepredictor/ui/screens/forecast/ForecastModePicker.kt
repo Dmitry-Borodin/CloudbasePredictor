@@ -24,9 +24,14 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cloudbasepredictor.model.ForecastMode
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_MODE_TAB
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_MODE_TAB
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_MODE_TAB
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_MODE_TAB
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
@@ -47,24 +52,28 @@ internal fun ForecastModePicker(
             ForecastModePickerItem(
                 icon = Icons.Outlined.WbSunny,
                 contentDescription = "Stuve",
+                testTag = STUVE_MODE_TAB,
                 selected = selectedMode == ForecastMode.STUVE,
                 onClick = { onModeSelected(ForecastMode.STUVE) },
             )
             ForecastModePickerItem(
                 icon = Icons.Outlined.Air,
                 contentDescription = "Wind",
+                testTag = WIND_MODE_TAB,
                 selected = selectedMode == ForecastMode.WIND,
                 onClick = { onModeSelected(ForecastMode.WIND) },
             )
             ForecastModePickerItem(
                 icon = Icons.Outlined.ArrowUpward,
                 contentDescription = "Thermic",
+                testTag = THERMIC_MODE_TAB,
                 selected = selectedMode == ForecastMode.THERMIC,
                 onClick = { onModeSelected(ForecastMode.THERMIC) },
             )
             ForecastModePickerItem(
                 icon = Icons.Outlined.Cloud,
                 contentDescription = "Cloud",
+                testTag = CLOUD_MODE_TAB,
                 selected = selectedMode == ForecastMode.CLOUD,
                 onClick = { onModeSelected(ForecastMode.CLOUD) },
             )
@@ -76,6 +85,7 @@ internal fun ForecastModePicker(
 private fun ForecastModePickerItem(
     icon: ImageVector,
     contentDescription: String,
+    testTag: String,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -92,6 +102,7 @@ private fun ForecastModePickerItem(
 
     Box(
         modifier = Modifier
+            .testTag(testTag)
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .clickable(onClick = onClick)

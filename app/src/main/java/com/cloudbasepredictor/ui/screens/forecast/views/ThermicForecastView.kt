@@ -19,12 +19,14 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ThermicForecastChartUiModel
 import com.cloudbasepredictor.ui.screens.forecast.aggregatedForDisplay
 import com.cloudbasepredictor.ui.screens.forecast.zoomedTopAltitudeKm
@@ -41,7 +43,8 @@ internal fun ThermicForecastView(
 ) {
     ForecastChartCard(
         uiState = uiState,
-        modifier = modifier,
+        title = "Thermic forecast",
+        modifier = modifier.testTag(THERMIC_VIEW),
     ) { chartModifier ->
         ThermicForecastGrid(
             chart = uiState.thermicChart,

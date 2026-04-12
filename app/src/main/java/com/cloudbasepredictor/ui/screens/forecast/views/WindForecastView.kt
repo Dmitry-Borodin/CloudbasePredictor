@@ -2,10 +2,12 @@ package com.cloudbasepredictor.ui.screens.forecast.views
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_VIEW
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
@@ -20,7 +22,7 @@ internal fun WindForecastView(
         title = "Wind layers",
         minAltitudeKm = 0.4f,
         onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
-        modifier = modifier,
+        modifier = modifier.testTag(WIND_VIEW),
     )
 }
 

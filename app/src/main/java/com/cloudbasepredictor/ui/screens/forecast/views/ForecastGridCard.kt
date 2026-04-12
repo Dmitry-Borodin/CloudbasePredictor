@@ -56,6 +56,7 @@ internal fun ForecastGridCard(
 ) {
     ForecastChartCard(
         uiState = uiState,
+        title = title,
         modifier = modifier,
     ) { chartModifier ->
         ForecastRiskGrid(
@@ -71,6 +72,7 @@ internal fun ForecastGridCard(
 @Composable
 internal fun ForecastChartCard(
     uiState: ForecastUiState,
+    title: String,
     modifier: Modifier = Modifier,
     chartContent: @Composable (Modifier) -> Unit,
 ) {
@@ -90,6 +92,17 @@ internal fun ForecastChartCard(
             if (uiState.isLoading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
+
+            Text(
+                text = uiState.selectedPlace?.name ?: "No location selected",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             uiState.errorMessage?.let { message ->
                 Text(
