@@ -37,6 +37,7 @@ fun ForecastRoute(
         onDateSelected = viewModel::selectDay,
         onForecastModeSelected = viewModel::selectForecastMode,
         onForecastViewportTopChanged = viewModel::updateChartTopAltitude,
+        onStuveHourChanged = viewModel::updateStuveHour,
         onSaveFavorite = viewModel::saveFavorite,
         onDeleteFavorite = viewModel::deleteFavorite,
         onOpenMap = onOpenMap,
@@ -49,6 +50,7 @@ fun ForecastScreen(
     onDateSelected: (Int) -> Unit,
     onForecastModeSelected: (ForecastMode) -> Unit = {},
     onForecastViewportTopChanged: (Float) -> Unit = {},
+    onStuveHourChanged: (Int) -> Unit = {},
     onSaveFavorite: (String) -> Unit = {},
     onDeleteFavorite: () -> Unit = {},
     onOpenMap: () -> Unit,
@@ -85,6 +87,7 @@ fun ForecastScreen(
                     StuveForecastView(
                         uiState = uiState,
                         onVisibleTopAltitudeChange = onForecastViewportTopChanged,
+                        onStuveHourChanged = onStuveHourChanged,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

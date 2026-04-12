@@ -38,6 +38,9 @@ data class ForecastUiState(
     val selectedDayIndex: Int = 0,
     val chartViewport: ForecastChartViewport = ForecastChartViewport(),
     val thermicChart: ThermicForecastChartUiModel = buildPlaceholderThermicForecastChart(dayIndex = 0),
+    val stuveChart: StuveForecastChartUiModel = buildPlaceholderStuveChart(),
+    val windChart: WindForecastChartUiModel = buildPlaceholderWindForecastChart(),
+    val cloudChart: CloudForecastChartUiModel = buildPlaceholderCloudForecastChart(),
     val dayChips: List<ForecastDayChipUiModel> = placeholderDayChips(),
     val forecastText: String = "Select a point on the map to open a forecast.",
     val isLoading: Boolean = false,
@@ -53,6 +56,7 @@ class ForecastViewModel @Inject constructor(
 ) : ViewModel() {
     private val selectedDayIndex = MutableStateFlow(0)
     private val chartViewport = MutableStateFlow(ForecastChartViewport())
+    private val stuveHour = MutableStateFlow(12)
     private val isLoading = MutableStateFlow(false)
     private val errorMessage = MutableStateFlow<String?>(null)
 
@@ -76,11 +80,13 @@ class ForecastViewModel @Inject constructor(
     private val chartContext = combine(
         selectedModeWithDayIndex,
         chartViewport,
-    ) { selectedModeAndDayIndex, currentChartViewport ->
+        stuveHour,
+    ) { selectedModeAndDayIndex, currentChartViewport, currentStuveHour ->
         ForecastChartContext(
             selectedForecastMode = selectedModeAndDayIndex.first,
             selectedDayIndex = selectedModeAndDayIndex.second,
             chartViewport = currentChartViewport,
+            stuveHour = currentStuveHour,
         )
     }
 
@@ -102,6 +108,15 @@ class ForecastViewModel @Inject constructor(
             selectedDayIndex = safeDayIndex,
             chartViewport = currentChartContext.chartViewport,
             thermicChart = buildPlaceholderThermicForecastChart(dayIndex = safeDayIndex),
+            stuveChart = buildPlaceholderStuveChart(
+                hour = currentChartContext.stuveHour,
+                dayIndex = safeDayIndex,
+            ),
+            windChart = buildPlaceholderWindForecastChart(
+                dayIndex = safeDayIndex,
+                maxAltitudeKm = currentChartContext.chartViewport.visibleTopAltitudeKm,
+            ),
+            cloudChart = buildPlaceholderCloudForecastChart(dayIndex = safeDayIndex),
             dayChips = dayChips,
             forecastText = buildForecastText(
                 mode = currentChartContext.selectedForecastMode,
@@ -168,12 +183,17 @@ class ForecastViewModel @Inject constructor(
             placeRepository.deleteFavorite(place.id)
         }
     }
+
+    fun updateStuveHour(hour: Int) {
+        stuveHour.value = hour.coerceIn(6, 22)
+    }
 }
 
 private data class ForecastChartContext(
     val selectedForecastMode: ForecastMode,
     val selectedDayIndex: Int,
     val chartViewport: ForecastChartViewport,
+    val stuveHour: Int = 12,
 )
 
 private fun buildForecastText(

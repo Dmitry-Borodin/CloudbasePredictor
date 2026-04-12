@@ -7,7 +7,10 @@ import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.screens.forecast.ForecastChartViewport
 import com.cloudbasepredictor.ui.screens.forecast.ForecastDayChipUiModel
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.buildPlaceholderCloudForecastChart
+import com.cloudbasepredictor.ui.screens.forecast.buildPlaceholderStuveChart
 import com.cloudbasepredictor.ui.screens.forecast.buildPlaceholderThermicForecastChart
+import com.cloudbasepredictor.ui.screens.forecast.buildPlaceholderWindForecastChart
 import com.cloudbasepredictor.ui.screens.map.MapUiState
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -70,6 +73,9 @@ object PreviewData {
         selectedPlace = savedPlace,
         selectedDayIndex = 2,
         thermicChart = buildPlaceholderThermicForecastChart(dayIndex = 2),
+        stuveChart = buildPlaceholderStuveChart(hour = 12, dayIndex = 2),
+        windChart = buildPlaceholderWindForecastChart(dayIndex = 2),
+        cloudChart = buildPlaceholderCloudForecastChart(dayIndex = 2),
         dayChips = forecastDayChips(7),
         forecastText = "Sat in Interlaken. Partly cloudy. High 20.0°C, low 10.2°C.",
         isLoading = false,
@@ -113,6 +119,9 @@ object PreviewData {
             selectedForecastMode = mode,
             chartViewport = ForecastChartViewport(visibleTopAltitudeKm = topAltitudeKm),
             thermicChart = buildPlaceholderThermicForecastChart(dayIndex = forecastReadyUiState.selectedDayIndex),
+            stuveChart = buildPlaceholderStuveChart(hour = 12, dayIndex = forecastReadyUiState.selectedDayIndex),
+            windChart = buildPlaceholderWindForecastChart(dayIndex = forecastReadyUiState.selectedDayIndex),
+            cloudChart = buildPlaceholderCloudForecastChart(dayIndex = forecastReadyUiState.selectedDayIndex),
             forecastText = "$modeLabel layered forecast preview for Interlaken.",
             isLoading = isLoading,
             errorMessage = errorMessage,

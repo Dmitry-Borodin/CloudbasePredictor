@@ -320,40 +320,82 @@ private fun ThermicForecastGrid(
         }
 
         drawIntoCanvas { canvas ->
-            displayChart.cells.forEach { cell ->
-                val timeIndex = timeIndexLookup[cell.startMinuteOfDayLocal] ?: return@forEach
-                val visibleStartAltitudeKm = cell.startAltitudeKm.coerceAtLeast(THERMIC_MIN_ALTITUDE_KM)
-                val visibleEndAltitudeKm = cell.endAltitudeKm.coerceAtMost(effectiveTopAltitudeKm)
+            // Dynamic label clustering: compute how many cells to skip
+            // so that labels don't overlap on small screens
+            val labelWidth = cellLabelPaint.measureText("0.0")
+            val labelHeight = cellLabelPaint.textSize
+            val minLabelSpacingH = labelWidth * 1.4f
+            val minLabelSpacingV = labelHeight * 2.2f
 
-                if (visibleEndAltitudeKm <= visibleStartAltitudeKm) {
-                    return@forEach
-                }
-
-                val topY = altitudeToY(
-                    altitudeKm = visibleEndAltitudeKm,
+            val timeCluster = max(1, ceil(minLabelSpacingH / columnWidth).toInt())
+            val sampleCellHeight = if (displayChart.cells.isNotEmpty()) {
+                val firstCell = displayChart.cells.first()
+                val topSample = altitudeToY(
+                    altitudeKm = firstCell.endAltitudeKm.coerceAtMost(effectiveTopAltitudeKm),
                     minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
                     maxAltitudeKm = effectiveTopAltitudeKm,
                     plotTop = plotTop,
                     plotBottom = plotBottom,
                 )
-                val bottomY = altitudeToY(
-                    altitudeKm = visibleStartAltitudeKm,
+                val bottomSample = altitudeToY(
+                    altitudeKm = firstCell.startAltitudeKm.coerceAtLeast(THERMIC_MIN_ALTITUDE_KM),
                     minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
                     maxAltitudeKm = effectiveTopAltitudeKm,
                     plotTop = plotTop,
                     plotBottom = plotBottom,
                 )
+                (bottomSample - topSample).coerceAtLeast(1f)
+            } else {
+                1f
+            }
+            val altCluster = max(1, ceil(minLabelSpacingV / sampleCellHeight).toInt())
 
-                if ((bottomY - topY) < cellLabelPaint.textSize + 2.dp.toPx()) {
-                    return@forEach
+            // Group cells by time slot for efficient cluster indexing
+            val cellsByTime = displayChart.cells.groupBy { it.startMinuteOfDayLocal }
+            val sortedTimeSlots = displayChart.timeSlots
+
+            sortedTimeSlots.forEachIndexed { timeIdx, startMinute ->
+                if (timeIdx % timeCluster != timeCluster / 2) return@forEachIndexed
+                val timeIndex = timeIndexLookup[startMinute] ?: return@forEachIndexed
+                val cellsInSlot = cellsByTime[startMinute]?.sortedBy { it.startAltitudeKm }
+                    ?: return@forEachIndexed
+
+                cellsInSlot.forEachIndexed cellLoop@{ altIdx, cell ->
+                    if (altIdx % altCluster != altCluster / 2) return@cellLoop
+
+                    val visibleStartAltitudeKm =
+                        cell.startAltitudeKm.coerceAtLeast(THERMIC_MIN_ALTITUDE_KM)
+                    val visibleEndAltitudeKm =
+                        cell.endAltitudeKm.coerceAtMost(effectiveTopAltitudeKm)
+
+                    if (visibleEndAltitudeKm <= visibleStartAltitudeKm) return@cellLoop
+
+                    val topY = altitudeToY(
+                        altitudeKm = visibleEndAltitudeKm,
+                        minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
+                        maxAltitudeKm = effectiveTopAltitudeKm,
+                        plotTop = plotTop,
+                        plotBottom = plotBottom,
+                    )
+                    val bottomY = altitudeToY(
+                        altitudeKm = visibleStartAltitudeKm,
+                        minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
+                        maxAltitudeKm = effectiveTopAltitudeKm,
+                        plotTop = plotTop,
+                        plotBottom = plotBottom,
+                    )
+
+                    if ((bottomY - topY) < cellLabelPaint.textSize + 2.dp.toPx()) {
+                        return@cellLoop
+                    }
+
+                    canvas.nativeCanvas.drawText(
+                        formatThermicStrengthLabel(cell.strengthMps),
+                        plotLeft + (timeIndex * columnWidth) + (columnWidth / 2f),
+                        topY + ((bottomY - topY) / 2f) + (cellLabelPaint.textSize * 0.35f),
+                        cellLabelPaint,
+                    )
                 }
-
-                canvas.nativeCanvas.drawText(
-                    formatThermicStrengthLabel(cell.strengthMps),
-                    plotLeft + (timeIndex * columnWidth) + (columnWidth / 2f),
-                    topY + ((bottomY - topY) / 2f) + (cellLabelPaint.textSize * 0.35f),
-                    cellLabelPaint,
-                )
             }
 
             majorAltitudeTicks.forEach { altitudeKm ->
