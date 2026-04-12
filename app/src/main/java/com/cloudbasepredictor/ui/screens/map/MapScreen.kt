@@ -39,10 +39,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.components.FavoritesListDialog
 import com.cloudbasepredictor.ui.preview.PreviewData
@@ -213,7 +215,7 @@ fun MapScreen(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Star,
-                    contentDescription = "Favorites",
+                    contentDescription = stringResource(R.string.cd_favorites),
                 )
             }
         }
@@ -231,7 +233,7 @@ fun MapScreen(
         ) {
             Icon(
                 imageVector = Icons.Outlined.Settings,
-                contentDescription = "Settings",
+                contentDescription = stringResource(R.string.cd_settings),
             )
         }
 
@@ -271,16 +273,16 @@ private fun MapUnavailableCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Map provider is unavailable right now.",
+                text = stringResource(R.string.map_unavailable_title),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = "Unable to resolve tiles.openfreemap.org. Retry when network is available.",
+                text = stringResource(R.string.map_unavailable_message),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(onClick = onRetry) {
-                Text(text = "Retry")
+                Text(text = stringResource(R.string.action_retry))
             }
         }
     }
@@ -308,7 +310,7 @@ private fun SelectedPointCard(
             Text(
                 text = String.format(
                     java.util.Locale.US,
-                    "Lat %.4f, Lon %.4f",
+                    stringResource(R.string.coordinates_lat_lon_format),
                     selectedPlace.latitude,
                     selectedPlace.longitude,
                 ),
@@ -316,7 +318,7 @@ private fun SelectedPointCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(onClick = onOpenForecast) {
-                Text(text = "Open")
+                Text(text = stringResource(R.string.action_open))
             }
         }
     }

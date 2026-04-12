@@ -26,12 +26,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.cloudbasepredictor.R
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
@@ -67,11 +69,11 @@ fun AboutScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = stringResource(R.string.cd_back),
                     )
                 }
                 Text(
-                    text = "About",
+                    text = stringResource(R.string.title_about),
                     style = MaterialTheme.typography.titleLarge,
                 )
             }
@@ -86,17 +88,17 @@ fun AboutScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = "Cloudbase Predictor",
+                text = stringResource(R.string.about_app_name),
                 style = MaterialTheme.typography.headlineMedium,
             )
 
             Text(
-                text = "Free and Open Source Software (FOSS)",
+                text = stringResource(R.string.about_foss_label),
                 style = MaterialTheme.typography.titleMedium,
             )
 
             Text(
-                text = "Licensed under GNU General Public License v3.0 (GPLv3).",
+                text = stringResource(R.string.about_license_text),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -104,15 +106,15 @@ fun AboutScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Data sources",
+                text = stringResource(R.string.about_data_sources),
                 style = MaterialTheme.typography.titleMedium,
             )
 
             val forecastText = buildAnnotatedString {
-                append("Forecast data: ")
+                append(stringResource(R.string.about_forecast_data_label))
                 pushStringAnnotation(tag = "URL", annotation = "https://open-meteo.com")
                 withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
-                    append("Open-Meteo")
+                    append(stringResource(R.string.about_open_meteo))
                 }
                 pop()
             }
@@ -130,10 +132,10 @@ fun AboutScreen(
             )
 
             val mapsText = buildAnnotatedString {
-                append("Map tiles: ")
+                append(stringResource(R.string.about_map_tiles_label))
                 pushStringAnnotation(tag = "URL", annotation = "https://openfreemap.org")
                 withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
-                    append("OpenFreeMap")
+                    append(stringResource(R.string.about_openfreemap))
                 }
                 pop()
             }

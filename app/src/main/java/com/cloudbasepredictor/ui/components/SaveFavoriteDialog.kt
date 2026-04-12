@@ -16,8 +16,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.cloudbasepredictor.R
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
@@ -33,7 +35,7 @@ fun SaveFavoriteDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(text = if (isFavorite) "Edit Favorite" else "Save Favorite")
+            Text(text = if (isFavorite) stringResource(R.string.dialog_title_edit_favorite) else stringResource(R.string.dialog_title_save_favorite))
         },
         text = {
             Column(
@@ -42,7 +44,7 @@ fun SaveFavoriteDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(text = "Name") },
+                    label = { Text(text = stringResource(R.string.label_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -58,7 +60,7 @@ fun SaveFavoriteDialog(
                         onDismiss()
                     }) {
                         Text(
-                            text = "Delete",
+                            text = stringResource(R.string.action_delete),
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
@@ -70,13 +72,13 @@ fun SaveFavoriteDialog(
                     },
                     enabled = name.isNotBlank(),
                 ) {
-                    Text(text = "Save")
+                    Text(text = stringResource(R.string.action_save))
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(text = "Cancel")
+                Text(text = stringResource(R.string.action_cancel))
             }
         },
     )

@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -31,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
@@ -63,12 +65,12 @@ internal fun ForecastTopBar(
             IconButton(onClick = onFavoriteClick) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                    contentDescription = "Favorites",
+                    contentDescription = stringResource(R.string.cd_favorites),
                 )
             }
 
             AutoScalingTitle(
-                text = placeName ?: "Forecast",
+                text = placeName ?: stringResource(R.string.title_forecast),
                 modifier = Modifier
                     .weight(1f)
                     .widthIn(min = minimumTitleWidth),
@@ -82,7 +84,7 @@ internal fun ForecastTopBar(
             IconButton(onClick = onOpenMap) {
                 Icon(
                     imageVector = Icons.Outlined.Map,
-                    contentDescription = "Open map",
+                    contentDescription = stringResource(R.string.cd_open_map),
                 )
             }
         }

@@ -27,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -34,6 +35,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.model.ForecastModel
+import com.cloudbasepredictor.R
 import com.cloudbasepredictor.ui.components.SaveFavoriteDialog
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.views.CloudForecastView
@@ -153,7 +155,7 @@ private fun ForecastLoadingContent(
         CircularProgressIndicator(modifier = Modifier.size(48.dp))
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = if (placeName != null) "Loading forecast for $placeName…" else "Loading forecast…",
+            text = if (placeName != null) stringResource(R.string.loading_forecast_for_place, placeName) else stringResource(R.string.loading_forecast),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
         )
@@ -188,7 +190,7 @@ private fun ForecastErrorContent(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onRetry) {
-            Text(text = "Retry")
+            Text(text = stringResource(R.string.action_retry))
         }
     }
 }

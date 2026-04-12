@@ -26,8 +26,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.ForecastModel
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
@@ -50,17 +52,27 @@ internal fun ModelSelectorOverlay(
         else -> selectedModel.displayName
     }
 
-    FilledTonalButton(
-        onClick = { showSheet = true },
-        modifier = modifier.testTag(ForecastTestTags.MODEL_SELECTOR_BUTTON),
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier,
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Tune,
-            contentDescription = null,
-            modifier = Modifier.height(18.dp),
+        FilledTonalButton(
+            onClick = { showSheet = true },
+            modifier = Modifier.testTag(ForecastTestTags.MODEL_SELECTOR_BUTTON),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Tune,
+                contentDescription = null,
+                modifier = Modifier.height(18.dp),
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(text = label, style = MaterialTheme.typography.labelMedium)
+        }
+        Text(
+            text = stringResource(R.string.model_selector_attribution),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
         )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(text = label, style = MaterialTheme.typography.labelMedium)
     }
 
     if (showSheet) {
@@ -93,13 +105,13 @@ private fun ModelSelectorSheetContent(
             .padding(bottom = 32.dp),
     ) {
         Text(
-            text = "Weather Model",
+            text = stringResource(R.string.title_weather_model),
             style = MaterialTheme.typography.titleMedium,
         )
         if (resolvedModel != null && resolvedModel != selectedModel) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Fell back to ${resolvedModel.displayName}",
+                text = stringResource(R.string.model_selector_fell_back, resolvedModel.displayName),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -157,7 +169,7 @@ private fun ModelOptionRow(
             if (isSelected) {
                 Icon(
                     imageVector = Icons.Outlined.Check,
-                    contentDescription = "Selected",
+                    contentDescription = stringResource(R.string.cd_selected),
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }

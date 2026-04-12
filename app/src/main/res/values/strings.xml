@@ -1,3 +1,98 @@
 <resources>
     <string name="app_name">Cloudbase predictor</string>
+
+    <!-- Common actions -->
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_close">Close</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_open">Open</string>
+    <string name="action_about">About</string>
+
+    <!-- Content descriptions -->
+    <string name="cd_back">Back</string>
+    <string name="cd_favorites">Favorites</string>
+    <string name="cd_settings">Settings</string>
+    <string name="cd_open_map">Open map</string>
+    <string name="cd_open_forecast_help">Open forecast help</string>
+    <string name="cd_selected">Selected</string>
+    <string name="cd_mode_stuve">Stuve</string>
+    <string name="cd_mode_wind">Wind</string>
+    <string name="cd_mode_thermic">Thermic</string>
+    <string name="cd_mode_cloud">Cloud</string>
+
+    <!-- SaveFavoriteDialog -->
+    <string name="dialog_title_edit_favorite">Edit Favorite</string>
+    <string name="dialog_title_save_favorite">Save Favorite</string>
+    <string name="label_name">Name</string>
+
+    <!-- FavoritesListDialog -->
+    <string name="dialog_title_favorites">Favorites</string>
+    <string name="favorites_empty_message">No favorites yet. Tap the star on the forecast screen to save a place.</string>
+
+    <!-- Settings -->
+    <string name="title_settings">Settings</string>
+    <string name="settings_data_source">Data source</string>
+
+    <!-- About -->
+    <string name="title_about">About</string>
+    <string name="about_app_name">Cloudbase Predictor</string>
+    <string name="about_foss_label">Free and Open Source Software (FOSS)</string>
+    <string name="about_license_text">Licensed under GNU General Public License v3.0 (GPLv3).</string>
+    <string name="about_data_sources">Data sources</string>
+    <string name="about_forecast_data_label">Forecast data: </string>
+    <string name="about_open_meteo">Open-Meteo</string>
+    <string name="about_map_tiles_label">Map tiles: </string>
+    <string name="about_openfreemap">OpenFreeMap</string>
+
+    <!-- Forecast -->
+    <string name="title_forecast">Forecast</string>
+    <string name="loading_forecast_for_place">Loading forecast for %1$s…</string>
+    <string name="loading_forecast">Loading forecast…</string>
+
+    <!-- Model selector -->
+    <string name="title_weather_model">Weather Model</string>
+    <string name="model_selector_fell_back">Fell back to %1$s</string>
+    <string name="model_selector_attribution">by open-meteo.com</string>
+
+    <!-- Map -->
+    <string name="map_unavailable_title">Map provider is unavailable right now.</string>
+    <string name="map_unavailable_message">Unable to resolve tiles.openfreemap.org. Retry when network is available.</string>
+    <string name="coordinates_lat_lon_format" formatted="false">Lat %.4f, Lon %.4f</string>
+
+    <!-- Help dialog - Thermic -->
+    <string name="help_thermic_title">Thermic forecast help</string>
+    <string name="help_thermic_summary">This chart shows estimated thermal strength by hour and altitude. Colored cells mark lift bands, and cloud markers indicate the top of usable convection.</string>
+    <string name="help_thermic_tip_1">Read stronger thermals from brighter cool colors and compare them across the day.</string>
+    <string name="help_thermic_tip_2">Use pinch zoom to inspect lower or higher altitude layers in more detail.</string>
+    <string name="help_thermic_tip_3">The current thermic chart uses generated UI data and is ready to be replaced by real forecast-derived output.</string>
+
+    <!-- Help dialog - Stuve -->
+    <string name="help_stuve_title">Stuve forecast help</string>
+    <string name="help_stuve_summary">The Stuve screen is intended for vertical atmosphere analysis. It will later explain instability, moisture, and other sounding-derived layers.</string>
+    <string name="help_stuve_tip_1">Use this view to reason about the vertical structure of the day once the sounding model is connected.</string>
+    <string name="help_stuve_tip_2">Switch back to thermic or cloud mode for a faster high-level read of soaring conditions.</string>
+    <string name="help_stuve_tip_3">The current Stuve screen still uses placeholder forecast content.</string>
+
+    <!-- Help dialog - Wind -->
+    <string name="help_wind_title">Wind forecast help</string>
+    <string name="help_wind_summary">The wind screen is reserved for layered wind direction and strength through the day. It will help compare usable windows at different altitudes.</string>
+    <string name="help_wind_tip_1">Check several altitude bands instead of relying on surface wind alone.</string>
+    <string name="help_wind_tip_2">Compare wind mode with thermic mode before judging whether climbs are usable.</string>
+    <string name="help_wind_tip_3">The current wind screen still uses placeholder forecast content.</string>
+
+    <!-- Help dialog - Cloud -->
+    <string name="help_cloud_title">Cloud forecast help</string>
+    <string name="help_cloud_summary">The cloud screen is reserved for layered cloud coverage and cloud-base-related information across the day.</string>
+    <string name="help_cloud_tip_1">Use cloud mode together with thermic mode to estimate whether lift reaches cloud base or stays blue.</string>
+    <string name="help_cloud_tip_2">Compare altitude bands to spot when cloud development starts climbing higher.</string>
+    <string name="help_cloud_tip_3">The current cloud screen still uses placeholder forecast content.</string>
+
+    <!-- Help dialog - Status messages -->
+    <string name="help_status_no_place">No place is selected yet. Open a point from the map to load forecast context for this screen.</string>
+    <string name="help_status_error">Forecast refresh failed: %1$s</string>
+    <string name="help_status_loading">Forecast data is currently loading for %1$s.</string>
+    <string name="help_status_showing">Showing the %1$s forecast for %2$s on %3$s.</string>
+    <string name="help_status_selected_day">the selected day</string>
 </resources>

@@ -32,10 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cloudbasepredictor.R
 import com.cloudbasepredictor.data.datasource.DataSourcePreference
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
@@ -82,11 +84,11 @@ fun SettingsScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = stringResource(R.string.cd_back),
                     )
                 }
                 Text(
-                    text = "Settings",
+                    text = stringResource(R.string.title_settings),
                     style = MaterialTheme.typography.titleLarge,
                 )
             }
@@ -103,7 +105,7 @@ fun SettingsScreen(
             // Data source dropdown
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Data source",
+                    text = stringResource(R.string.settings_data_source),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 var expanded by remember { mutableStateOf(false) }
@@ -144,7 +146,7 @@ fun SettingsScreen(
                     contentDescription = null,
                     modifier = Modifier.padding(end = 8.dp),
                 )
-                Text(text = "About")
+                Text(text = stringResource(R.string.action_about))
             }
         }
     }

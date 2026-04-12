@@ -18,8 +18,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.HELP_BUTTON
@@ -41,7 +43,7 @@ internal fun HelpButtonOverlay(
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Outlined.HelpOutline,
-            contentDescription = "Open forecast help",
+            contentDescription = stringResource(R.string.cd_open_forecast_help),
         )
     }
 
@@ -75,7 +77,7 @@ internal fun HelpButtonOverlay(
             },
             confirmButton = {
                 TextButton(onClick = { isDialogVisible = false }) {
-                    Text(text = "Close")
+                    Text(text = stringResource(R.string.action_close))
                 }
             },
         )
@@ -86,54 +88,60 @@ internal fun HelpButtonOverlay(
 private fun rememberForecastHelpContent(uiState: ForecastUiState): ForecastHelpContent {
     return when (uiState.selectedForecastMode) {
         ForecastMode.THERMIC -> ForecastHelpContent(
-            title = "Thermic forecast help",
-            summary = "This chart shows estimated thermal strength by hour and altitude. Colored cells mark lift bands, and cloud markers indicate the top of usable convection.",
+            title = stringResource(R.string.help_thermic_title),
+            summary = stringResource(R.string.help_thermic_summary),
             statusMessage = forecastStatusMessage(uiState),
             tips = listOf(
-                "Read stronger thermals from brighter cool colors and compare them across the day.",
-                "Use pinch zoom to inspect lower or higher altitude layers in more detail.",
-                "The current thermic chart uses generated UI data and is ready to be replaced by real forecast-derived output.",
+                stringResource(R.string.help_thermic_tip_1),
+                stringResource(R.string.help_thermic_tip_2),
+                stringResource(R.string.help_thermic_tip_3),
             ),
         )
         ForecastMode.STUVE -> ForecastHelpContent(
-            title = "Stuve forecast help",
-            summary = "The Stuve screen is intended for vertical atmosphere analysis. It will later explain instability, moisture, and other sounding-derived layers.",
+            title = stringResource(R.string.help_stuve_title),
+            summary = stringResource(R.string.help_stuve_summary),
             statusMessage = forecastStatusMessage(uiState),
             tips = listOf(
-                "Use this view to reason about the vertical structure of the day once the sounding model is connected.",
-                "Switch back to thermic or cloud mode for a faster high-level read of soaring conditions.",
-                "The current Stuve screen still uses placeholder forecast content.",
+                stringResource(R.string.help_stuve_tip_1),
+                stringResource(R.string.help_stuve_tip_2),
+                stringResource(R.string.help_stuve_tip_3),
             ),
         )
         ForecastMode.WIND -> ForecastHelpContent(
-            title = "Wind forecast help",
-            summary = "The wind screen is reserved for layered wind direction and strength through the day. It will help compare usable windows at different altitudes.",
+            title = stringResource(R.string.help_wind_title),
+            summary = stringResource(R.string.help_wind_summary),
             statusMessage = forecastStatusMessage(uiState),
             tips = listOf(
-                "Check several altitude bands instead of relying on surface wind alone.",
-                "Compare wind mode with thermic mode before judging whether climbs are usable.",
-                "The current wind screen still uses placeholder forecast content.",
+                stringResource(R.string.help_wind_tip_1),
+                stringResource(R.string.help_wind_tip_2),
+                stringResource(R.string.help_wind_tip_3),
             ),
         )
         ForecastMode.CLOUD -> ForecastHelpContent(
-            title = "Cloud forecast help",
-            summary = "The cloud screen is reserved for layered cloud coverage and cloud-base-related information across the day.",
+            title = stringResource(R.string.help_cloud_title),
+            summary = stringResource(R.string.help_cloud_summary),
             statusMessage = forecastStatusMessage(uiState),
             tips = listOf(
-                "Use cloud mode together with thermic mode to estimate whether lift reaches cloud base or stays blue.",
-                "Compare altitude bands to spot when cloud development starts climbing higher.",
-                "The current cloud screen still uses placeholder forecast content.",
+                stringResource(R.string.help_cloud_tip_1),
+                stringResource(R.string.help_cloud_tip_2),
+                stringResource(R.string.help_cloud_tip_3),
             ),
         )
     }
 }
 
+@Composable
 private fun forecastStatusMessage(uiState: ForecastUiState): String {
     return when {
-        uiState.selectedPlace == null -> "No place is selected yet. Open a point from the map to load forecast context for this screen."
-        uiState.errorMessage != null -> "Forecast refresh failed: ${uiState.errorMessage}"
-        uiState.isLoading -> "Forecast data is currently loading for ${uiState.selectedPlace.name}."
-        else -> "Showing the ${uiState.selectedForecastMode.name.lowercase()} forecast for ${uiState.selectedPlace.name} on ${uiState.dayChips.getOrNull(uiState.selectedDayIndex)?.subtitle ?: "the selected day"}."
+        uiState.selectedPlace == null -> stringResource(R.string.help_status_no_place)
+        uiState.errorMessage != null -> stringResource(R.string.help_status_error, uiState.errorMessage!!)
+        uiState.isLoading -> stringResource(R.string.help_status_loading, uiState.selectedPlace.name)
+        else -> stringResource(
+            R.string.help_status_showing,
+            uiState.selectedForecastMode.name.lowercase(),
+            uiState.selectedPlace.name,
+            uiState.dayChips.getOrNull(uiState.selectedDayIndex)?.subtitle ?: stringResource(R.string.help_status_selected_day),
+        )
     }
 }
 

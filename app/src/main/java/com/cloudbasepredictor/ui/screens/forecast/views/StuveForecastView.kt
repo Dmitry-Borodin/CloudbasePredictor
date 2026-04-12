@@ -3,6 +3,7 @@ package com.cloudbasepredictor.ui.screens.forecast.views
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
@@ -51,6 +53,7 @@ import com.cloudbasepredictor.ui.screens.forecast.dryAdiabatTemperatureC
 import com.cloudbasepredictor.ui.screens.forecast.mixingRatioTemperatureC
 import com.cloudbasepredictor.ui.screens.forecast.moistAdiabatTemperatureC
 import com.cloudbasepredictor.ui.screens.forecast.pressureToApproxHeightMeters
+import com.cloudbasepredictor.ui.screens.forecast.zoomedTopAltitudeKm
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.util.Locale
 import kotlin.math.PI
@@ -79,6 +82,8 @@ internal fun StuveForecastView(
         ) {
             StuveDiagramCanvas(
                 chart = stuveChart,
+                visibleTopAltitudeKm = uiState.chartViewport.visibleTopAltitudeKm,
+                onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
                 modifier = Modifier.fillMaxSize(),
             )
 
@@ -152,6 +157,8 @@ private fun StuveTimeSlider(
 @Composable
 private fun StuveDiagramCanvas(
     chart: StuveForecastChartUiModel,
+    visibleTopAltitudeKm: Float,
+    onVisibleTopAltitudeChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -197,7 +204,21 @@ private fun StuveDiagramCanvas(
         }
     }
 
-    Canvas(modifier = modifier) {
+    Canvas(
+        modifier = modifier.pointerInput(visibleTopAltitudeKm) {
+            detectTransformGestures { _, _, zoom, _ ->
+                onVisibleTopAltitudeChange(
+                    zoomedTopAltitudeKm(
+                        currentTopAltitudeKm = visibleTopAltitudeKm,
+                        zoomChange = zoom,
+                    ),
+                )
+            }
+        },
+    ) {
+        // Convert visibleTopAltitudeKm to a top pressure for the diagram
+        val stuveTopPressure = altitudeKmToApproxPressureHpa(visibleTopAltitudeKm)
+            .coerceIn(STUVE_MIN_TOP_PRESSURE, STUVE_BOTTOM_PRESSURE - 50f)
         val leftAxisWidth = with(density) { 40.dp.toPx() }
         val rightAltitudeWidth = with(density) { 40.dp.toPx() }
         val rightWindWidth = with(density) { 56.dp.toPx() }
@@ -241,10 +262,11 @@ private fun StuveDiagramCanvas(
 
         // Isobars (horizontal lines)
         val pressureLabels = listOf(
-            1000f, 900f, 850f, 800f, 700f, 600f,
-        )
+            1000f, 950f, 900f, 850f, 800f, 750f, 700f, 650f, 600f,
+            550f, 500f, 450f, 400f, 350f, 300f, 250f, 200f,
+        ).filter { it >= stuveTopPressure }
         pressureLabels.forEach { p ->
-            val y = pressureToY(p, plotTop, plotBottom)
+            val y = pressureToY(p, plotTop, plotBottom, stuveTopPressure)
             val alpha = if (p.toInt() % 200 == 0) 0.4f else 0.2f
             drawLine(
                 color = outlineColor.copy(alpha = alpha),
@@ -264,6 +286,7 @@ private fun StuveDiagramCanvas(
                 plotRight = plotRight,
                 plotTop = plotTop,
                 plotBottom = plotBottom,
+                topPressure = stuveTopPressure,
                 color = Color(0xFF44AA44).copy(alpha = 0.35f),
                 strokeWidth = 1.dp.toPx(),
             )
@@ -279,6 +302,7 @@ private fun StuveDiagramCanvas(
                 plotRight = plotRight,
                 plotTop = plotTop,
                 plotBottom = plotBottom,
+                topPressure = stuveTopPressure,
                 color = Color(0xFF00AACC).copy(alpha = 0.3f),
                 strokeWidth = 1.dp.toPx(),
                 dashOn = 6.dp.toPx(),
@@ -296,6 +320,7 @@ private fun StuveDiagramCanvas(
                 plotRight = plotRight,
                 plotTop = plotTop,
                 plotBottom = plotBottom,
+                topPressure = stuveTopPressure,
                 color = Color(0xFF5588CC).copy(alpha = 0.3f),
                 strokeWidth = 1.dp.toPx(),
                 dotOn = 3.dp.toPx(),
@@ -314,6 +339,7 @@ private fun StuveDiagramCanvas(
             plotRight = plotRight,
             plotTop = plotTop,
             plotBottom = plotBottom,
+            topPressure = stuveTopPressure,
             color = Color(0xFFDD2222),
             strokeWidth = 2.5f.dp.toPx(),
             drawDataDots = true,
@@ -329,6 +355,7 @@ private fun StuveDiagramCanvas(
             plotRight = plotRight,
             plotTop = plotTop,
             plotBottom = plotBottom,
+            topPressure = stuveTopPressure,
             color = Color(0xFF2255CC),
             strokeWidth = 2f.dp.toPx(),
             drawDataDots = true,
@@ -344,6 +371,7 @@ private fun StuveDiagramCanvas(
             plotRight = plotRight,
             plotTop = plotTop,
             plotBottom = plotBottom,
+            topPressure = stuveTopPressure,
             color = Color(0xFF333333),
             strokeWidth = 2f.dp.toPx(),
             dashOn = 8.dp.toPx(),
@@ -352,7 +380,7 @@ private fun StuveDiagramCanvas(
 
         // LCL marker
         chart.lclPressureHpa?.let { lcl ->
-            val lclY = pressureToY(lcl, plotTop, plotBottom)
+            val lclY = pressureToY(lcl, plotTop, plotBottom, stuveTopPressure)
             drawLine(
                 color = Color(0xFF888888).copy(alpha = 0.6f),
                 start = Offset(plotLeft, lclY),
@@ -374,7 +402,7 @@ private fun StuveDiagramCanvas(
 
         // --- Wind barbs on the right ---
         chart.windBarbs.forEach { barb ->
-            val y = pressureToY(barb.pressureHpa, plotTop, plotBottom)
+            val y = pressureToY(barb.pressureHpa, plotTop, plotBottom, stuveTopPressure)
             if (y in plotTop..plotBottom) {
                 drawWindBarb(
                     centerX = plotRight + rightAltitudeWidth + rightWindWidth / 2f,
@@ -391,7 +419,7 @@ private fun StuveDiagramCanvas(
         drawIntoCanvas { canvas ->
             // Pressure labels (left axis — pressure only)
             pressureLabels.forEach { p ->
-                val y = pressureToY(p, plotTop, plotBottom)
+                val y = pressureToY(p, plotTop, plotBottom, stuveTopPressure)
                 if (y in plotTop..plotBottom) {
                     canvas.nativeCanvas.drawText(
                         "${p.toInt()}",
@@ -421,7 +449,7 @@ private fun StuveDiagramCanvas(
 
             // Mixing ratio labels (top of plot)
             STUVE_MIXING_RATIO_VALUES_GKG.forEach { w ->
-                val tempAtTop = mixingRatioTemperatureC(w, STUVE_TOP_PRESSURE)
+                val tempAtTop = mixingRatioTemperatureC(w, stuveTopPressure)
                 if (tempAtTop in tempMin..tempMax) {
                     val x = temperatureToX(
                         tempAtTop, tempMin, tempMax, plotLeft, plotRight,
@@ -438,7 +466,7 @@ private fun StuveDiagramCanvas(
 
             // LCL label
             chart.lclPressureHpa?.let { lcl ->
-                val lclY = pressureToY(lcl, plotTop, plotBottom)
+                val lclY = pressureToY(lcl, plotTop, plotBottom, stuveTopPressure)
                 if (lclY in plotTop..plotBottom) {
                     val lclLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = Color(0xFF666666).toArgb()
@@ -456,7 +484,7 @@ private fun StuveDiagramCanvas(
 
             // Wind speed labels
             chart.windBarbs.forEach { barb ->
-                val y = pressureToY(barb.pressureHpa, plotTop, plotBottom)
+                val y = pressureToY(barb.pressureHpa, plotTop, plotBottom, stuveTopPressure)
                 if (y in plotTop..plotBottom) {
                     val windLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = axisLabelColor.toArgb()
@@ -475,7 +503,7 @@ private fun StuveDiagramCanvas(
 
             // Altitude labels (right axis, meters)
             pressureLabels.forEach { p ->
-                val y = pressureToY(p, plotTop, plotBottom)
+                val y = pressureToY(p, plotTop, plotBottom, stuveTopPressure)
                 if (y in plotTop..plotBottom) {
                     val heightM = pressureToApproxHeightMeters(p)
                     val label = if (heightM >= 1000) {
@@ -497,17 +525,25 @@ private fun StuveDiagramCanvas(
 
 // --- Coordinate mapping ---
 
-private const val STUVE_TOP_PRESSURE = 600f
+private const val STUVE_MIN_TOP_PRESSURE = 200f
 private const val STUVE_BOTTOM_PRESSURE = 1050f
 private const val STUVE_KAPPA = 0.286f
+
+/** Convert altitude in km to an approximate pressure in hPa (inverse of ISA table). */
+private fun altitudeKmToApproxPressureHpa(altitudeKm: Float): Float {
+    // Simple barometric approximation: P = 1013.25 * (1 - 0.0000225577 * h)^5.25588
+    val hMeters = (altitudeKm * 1000f).coerceAtLeast(0f)
+    return (1013.25f * (1f - 0.0000225577f * hMeters).pow(5.25588f))
+}
 
 private fun pressureToY(
     pressureHpa: Float,
     plotTop: Float,
     plotBottom: Float,
+    topPressure: Float,
 ): Float {
-    val pNorm = (pressureHpa.pow(STUVE_KAPPA) - STUVE_TOP_PRESSURE.pow(STUVE_KAPPA)) /
-        (STUVE_BOTTOM_PRESSURE.pow(STUVE_KAPPA) - STUVE_TOP_PRESSURE.pow(STUVE_KAPPA))
+    val pNorm = (pressureHpa.pow(STUVE_KAPPA) - topPressure.pow(STUVE_KAPPA)) /
+        (STUVE_BOTTOM_PRESSURE.pow(STUVE_KAPPA) - topPressure.pow(STUVE_KAPPA))
     return plotTop + pNorm * (plotBottom - plotTop)
 }
 
@@ -532,17 +568,18 @@ private fun DrawScope.drawDryAdiabat(
     plotRight: Float,
     plotTop: Float,
     plotBottom: Float,
+    topPressure: Float,
     color: Color,
     strokeWidth: Float,
 ) {
     val pressures = STUVE_PRESSURE_LEVELS.filter {
-        it in STUVE_TOP_PRESSURE..STUVE_BOTTOM_PRESSURE
+        it in topPressure..STUVE_BOTTOM_PRESSURE
     }
     val points = pressures.map { p ->
         val tempC = dryAdiabatTemperatureC(thetaK, p)
         Offset(
             x = temperatureToX(tempC, tempMin, tempMax, plotLeft, plotRight),
-            y = pressureToY(p, plotTop, plotBottom),
+            y = pressureToY(p, plotTop, plotBottom, topPressure),
         )
     }.filter { it.x in plotLeft..plotRight && it.y in plotTop..plotBottom }
 
@@ -564,6 +601,7 @@ private fun DrawScope.drawMoistAdiabat(
     plotRight: Float,
     plotTop: Float,
     plotBottom: Float,
+    topPressure: Float,
     color: Color,
     strokeWidth: Float,
     dashOn: Float,
@@ -571,7 +609,7 @@ private fun DrawScope.drawMoistAdiabat(
 ) {
     val pressures = buildList {
         var p = STUVE_BOTTOM_PRESSURE
-        while (p >= STUVE_TOP_PRESSURE) {
+        while (p >= topPressure) {
             add(p)
             p -= 25f
         }
@@ -580,7 +618,7 @@ private fun DrawScope.drawMoistAdiabat(
         val tempC = moistAdiabatTemperatureC(thetaWK, p)
         Offset(
             x = temperatureToX(tempC, tempMin, tempMax, plotLeft, plotRight),
-            y = pressureToY(p, plotTop, plotBottom),
+            y = pressureToY(p, plotTop, plotBottom, topPressure),
         )
     }.filter { it.x in plotLeft..plotRight && it.y in plotTop..plotBottom }
 
@@ -604,6 +642,7 @@ private fun DrawScope.drawMixingRatioLine(
     plotRight: Float,
     plotTop: Float,
     plotBottom: Float,
+    topPressure: Float,
     color: Color,
     strokeWidth: Float,
     dotOn: Float,
@@ -611,7 +650,7 @@ private fun DrawScope.drawMixingRatioLine(
 ) {
     val pressures = buildList {
         var p = STUVE_BOTTOM_PRESSURE
-        while (p >= STUVE_TOP_PRESSURE) {
+        while (p >= topPressure) {
             add(p)
             p -= 50f
         }
@@ -620,7 +659,7 @@ private fun DrawScope.drawMixingRatioLine(
         val tempC = mixingRatioTemperatureC(wGKg, p)
         Offset(
             x = temperatureToX(tempC, tempMin, tempMax, plotLeft, plotRight),
-            y = pressureToY(p, plotTop, plotBottom),
+            y = pressureToY(p, plotTop, plotBottom, topPressure),
         )
     }.filter { it.x in plotLeft..plotRight && it.y in plotTop..plotBottom }
 
@@ -644,6 +683,7 @@ private fun DrawScope.drawProfile(
     plotRight: Float,
     plotTop: Float,
     plotBottom: Float,
+    topPressure: Float,
     color: Color,
     strokeWidth: Float,
     dashOn: Float? = null,
@@ -654,7 +694,7 @@ private fun DrawScope.drawProfile(
     val offsets = points.map { pt ->
         Offset(
             x = temperatureToX(pt.temperatureC, tempMin, tempMax, plotLeft, plotRight),
-            y = pressureToY(pt.pressureHpa, plotTop, plotBottom),
+            y = pressureToY(pt.pressureHpa, plotTop, plotBottom, topPressure),
         )
     }
 

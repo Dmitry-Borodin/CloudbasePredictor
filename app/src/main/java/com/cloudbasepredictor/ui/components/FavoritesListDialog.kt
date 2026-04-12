@@ -15,8 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
@@ -31,12 +33,12 @@ fun FavoritesListDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(text = "Favorites")
+            Text(text = stringResource(R.string.dialog_title_favorites))
         },
         text = {
             if (favorites.isEmpty()) {
                 Text(
-                    text = "No favorites yet. Tap the star on the forecast screen to save a place.",
+                    text = stringResource(R.string.favorites_empty_message),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -61,7 +63,7 @@ fun FavoritesListDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(text = "Close")
+                Text(text = stringResource(R.string.action_close))
             }
         },
     )

@@ -93,7 +93,7 @@ private fun ThermicForecastGrid(
     val cellLabelPaint = remember(density, cellTextColor) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = cellTextColor.toArgb()
-            textSize = with(density) { 11.sp.toPx() }
+            textSize = with(density) { 20.sp.toPx() }
             textAlign = Paint.Align.CENTER
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
         }
@@ -320,82 +320,64 @@ private fun ThermicForecastGrid(
         }
 
         drawIntoCanvas { canvas ->
-            // Dynamic label clustering: compute how many cells to skip
-            // so that labels don't overlap on small screens
-            val labelWidth = cellLabelPaint.measureText("0.0")
-            val labelHeight = cellLabelPaint.textSize
-            val minLabelSpacingH = labelWidth * 1.4f
-            val minLabelSpacingV = labelHeight * 2.2f
+            // Radius-based dedup: skip labels whose center is within 30sp of an
+            // already-drawn label, so numbers never overlap.
+            val dedupRadiusPx = with(density) { 30.sp.toPx() }
+            val dedupRadiusSq = dedupRadiusPx * dedupRadiusPx
+            val drawnCenters = mutableListOf<Offset>()
 
-            val timeCluster = max(1, ceil(minLabelSpacingH / columnWidth).toInt())
-            val sampleCellHeight = if (displayChart.cells.isNotEmpty()) {
-                val firstCell = displayChart.cells.first()
-                val topSample = altitudeToY(
-                    altitudeKm = firstCell.endAltitudeKm.coerceAtMost(effectiveTopAltitudeKm),
+            // Sort cells so that strongest thermals get labels first
+            val sortedCells = displayChart.cells.sortedByDescending { it.strengthMps }
+
+            sortedCells.forEach cellLoop@{ cell ->
+                val timeIndex = timeIndexLookup[cell.startMinuteOfDayLocal] ?: return@cellLoop
+
+                val visibleStartAltitudeKm =
+                    cell.startAltitudeKm.coerceAtLeast(THERMIC_MIN_ALTITUDE_KM)
+                val visibleEndAltitudeKm =
+                    cell.endAltitudeKm.coerceAtMost(effectiveTopAltitudeKm)
+
+                if (visibleEndAltitudeKm <= visibleStartAltitudeKm) return@cellLoop
+
+                val topY = altitudeToY(
+                    altitudeKm = visibleEndAltitudeKm,
                     minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
                     maxAltitudeKm = effectiveTopAltitudeKm,
                     plotTop = plotTop,
                     plotBottom = plotBottom,
                 )
-                val bottomSample = altitudeToY(
-                    altitudeKm = firstCell.startAltitudeKm.coerceAtLeast(THERMIC_MIN_ALTITUDE_KM),
+                val bottomY = altitudeToY(
+                    altitudeKm = visibleStartAltitudeKm,
                     minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
                     maxAltitudeKm = effectiveTopAltitudeKm,
                     plotTop = plotTop,
                     plotBottom = plotBottom,
                 )
-                (bottomSample - topSample).coerceAtLeast(1f)
-            } else {
-                1f
-            }
-            val altCluster = max(1, ceil(minLabelSpacingV / sampleCellHeight).toInt())
 
-            // Group cells by time slot for efficient cluster indexing
-            val cellsByTime = displayChart.cells.groupBy { it.startMinuteOfDayLocal }
-            val sortedTimeSlots = displayChart.timeSlots
-
-            sortedTimeSlots.forEachIndexed { timeIdx, startMinute ->
-                if (timeIdx % timeCluster != timeCluster / 2) return@forEachIndexed
-                val timeIndex = timeIndexLookup[startMinute] ?: return@forEachIndexed
-                val cellsInSlot = cellsByTime[startMinute]?.sortedBy { it.startAltitudeKm }
-                    ?: return@forEachIndexed
-
-                cellsInSlot.forEachIndexed cellLoop@{ altIdx, cell ->
-                    if (altIdx % altCluster != altCluster / 2) return@cellLoop
-
-                    val visibleStartAltitudeKm =
-                        cell.startAltitudeKm.coerceAtLeast(THERMIC_MIN_ALTITUDE_KM)
-                    val visibleEndAltitudeKm =
-                        cell.endAltitudeKm.coerceAtMost(effectiveTopAltitudeKm)
-
-                    if (visibleEndAltitudeKm <= visibleStartAltitudeKm) return@cellLoop
-
-                    val topY = altitudeToY(
-                        altitudeKm = visibleEndAltitudeKm,
-                        minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
-                        maxAltitudeKm = effectiveTopAltitudeKm,
-                        plotTop = plotTop,
-                        plotBottom = plotBottom,
-                    )
-                    val bottomY = altitudeToY(
-                        altitudeKm = visibleStartAltitudeKm,
-                        minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
-                        maxAltitudeKm = effectiveTopAltitudeKm,
-                        plotTop = plotTop,
-                        plotBottom = plotBottom,
-                    )
-
-                    if ((bottomY - topY) < cellLabelPaint.textSize + 2.dp.toPx()) {
-                        return@cellLoop
-                    }
-
-                    canvas.nativeCanvas.drawText(
-                        formatThermicStrengthLabel(cell.strengthMps),
-                        plotLeft + (timeIndex * columnWidth) + (columnWidth / 2f),
-                        topY + ((bottomY - topY) / 2f) + (cellLabelPaint.textSize * 0.35f),
-                        cellLabelPaint,
-                    )
+                if ((bottomY - topY) < cellLabelPaint.textSize + 2.dp.toPx()) {
+                    return@cellLoop
                 }
+
+                val centerX = plotLeft + (timeIndex * columnWidth) + (columnWidth / 2f)
+                val centerY = topY + ((bottomY - topY) / 2f)
+                val center = Offset(centerX, centerY)
+
+                // Skip if too close to an already-drawn label
+                val tooClose = drawnCenters.any { existing ->
+                    val dx = existing.x - center.x
+                    val dy = existing.y - center.y
+                    dx * dx + dy * dy < dedupRadiusSq
+                }
+                if (tooClose) return@cellLoop
+
+                drawnCenters += center
+
+                canvas.nativeCanvas.drawText(
+                    formatThermicStrengthLabel(cell.strengthMps),
+                    centerX,
+                    centerY + (cellLabelPaint.textSize * 0.35f),
+                    cellLabelPaint,
+                )
             }
 
             majorAltitudeTicks.forEach { altitudeKm ->
