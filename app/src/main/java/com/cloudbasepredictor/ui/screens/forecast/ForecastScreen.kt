@@ -8,7 +8,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.ui.screens.forecast.views.CloudForecastView
+import com.cloudbasepredictor.ui.screens.forecast.views.StuveForecastView
+import com.cloudbasepredictor.ui.screens.forecast.views.ThermicForecastView
+import com.cloudbasepredictor.ui.screens.forecast.views.WindForecastView
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
@@ -21,6 +26,7 @@ fun ForecastRoute(
     ForecastScreen(
         uiState = uiState,
         onDateSelected = viewModel::selectDay,
+        onForecastModeSelected = viewModel::selectForecastMode,
         onOpenMap = onOpenMap,
     )
 }
@@ -29,6 +35,7 @@ fun ForecastRoute(
 fun ForecastScreen(
     uiState: ForecastUiState,
     onDateSelected: (Int) -> Unit,
+    onForecastModeSelected: (ForecastMode) -> Unit = {},
     onOpenMap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -37,13 +44,37 @@ fun ForecastScreen(
     ) {
         ForecastTopBar(
             placeName = uiState.selectedPlace?.name,
+            selectedMode = uiState.selectedForecastMode,
+            onModeSelected = onForecastModeSelected,
             onOpenMap = onOpenMap,
         )
 
-        ThermicForecastView(
-            uiState = uiState,
-            modifier = Modifier.weight(1f),
-        )
+        when (uiState.selectedForecastMode) {
+            ForecastMode.THERMIC -> {
+                ThermicForecastView(
+                    uiState = uiState,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            ForecastMode.STUVE -> {
+                StuveForecastView(
+                    uiState = uiState,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            ForecastMode.WIND -> {
+                WindForecastView(
+                    uiState = uiState,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            ForecastMode.CLOUD -> {
+                CloudForecastView(
+                    uiState = uiState,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
 
         ForecastDatePicker(
             dayChips = uiState.dayChips,

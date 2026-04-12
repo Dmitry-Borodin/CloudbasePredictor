@@ -1,10 +1,12 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import com.cloudbasepredictor.data.forecast.ForecastModeRepository
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cloudbasepredictor.data.forecast.ForecastRepository
 import com.cloudbasepredictor.data.place.PlaceRepository
 import com.cloudbasepredictor.model.DailyForecast
+import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.model.ForecastSnapshot
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.model.WeatherCode
@@ -31,6 +33,7 @@ data class ForecastDayChipUiModel(
 
 data class ForecastUiState(
     val selectedPlace: SavedPlace? = null,
+    val selectedForecastMode: ForecastMode = ForecastMode.THERMIC,
     val selectedDayIndex: Int = 0,
     val dayChips: List<ForecastDayChipUiModel> = placeholderDayChips(),
     val forecastText: String = "Select a point on the map to open a forecast.",
@@ -43,6 +46,7 @@ data class ForecastUiState(
 class ForecastViewModel @Inject constructor(
     private val forecastRepository: ForecastRepository,
     private val placeRepository: PlaceRepository,
+    private val forecastModeRepository: ForecastModeRepository,
 ) : ViewModel() {
     private val selectedDayIndex = MutableStateFlow(0)
     private val isLoading = MutableStateFlow(false)
@@ -58,13 +62,21 @@ class ForecastViewModel @Inject constructor(
         }
     }
 
+    private val selectedModeWithDayIndex = combine(
+        forecastModeRepository.selectedMode,
+        selectedDayIndex,
+    ) { mode, dayIndex ->
+        mode to dayIndex
+    }
+
     val uiState: StateFlow<ForecastUiState> = combine(
         selectedPlace,
         selectedForecast,
-        selectedDayIndex,
+        selectedModeWithDayIndex,
         isLoading,
         errorMessage,
-    ) { place, snapshot, dayIndex, loading, currentError ->
+    ) { place, snapshot, selectedModeAndDayIndex, loading, currentError ->
+        val (selectedForecastMode, dayIndex) = selectedModeAndDayIndex
         val dayChips = snapshot?.days?.let(::buildDayChips)
             ?.takeIf { it.isNotEmpty() }
             ?: placeholderDayChips()
@@ -72,9 +84,11 @@ class ForecastViewModel @Inject constructor(
 
         ForecastUiState(
             selectedPlace = place,
+            selectedForecastMode = selectedForecastMode,
             selectedDayIndex = safeDayIndex,
             dayChips = dayChips,
             forecastText = buildForecastText(
+                mode = selectedForecastMode,
                 place = place,
                 snapshot = snapshot,
                 selectedDayIndex = safeDayIndex,
@@ -114,9 +128,14 @@ class ForecastViewModel @Inject constructor(
     fun selectDay(index: Int) {
         selectedDayIndex.value = index
     }
+
+    fun selectForecastMode(mode: ForecastMode) {
+        forecastModeRepository.selectMode(mode)
+    }
 }
 
 private fun buildForecastText(
+    mode: ForecastMode,
     place: SavedPlace?,
     snapshot: ForecastSnapshot?,
     selectedDayIndex: Int,
@@ -130,10 +149,35 @@ private fun buildForecastText(
     val selectedDay = days.getOrNull(selectedDayIndex)
 
     if (selectedDay == null) {
-        return if (isLoading) {
-            "Loading a 14-day forecast for ${place.name}."
-        } else {
-            "Forecast content for ${place.name} will appear here."
+        return when (mode) {
+            ForecastMode.THERMIC -> {
+                if (isLoading) {
+                    "Loading a 14-day forecast for ${place.name}."
+                } else {
+                    "Forecast content for ${place.name} will appear here."
+                }
+            }
+            ForecastMode.STUVE -> {
+                if (isLoading) {
+                    "Loading a 14-day stuve forecast for ${place.name}."
+                } else {
+                    "Stuve forecast content for ${place.name} will appear here."
+                }
+            }
+            ForecastMode.WIND -> {
+                if (isLoading) {
+                    "Loading a 14-day wind forecast for ${place.name}."
+                } else {
+                    "Wind forecast content for ${place.name} will appear here."
+                }
+            }
+            ForecastMode.CLOUD -> {
+                if (isLoading) {
+                    "Loading a 14-day cloud forecast for ${place.name}."
+                } else {
+                    "Cloud forecast content for ${place.name} will appear here."
+                }
+            }
         }
     }
 
@@ -144,17 +188,54 @@ private fun buildForecastText(
         selectedDay.date
     }
 
-    return buildString {
-        append(dayTitle)
-        append(" in ")
-        append(place.name)
-        append(". ")
-        append(weather.label)
-        append(". High ")
-        append(formatTemperature(selectedDay.maxTemperatureCelsius))
-        append(", low ")
-        append(formatTemperature(selectedDay.minTemperatureCelsius))
-        append(". This area can later host the full forecast layout.")
+    return when (mode) {
+        ForecastMode.THERMIC -> {
+            buildString {
+                append(dayTitle)
+                append(" in ")
+                append(place.name)
+                append(". ")
+                append(weather.label)
+                append(". High ")
+                append(formatTemperature(selectedDay.maxTemperatureCelsius))
+                append(", low ")
+                append(formatTemperature(selectedDay.minTemperatureCelsius))
+                append(". This area can later host the full thermic forecast layout.")
+            }
+        }
+        ForecastMode.STUVE -> {
+            buildString {
+                append(dayTitle)
+                append(" in ")
+                append(place.name)
+                append(". ")
+                append(weather.label)
+                append(". Stuve placeholder forecast. ")
+                append("This area can later host the full stuve forecast layout.")
+            }
+        }
+        ForecastMode.WIND -> {
+            buildString {
+                append(dayTitle)
+                append(" in ")
+                append(place.name)
+                append(". ")
+                append(weather.label)
+                append(". Wind placeholder forecast. ")
+                append("This area can later host the full wind forecast layout.")
+            }
+        }
+        ForecastMode.CLOUD -> {
+            buildString {
+                append(dayTitle)
+                append(" in ")
+                append(place.name)
+                append(". ")
+                append(weather.label)
+                append(". Cloud forecast placeholder. ")
+                append("This area can later host the full cloud forecast layout.")
+            }
+        }
     }
 }
 
