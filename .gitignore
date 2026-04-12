@@ -1,5 +1,6 @@
 *.iml
 .gradle
+agent-local/
 /local.properties
 /.idea/*
 .DS_Store
@@ -8,5 +9,3 @@
 .externalNativeBuild
 .cxx
 local.properties
-
-
