@@ -20,6 +20,27 @@ object PreviewData {
         latitude = 46.5582,
         longitude = 7.8354,
         defaultModel = "open-meteo",
+        isFavorite = true,
+    )
+
+    val favoritePlaces = listOf(
+        savedPlace,
+        SavedPlace(
+            id = "place:47.3769:8.5417",
+            name = "Zurich",
+            latitude = 47.3769,
+            longitude = 8.5417,
+            defaultModel = "open-meteo",
+            isFavorite = true,
+        ),
+        SavedPlace(
+            id = "place:46.9480:7.4474",
+            name = "Bern",
+            latitude = 46.9480,
+            longitude = 7.4474,
+            defaultModel = "open-meteo",
+            isFavorite = true,
+        ),
     )
 
     val dailyForecasts: List<DailyForecast> = List(7) { index ->
@@ -100,6 +121,7 @@ object PreviewData {
 
     val mapUiState = MapUiState(
         selectedPlace = savedPlace,
+        favoritePlaces = favoritePlaces,
     )
 
     private fun dateOffsetByDays(days: Int): String {

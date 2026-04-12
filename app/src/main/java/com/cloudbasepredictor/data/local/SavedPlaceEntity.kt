@@ -11,4 +11,5 @@ data class SavedPlaceEntity(
     val latitude: Double,
     val longitude: Double,
     val defaultModel: String,
+    val isFavorite: Boolean = false,
 )

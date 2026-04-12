@@ -6,19 +6,28 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.model.SavedPlace
+import com.cloudbasepredictor.ui.components.FavoritesListDialog
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.net.InetAddress
@@ -69,6 +79,8 @@ fun MapRoute(
         uiState = uiState,
         onMapTapped = viewModel::selectPoint,
         onOpenForecast = viewModel::openSelectedForecast,
+        onFavoriteClick = viewModel::openForecastForPlace,
+        onSaveCameraPosition = viewModel::saveCameraPosition,
     )
 }
 
@@ -77,6 +89,8 @@ fun MapScreen(
     uiState: MapUiState,
     onMapTapped: (Double, Double) -> Unit,
     onOpenForecast: () -> Unit,
+    onFavoriteClick: (SavedPlace) -> Unit,
+    onSaveCameraPosition: (Double, Double, Double) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var availabilityProbeKey by remember { mutableIntStateOf(0) }
@@ -87,13 +101,33 @@ fun MapScreen(
         value = isMapStyleHostReachable()
     }
 
+    val initialCamera = uiState.initialCamera
     val cameraState = rememberCameraState(
         firstPosition = CameraPosition(
-            target = Position(longitude = 13.4050, latitude = 52.5200),
-            zoom = 5.5,
+            target = if (initialCamera != null) {
+                Position(longitude = initialCamera.longitude, latitude = initialCamera.latitude)
+            } else {
+                Position(longitude = 13.4050, latitude = 52.5200)
+            },
+            zoom = initialCamera?.zoom ?: 5.5,
         )
     )
+
+    DisposableEffect(Unit) {
+        onDispose {
+            val pos = cameraState.position
+            onSaveCameraPosition(
+                pos.target.latitude,
+                pos.target.longitude,
+                pos.zoom,
+            )
+        }
+    }
+
     val markerData = uiState.selectedPlace?.let(::buildMarkerFeatureCollection) ?: emptyFeatureCollection()
+    val favoritesData = buildFavoritesFeatureCollection(uiState.favoritePlaces)
+
+    var showFavoritesDialog by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -161,8 +195,36 @@ fun MapScreen(
                             strokeColor = const(Color.White),
                             strokeWidth = const(3.dp),
                         )
+
+                        val favoritesSource = rememberGeoJsonSource(
+                            data = GeoJsonData.JsonString(favoritesData),
+                        )
+                        CircleLayer(
+                            id = "favorite-points",
+                            source = favoritesSource,
+                            color = const(Color(0xFFFFD700)),
+                            radius = const(10.dp),
+                            strokeColor = const(Color.White),
+                            strokeWidth = const(2.dp),
+                        )
                     }
                 }
+            }
+
+            FloatingActionButton(
+                onClick = { showFavoritesDialog = true },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .size(40.dp),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                contentColor = Color(0xFFFFD700),
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "Favorites",
+                )
             }
 
             uiState.selectedPlace?.let { selectedPlace ->
@@ -175,6 +237,14 @@ fun MapScreen(
                 )
             }
         }
+    }
+
+    if (showFavoritesDialog) {
+        FavoritesListDialog(
+            favorites = uiState.favoritePlaces,
+            onPlaceClick = onFavoriteClick,
+            onDismiss = { showFavoritesDialog = false },
+        )
     }
 }
 
@@ -256,10 +326,34 @@ private fun buildMarkerFeatureCollection(place: SavedPlace): String {
                 "coordinates": [${place.longitude}, ${place.latitude}]
               },
               "properties": {
-                "name": "${place.name}"
+                "name": "${place.name.replace("\"", "\\\"")}"
               }
             }
           ]
+        }
+    """.trimIndent()
+}
+
+private fun buildFavoritesFeatureCollection(places: List<SavedPlace>): String {
+    if (places.isEmpty()) return emptyFeatureCollection()
+    val features = places.joinToString(",") { place ->
+        """
+            {
+              "type": "Feature",
+              "geometry": {
+                "type": "Point",
+                "coordinates": [${place.longitude}, ${place.latitude}]
+              },
+              "properties": {
+                "name": "${place.name.replace("\"", "\\\"")}"
+              }
+            }
+        """
+    }
+    return """
+        {
+          "type": "FeatureCollection",
+          "features": [$features]
         }
     """.trimIndent()
 }
@@ -291,6 +385,20 @@ private fun SelectedPointCardPreview() {
         SelectedPointCard(
             selectedPlace = PreviewData.mapUiState.selectedPlace ?: PreviewData.savedPlace,
             onOpenForecast = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MapScreenPreview() {
+    CloudbasePredictorTheme {
+        MapScreen(
+            uiState = PreviewData.mapUiState,
+            onMapTapped = { _, _ -> },
+            onOpenForecast = {},
+            onFavoriteClick = {},
+            onSaveCameraPosition = { _, _, _ -> },
         )
     }
 }

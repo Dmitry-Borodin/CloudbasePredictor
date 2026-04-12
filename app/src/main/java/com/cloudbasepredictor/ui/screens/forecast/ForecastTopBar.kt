@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,8 +37,10 @@ import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 @Composable
 internal fun ForecastTopBar(
     placeName: String?,
+    isFavorite: Boolean,
     selectedMode: ForecastMode,
     onModeSelected: (ForecastMode) -> Unit,
+    onFavoriteClick: () -> Unit,
     onOpenMap: () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -56,6 +60,13 @@ internal fun ForecastTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            IconButton(onClick = onFavoriteClick) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                    contentDescription = "Favorites",
+                )
+            }
+
             AutoScalingTitle(
                 text = placeName ?: "Forecast",
                 modifier = Modifier
@@ -132,8 +143,25 @@ private fun ForecastTopBarPreview() {
     CloudbasePredictorTheme {
         ForecastTopBar(
             placeName = "46.5582, 7.8354",
+            isFavorite = false,
             selectedMode = ForecastMode.THERMIC,
             onModeSelected = {},
+            onFavoriteClick = {},
+            onOpenMap = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ForecastTopBarFavoritePreview() {
+    CloudbasePredictorTheme {
+        ForecastTopBar(
+            placeName = "Interlaken",
+            isFavorite = true,
+            selectedMode = ForecastMode.THERMIC,
+            onModeSelected = {},
+            onFavoriteClick = {},
             onOpenMap = {},
         )
     }

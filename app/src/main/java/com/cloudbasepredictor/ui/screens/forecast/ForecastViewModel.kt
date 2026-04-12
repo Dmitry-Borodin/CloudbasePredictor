@@ -154,6 +154,20 @@ class ForecastViewModel @Inject constructor(
             currentViewport.withVisibleTopAltitudeKm(topAltitudeKm)
         }
     }
+
+    fun saveFavorite(name: String) {
+        val place = uiState.value.selectedPlace ?: return
+        viewModelScope.launch {
+            placeRepository.saveFavorite(place.id, name)
+        }
+    }
+
+    fun deleteFavorite() {
+        val place = uiState.value.selectedPlace ?: return
+        viewModelScope.launch {
+            placeRepository.deleteFavorite(place.id)
+        }
+    }
 }
 
 private data class ForecastChartContext(

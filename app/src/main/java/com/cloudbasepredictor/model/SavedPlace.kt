@@ -8,6 +8,7 @@ data class SavedPlace(
     val latitude: Double,
     val longitude: Double,
     val defaultModel: String,
+    val isFavorite: Boolean = false,
 ) {
     companion object {
         fun fromCoordinates(

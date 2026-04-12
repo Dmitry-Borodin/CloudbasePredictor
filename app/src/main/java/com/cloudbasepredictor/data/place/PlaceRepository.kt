@@ -4,6 +4,7 @@ import com.cloudbasepredictor.data.local.SavedPlaceDao
 import com.cloudbasepredictor.data.local.SavedPlaceEntity
 import com.cloudbasepredictor.di.IoDispatcher
 import com.cloudbasepredictor.model.SavedPlace
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
@@ -19,7 +20,15 @@ interface PlaceRepository {
 
     fun observeSavedPlaces(): Flow<List<SavedPlace>>
 
+    fun observeFavoritePlaces(): Flow<List<SavedPlace>>
+
     suspend fun saveAndSelectPlace(place: SavedPlace)
+
+    suspend fun saveFavorite(placeId: String, name: String)
+
+    suspend fun deleteFavorite(placeId: String)
+
+    suspend fun selectPlace(place: SavedPlace)
 }
 
 @Singleton
@@ -37,16 +46,52 @@ class DefaultPlaceRepository @Inject constructor(
         }
     }
 
+    override fun observeFavoritePlaces(): Flow<List<SavedPlace>> {
+        return savedPlaceDao.observeFavoritePlaces().map { entities ->
+            entities.map(SavedPlaceEntity::toDomainModel)
+        }
+    }
+
     override suspend fun saveAndSelectPlace(place: SavedPlace) = withContext(ioDispatcher) {
-        savedPlaceDao.upsert(
-            SavedPlaceEntity(
-                id = place.id,
-                name = place.name,
-                latitude = place.latitude,
-                longitude = place.longitude,
-                defaultModel = place.defaultModel,
+        val existing = savedPlaceDao.findById(place.id)
+        if (existing != null) {
+            mutableSelectedPlace.value = existing.toDomainModel()
+        } else {
+            savedPlaceDao.upsert(
+                SavedPlaceEntity(
+                    id = place.id,
+                    name = place.name,
+                    latitude = place.latitude,
+                    longitude = place.longitude,
+                    defaultModel = place.defaultModel,
+                    isFavorite = false,
+                )
             )
-        )
+            mutableSelectedPlace.value = place
+        }
+    }
+
+    override suspend fun saveFavorite(placeId: String, name: String) = withContext(ioDispatcher) {
+        val existing = savedPlaceDao.findById(placeId) ?: return@withContext
+        val updated = existing.copy(name = name, isFavorite = true)
+        savedPlaceDao.upsert(updated)
+        if (mutableSelectedPlace.value?.id == placeId) {
+            mutableSelectedPlace.value = updated.toDomainModel()
+        }
+    }
+
+    override suspend fun deleteFavorite(placeId: String) = withContext(ioDispatcher) {
+        val existing = savedPlaceDao.findById(placeId) ?: return@withContext
+        val lat = String.format(Locale.US, "%.4f", existing.latitude)
+        val lon = String.format(Locale.US, "%.4f", existing.longitude)
+        val updated = existing.copy(name = "$lat, $lon", isFavorite = false)
+        savedPlaceDao.upsert(updated)
+        if (mutableSelectedPlace.value?.id == placeId) {
+            mutableSelectedPlace.value = updated.toDomainModel()
+        }
+    }
+
+    override suspend fun selectPlace(place: SavedPlace) {
         mutableSelectedPlace.value = place
     }
 }
@@ -58,5 +103,6 @@ private fun SavedPlaceEntity.toDomainModel(): SavedPlace {
         latitude = latitude,
         longitude = longitude,
         defaultModel = defaultModel,
+        isFavorite = isFavorite,
     )
 }

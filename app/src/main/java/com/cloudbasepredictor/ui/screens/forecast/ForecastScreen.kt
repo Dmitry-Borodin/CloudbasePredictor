@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -14,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.model.ForecastMode
+import com.cloudbasepredictor.ui.components.SaveFavoriteDialog
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.views.CloudForecastView
 import com.cloudbasepredictor.ui.screens.forecast.views.StuveForecastView
@@ -33,6 +37,8 @@ fun ForecastRoute(
         onDateSelected = viewModel::selectDay,
         onForecastModeSelected = viewModel::selectForecastMode,
         onForecastViewportTopChanged = viewModel::updateChartTopAltitude,
+        onSaveFavorite = viewModel::saveFavorite,
+        onDeleteFavorite = viewModel::deleteFavorite,
         onOpenMap = onOpenMap,
     )
 }
@@ -43,16 +49,22 @@ fun ForecastScreen(
     onDateSelected: (Int) -> Unit,
     onForecastModeSelected: (ForecastMode) -> Unit = {},
     onForecastViewportTopChanged: (Float) -> Unit = {},
+    onSaveFavorite: (String) -> Unit = {},
+    onDeleteFavorite: () -> Unit = {},
     onOpenMap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showFavoriteDialog by rememberSaveable { mutableStateOf(false) }
+
     Column(
         modifier = modifier.fillMaxSize(),
     ) {
         ForecastTopBar(
             placeName = uiState.selectedPlace?.name,
+            isFavorite = uiState.selectedPlace?.isFavorite == true,
             selectedMode = uiState.selectedForecastMode,
             onModeSelected = onForecastModeSelected,
+            onFavoriteClick = { showFavoriteDialog = true },
             onOpenMap = onOpenMap,
         )
 
@@ -104,6 +116,17 @@ fun ForecastScreen(
             dayChips = uiState.dayChips,
             selectedDayIndex = uiState.selectedDayIndex,
             onDateSelected = onDateSelected,
+        )
+    }
+
+    if (showFavoriteDialog) {
+        val place = uiState.selectedPlace
+        SaveFavoriteDialog(
+            currentName = if (place?.isFavorite == true) place.name else "",
+            isFavorite = place?.isFavorite == true,
+            onSave = onSaveFavorite,
+            onDelete = onDeleteFavorite,
+            onDismiss = { showFavoriteDialog = false },
         )
     }
 }
