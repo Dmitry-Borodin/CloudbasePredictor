@@ -1,8 +1,11 @@
 package com.cloudbasepredictor.ui.screens.forecast.views
 
+import android.content.res.Configuration
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,7 +14,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -19,6 +25,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -60,6 +67,7 @@ internal fun WindForecastView(
         WindChartCanvas(
             chart = uiState.windChart,
             visibleTopAltitudeKm = uiState.chartViewport.visibleTopAltitudeKm,
+            elevationKm = uiState.elevationKm,
             onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
             modifier = Modifier.fillMaxSize(),
         )
@@ -79,6 +87,7 @@ internal fun WindForecastView(
 private fun WindChartCanvas(
     chart: WindForecastChartUiModel,
     visibleTopAltitudeKm: Float,
+    elevationKm: Float,
     onVisibleTopAltitudeChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -122,18 +131,38 @@ private fun WindChartCanvas(
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
         }
     }
+    val tooltipPaint = remember(density, onSurfaceColor) {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = onSurfaceColor.toArgb()
+            textSize = with(density) { 12.sp.toPx() }
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        }
+    }
+    var crosshairPos by remember { mutableStateOf<Offset?>(null) }
 
     Canvas(
-        modifier = modifier.pointerInput(visibleTopAltitudeKm) {
-            detectTransformGestures { _, _, zoom, _ ->
-                onVisibleTopAltitudeChange(
-                    zoomedTopAltitudeKm(
-                        currentTopAltitudeKm = visibleTopAltitudeKm,
-                        zoomChange = zoom,
-                    ),
+        modifier = modifier
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    crosshairPos = if (crosshairPos != null) null else offset
+                }
+            }
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { offset -> crosshairPos = offset },
+                    onDrag = { change, _ -> crosshairPos = change.position },
                 )
             }
-        },
+            .pointerInput(visibleTopAltitudeKm) {
+                detectTransformGestures { _, _, zoom, _ ->
+                    onVisibleTopAltitudeChange(
+                        zoomedTopAltitudeKm(
+                            currentTopAltitudeKm = visibleTopAltitudeKm,
+                            zoomChange = zoom,
+                        ),
+                    )
+                }
+            },
     ) {
         val axisWidth = with(density) { 60.dp.toPx() }
         val bottomAxisHeight = with(density) { 38.dp.toPx() }
@@ -146,9 +175,9 @@ private fun WindChartCanvas(
         val plotWidth = plotRight - plotLeft
         val plotHeight = plotBottom - plotTop
 
-        val minAltitudeKm = WIND_MIN_ALTITUDE_KM
+        val minAltitudeKm = elevationKm
         val effectiveTopAltitudeKm = max(
-            visibleTopAltitudeKm,
+            elevationKm + visibleTopAltitudeKm,
             minAltitudeKm + WIND_MIN_VISIBLE_ALTITUDE_RANGE_KM,
         )
 
@@ -165,35 +194,36 @@ private fun WindChartCanvas(
 
         val columnWidth = plotWidth / chart.hours.size
 
-        // Determine which altitudes and hours to show arrows for,
-        // based on available cell size vs arrowSizePx
-        val visibleAltitudes = chart.altitudeBandsKm.filter {
-            it in minAltitudeKm..effectiveTopAltitudeKm
+        // Use altitude bands for display
+        val visibleBands = chart.altitudeBands.filter {
+            it.topKm > minAltitudeKm && it.bottomKm < effectiveTopAltitudeKm
         }
+        val visibleAltitudes = visibleBands.map { it.centerKm }
         if (visibleAltitudes.isEmpty()) return@Canvas
 
-        val altStep = if (visibleAltitudes.size > 1) {
-            visibleAltitudes[1] - visibleAltitudes[0]
-        } else {
-            0.25f
-        }
-        val bandHeightPx = plotHeight * altStep / (effectiveTopAltitudeKm - minAltitudeKm)
+        // Average band height for arrow clustering
+        val avgBandHeightKm = if (visibleBands.size > 1) {
+            (visibleBands.last().topKm - visibleBands.first().bottomKm) / visibleBands.size
+        } else 0.25f
+        val bandHeightPx = plotHeight * avgBandHeightKm / (effectiveTopAltitudeKm - minAltitudeKm)
 
         // Clustering: skip arrows if cells are too small
         val altCluster = max(1, ceil(arrowSizePx * 1.1f / bandHeightPx).toInt())
         val hourCluster = max(1, ceil(arrowSizePx * 1.1f / columnWidth).toInt())
 
-        // ── Wind speed background (smooth color per cell) ──────────
+        // ── Wind speed background using band boundaries ──────────
         chart.hours.forEachIndexed { hourIndex, hour ->
             val x = plotLeft + hourIndex * columnWidth
-            visibleAltitudes.forEachIndexed { altIdx, altKm ->
-                val cell = chart.cells.find { it.hour == hour && it.altitudeKm == altKm }
-                    ?: return@forEachIndexed
+            visibleBands.forEach { band ->
+                val cell = chart.cells.find { it.hour == hour && it.altitudeKm == band.centerKm }
+                    ?: return@forEach
                 val topY = altitudeToY(
-                    altKm + altStep, minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
+                    band.topKm.coerceAtMost(effectiveTopAltitudeKm),
+                    minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
                 )
                 val bottomY = altitudeToY(
-                    altKm, minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
+                    band.bottomKm.coerceAtLeast(minAltitudeKm),
+                    minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
                 )
                 drawRect(
                     color = windSpeedBgColor(cell.speedKmh),
@@ -310,17 +340,26 @@ private fun WindChartCanvas(
             val hourIndex = chart.hours.indexOf(hour)
             val cellCenterX = plotLeft + hourIndex * columnWidth + columnWidth * hourCluster / 2f
 
-            clusteredAltitudes.forEach { altKm ->
+            clusteredAltitudes.forEach clusteredAlt@{ altKm ->
+                // Collect cells in the altitude cluster range for averaging
+                val altIdx = visibleAltitudes.indexOf(altKm)
+                val clusterAlts = visibleAltitudes.subList(
+                    altIdx, (altIdx + altCluster).coerceAtMost(visibleAltitudes.size),
+                )
+                val clusterCells = clusterAlts.mapNotNull { a ->
+                    chart.cells.find { it.hour == hour && it.altitudeKm == a }
+                }
+                if (clusterCells.isEmpty()) return@clusteredAlt
+
+                val avgSpeed = clusterCells.map { it.speedKmh }.average().toFloat()
+                val avgDir = averageWindDirection(clusterCells.map { it.directionDeg })
+                val clusterBandBottom = visibleBands.find { it.centerKm == clusterAlts.first() }?.bottomKm ?: altKm
+                val clusterBandTop = visibleBands.find { it.centerKm == clusterAlts.last() }?.topKm ?: altKm
                 val cellCenterY = altitudeToY(
-                    altKm + altStep * altCluster / 2f,
+                    (clusterBandBottom + clusterBandTop) / 2f,
                     minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
                 )
-
-                // Find the cell closest to center of cluster
-                val cell = chart.cells.find { it.hour == hour && it.altitudeKm == altKm }
-                    ?: return@forEach
-
-                if (cellCenterY !in plotTop..plotBottom) return@forEach
+                if (cellCenterY !in plotTop..plotBottom) return@clusteredAlt
 
                 // Draw arrow — black in light theme (onSurface)
                 val arrowDrawSize = min(
@@ -330,9 +369,9 @@ private fun WindChartCanvas(
                 drawWindArrow(
                     centerX = cellCenterX,
                     centerY = cellCenterY,
-                    directionDeg = cell.directionDeg,
+                    directionDeg = avgDir,
                     arrowSize = arrowDrawSize,
-                    speedKmh = cell.speedKmh,
+                    speedKmh = avgSpeed,
                     color = onSurfaceColor,
                 )
             }
@@ -375,16 +414,24 @@ private fun WindChartCanvas(
                 val hourIndex = chart.hours.indexOf(hour)
                 val cellCenterX = plotLeft + hourIndex * columnWidth + columnWidth * hourCluster / 2f
 
-                clusteredAltitudes.forEach { altKm ->
+                clusteredAltitudes.forEach clusteredAltLabel@{ altKm ->
+                    val altIdx = visibleAltitudes.indexOf(altKm)
+                    val clusterAlts = visibleAltitudes.subList(
+                        altIdx, (altIdx + altCluster).coerceAtMost(visibleAltitudes.size),
+                    )
+                    val clusterCells = clusterAlts.mapNotNull { a ->
+                        chart.cells.find { it.hour == hour && it.altitudeKm == a }
+                    }
+                    if (clusterCells.isEmpty()) return@clusteredAltLabel
+
+                    val avgSpeed = clusterCells.map { it.speedKmh }.average().toFloat()
+                    val clusterBandBottom = visibleBands.find { it.centerKm == clusterAlts.first() }?.bottomKm ?: altKm
+                    val clusterBandTop = visibleBands.find { it.centerKm == clusterAlts.last() }?.topKm ?: altKm
                     val cellCenterY = altitudeToY(
-                        altKm + altStep * altCluster / 2f,
+                        (clusterBandBottom + clusterBandTop) / 2f,
                         minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
                     )
-
-                    val cell = chart.cells.find { it.hour == hour && it.altitudeKm == altKm }
-                        ?: return@forEach
-
-                    if (cellCenterY !in plotTop..plotBottom) return@forEach
+                    if (cellCenterY !in plotTop..plotBottom) return@clusteredAltLabel
 
                     // Speed text below the arrow
                     val arrowDrawSize = min(
@@ -392,7 +439,7 @@ private fun WindChartCanvas(
                         min(columnWidth * hourCluster * 0.8f, bandHeightPx * altCluster * 0.8f),
                     )
                     canvas.nativeCanvas.drawText(
-                        "${cell.speedKmh.toInt()}",
+                        "${avgSpeed.toInt()}",
                         cellCenterX,
                         cellCenterY + arrowDrawSize / 2f + speedLabelPaint.textSize + 1.dp.toPx(),
                         speedLabelPaint,
@@ -436,6 +483,102 @@ private fun WindChartCanvas(
                         30.dp.toPx(),
                         y - 4.dp.toPx(),
                         flLabelPaint,
+                    )
+                }
+            }
+        }
+
+        // ── Crosshair overlay ──────────────────────────────────
+        crosshairPos?.let { pos ->
+            val cx = pos.x.coerceIn(plotLeft, plotRight)
+            val cy = pos.y.coerceIn(plotTop, plotBottom)
+
+            val dash = PathEffect.dashPathEffect(floatArrayOf(8f, 6f))
+            drawLine(
+                color = onSurfaceColor.copy(alpha = 0.5f),
+                start = Offset(cx, plotTop),
+                end = Offset(cx, plotBottom),
+                strokeWidth = 1.dp.toPx(),
+                pathEffect = dash,
+            )
+            drawLine(
+                color = onSurfaceColor.copy(alpha = 0.5f),
+                start = Offset(plotLeft, cy),
+                end = Offset(plotRight, cy),
+                strokeWidth = 1.dp.toPx(),
+                pathEffect = dash,
+            )
+
+            val reticleR = with(density) { 18.dp.toPx() }
+            drawCircle(
+                color = onSurfaceColor.copy(alpha = 0.7f),
+                radius = reticleR,
+                center = Offset(cx, cy),
+                style = Stroke(width = 2.dp.toPx()),
+            )
+            val tick = with(density) { 4.dp.toPx() }
+            for (angleDeg in listOf(0f, 90f, 180f, 270f)) {
+                val rad = angleDeg * PI.toFloat() / 180f
+                drawLine(
+                    color = onSurfaceColor.copy(alpha = 0.7f),
+                    start = Offset(
+                        cx + cos(rad) * (reticleR - tick),
+                        cy + sin(rad) * (reticleR - tick),
+                    ),
+                    end = Offset(
+                        cx + cos(rad) * (reticleR + tick),
+                        cy + sin(rad) * (reticleR + tick),
+                    ),
+                    strokeWidth = 2.dp.toPx(),
+                )
+            }
+
+            val altKm = yToAltitude(cy, minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom)
+            val hourIdx = ((cx - plotLeft) / columnWidth).toInt()
+                .coerceIn(0, chart.hours.size - 1)
+            val hour = chart.hours[hourIdx]
+            val cell = chart.cells
+                .filter { it.hour == hour }
+                .minByOrNull { kotlin.math.abs(it.altitudeKm - altKm) }
+
+            val tooltipLines = mutableListOf<String>()
+            tooltipLines += String.format(Locale.US, "%02dh  %.1f km", hour, altKm)
+            if (cell != null) {
+                tooltipLines += "${cell.speedKmh.toInt()} km/h  ${cell.directionDeg.toInt()}°"
+            }
+
+            val lineH = tooltipPaint.textSize * 1.3f
+            val maxTextW = tooltipLines.maxOf { tooltipPaint.measureText(it) }
+            val padH = with(density) { 8.dp.toPx() }
+            val padV = with(density) { 6.dp.toPx() }
+            val ttW = maxTextW + padH * 2
+            val ttH = lineH * tooltipLines.size + padV * 2
+            val ttX = if (cx + reticleR + ttW + 8.dp.toPx() < plotRight)
+                cx + reticleR + 8.dp.toPx()
+            else
+                cx - reticleR - ttW - 8.dp.toPx()
+            val ttY = (cy - ttH / 2f).coerceIn(plotTop, plotBottom - ttH)
+
+            drawRoundRect(
+                color = gridBackgroundColor.copy(alpha = 0.92f),
+                topLeft = Offset(ttX, ttY),
+                size = Size(ttW, ttH),
+                cornerRadius = CornerRadius(4.dp.toPx()),
+            )
+            drawRoundRect(
+                color = onSurfaceColor.copy(alpha = 0.3f),
+                topLeft = Offset(ttX, ttY),
+                size = Size(ttW, ttH),
+                cornerRadius = CornerRadius(4.dp.toPx()),
+                style = Stroke(width = 1.dp.toPx()),
+            )
+            drawIntoCanvas { canvas ->
+                tooltipLines.forEachIndexed { idx, line ->
+                    canvas.nativeCanvas.drawText(
+                        line,
+                        ttX + padH,
+                        ttY + padV + (idx + 1) * lineH - lineH * 0.15f,
+                        tooltipPaint,
                     )
                 }
             }
@@ -494,15 +637,24 @@ private fun DrawScope.drawWindArrow(
 
 private fun windSpeedColor(speedKmh: Float): Color {
     val normalized = (speedKmh / 60f).coerceIn(0f, 1f)
-    val low = Color(0xFF4CAF50)    // Green — calm
-    val medium = Color(0xFFFFC107)  // Amber — moderate
-    val high = Color(0xFFE53935)    // Red — strong
+    val colorStops = listOf(
+        0f to Color(0xFF81C784),     // Soft green — calm
+        0.15f to Color(0xFF4CAF50),  // Green — light breeze
+        0.3f to Color(0xFFCDDC39),   // Lime — moderate
+        0.45f to Color(0xFFFFEB3B),  // Yellow — fresh breeze
+        0.6f to Color(0xFFFFC107),   // Amber — strong
+        0.75f to Color(0xFFFF9800),  // Orange — near gale
+        0.9f to Color(0xFFE53935),   // Red — gale
+        1f to Color(0xFF9C27B0),     // Purple — storm
+    )
 
-    return if (normalized <= 0.5f) {
-        lerp(low, medium, normalized / 0.5f)
-    } else {
-        lerp(medium, high, (normalized - 0.5f) / 0.5f)
-    }
+    val lowerStop = colorStops.lastOrNull { it.first <= normalized } ?: colorStops.first()
+    val upperStop = colorStops.firstOrNull { it.first >= normalized } ?: colorStops.last()
+
+    if (lowerStop.first == upperStop.first) return lowerStop.second
+
+    val fraction = (normalized - lowerStop.first) / (upperStop.first - lowerStop.first)
+    return lerp(lowerStop.second, upperStop.second, fraction)
 }
 
 /** Background color for wind cells — same scale as windSpeedColor but with low alpha. */
@@ -521,6 +673,17 @@ private fun altitudeToY(
     return plotBottom - normalizedAltitude * (plotBottom - plotTop)
 }
 
+private fun yToAltitude(
+    y: Float,
+    minAltitudeKm: Float,
+    maxAltitudeKm: Float,
+    plotTop: Float,
+    plotBottom: Float,
+): Float {
+    val normalizedAltitude = (plotBottom - y) / (plotBottom - plotTop)
+    return minAltitudeKm + normalizedAltitude * (maxAltitudeKm - minAltitudeKm)
+}
+
 private fun buildAltitudeTicks(
     minAltitudeKm: Float,
     maxAltitudeKm: Float,
@@ -536,8 +699,21 @@ private fun buildAltitudeTicks(
     return ticks.distinctBy { (it * 100f).toInt() }
 }
 
-private const val WIND_MIN_ALTITUDE_KM = 0.4f
 private const val WIND_MIN_VISIBLE_ALTITUDE_RANGE_KM = 0.75f
+
+/** Average wind directions by decomposing into unit vectors and recombining. */
+private fun averageWindDirection(directions: List<Float>): Float {
+    if (directions.isEmpty()) return 0f
+    var sinSum = 0f
+    var cosSum = 0f
+    directions.forEach { deg ->
+        val rad = deg * PI.toFloat() / 180f
+        sinSum += sin(rad)
+        cosSum += cos(rad)
+    }
+    val avgRad = kotlin.math.atan2(sinSum, cosSum)
+    return ((avgRad * 180f / PI.toFloat()) + 360f) % 360f
+}
 
 @Preview(name = "Wind Default", showBackground = true, widthDp = 420, heightDp = 720)
 @Composable
@@ -571,6 +747,22 @@ private fun WindForecastViewZoomedOutPreview() {
                 mode = ForecastMode.WIND,
                 topAltitudeKm = 6.5f,
             ),
+        )
+    }
+}
+
+@Preview(
+    name = "Wind Dark",
+    showBackground = true,
+    widthDp = 420,
+    heightDp = 720,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun WindForecastViewDarkPreview() {
+    CloudbasePredictorTheme(darkTheme = true) {
+        WindForecastView(
+            uiState = PreviewData.forecastUiStateForMode(ForecastMode.WIND),
         )
     }
 }

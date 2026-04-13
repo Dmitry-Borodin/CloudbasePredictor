@@ -14,7 +14,7 @@ fun OpenMeteoHourlyForecastResponse.toHourlyForecastData(): HourlyForecastData {
     val hourly = this.hourly
     val times = hourly.time  // ISO-8601 local, e.g. "2026-04-12T14:00"
 
-    val pressureLevels = listOf(1000, 950, 925, 900, 850, 800, 700, 600, 500)
+    val pressureLevels = listOf(1000, 975, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500)
     val tempByPressure = hourly.temperaturesByPressure().toMap()
     val dewByPressure = hourly.dewPointsByPressure().toMap()
     val windSpeedByPressure = hourly.windSpeedsByPressure().toMap()

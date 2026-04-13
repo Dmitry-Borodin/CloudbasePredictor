@@ -1,5 +1,6 @@
 package com.cloudbasepredictor.ui
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
@@ -17,12 +18,15 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.data.local.DatabaseErrorManager
+import com.cloudbasepredictor.data.theme.ThemePreference
+import com.cloudbasepredictor.data.theme.ThemeRepository
 import com.cloudbasepredictor.ui.navigation.CloudbaseNavGraph
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
 fun CloudbasePredictorApp(
     databaseErrorManager: DatabaseErrorManager? = null,
+    themeRepository: ThemeRepository? = null,
     navGraph: @Composable (Modifier, NavHostController) -> Unit = { modifier, navController ->
         CloudbaseNavGraph(
             navController = navController,
@@ -30,7 +34,14 @@ fun CloudbasePredictorApp(
         )
     },
 ) {
-    CloudbasePredictorTheme {
+    val themePref = themeRepository?.preference?.collectAsStateWithLifecycle()
+    val darkTheme = when (themePref?.value) {
+        ThemePreference.LIGHT -> false
+        ThemePreference.DARK -> true
+        else -> isSystemInDarkTheme()
+    }
+
+    CloudbasePredictorTheme(darkTheme = darkTheme) {
         val navController = rememberNavController()
         navGraph(Modifier.fillMaxSize(), navController)
 

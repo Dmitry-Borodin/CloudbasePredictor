@@ -136,6 +136,7 @@ internal fun buildThermicChartFromData(
     val timeSlots = daytimePoints.map { it.hour * 60 }
 
     val elevation = hourlyData.elevation ?: 0.0
+    val elevationKm = elevation.toFloat() / 1000f
 
     val cells = mutableListOf<ThermicForecastCellUiModel>()
     val cloudMarkers = mutableListOf<ThermicForecastCloudMarkerUiModel>()
@@ -156,25 +157,25 @@ internal fun buildThermicChartFromData(
         val surfaceThetaK = (surfaceTemp.toFloat() + 273.15f) * (1000f / surfacePressure).pow(kappa)
 
         // Find thermal top: where parcel temp < environment temp
-        var thermalTopKm = 0f
+        var thermalTopKm = elevationKm
         for (pl in pressureLevels.reversed()) {
-            val heightAgl = ((pl.geopotentialHeightM ?: 0.0) - elevation).toFloat() / 1000f
-            if (heightAgl < 0f) continue
+            val heightAsl = (pl.geopotentialHeightM ?: 0.0).toFloat() / 1000f
+            if (heightAsl < elevationKm) continue
             val parcelTemp = dryAdiabatTemperatureC(surfaceThetaK, pl.pressureHpa.toFloat())
             if (parcelTemp < pl.temperatureC.toFloat()) {
-                thermalTopKm = heightAgl.coerceAtLeast(0f)
+                thermalTopKm = heightAsl.coerceAtLeast(elevationKm)
                 break
             }
-            thermalTopKm = heightAgl
+            thermalTopKm = heightAsl
         }
 
         // Build thermal cells below the top
         val altitudeStepKm = 0.2f
-        var currentAlt = 0f
+        var currentAlt = elevationKm
         while (currentAlt < thermalTopKm) {
             val nextAlt = (currentAlt + altitudeStepKm).coerceAtMost(thermalTopKm)
             val bandCenter = (currentAlt + nextAlt) / 2f
-            val altFraction = if (thermalTopKm > 0f) bandCenter / thermalTopKm else 0f
+            val altFraction = if (thermalTopKm > elevationKm) (bandCenter - elevationKm) / (thermalTopKm - elevationKm) else 0f
             // Thermal strength from CAPE: scaled sqrt(2*CAPE) for realistic thermal values
             val maxUpdraft = (kotlin.math.sqrt(2.0 * capeJKg).toFloat() * 0.15f).coerceAtMost(10f)
             val strength = (maxUpdraft * (1f - altFraction * 0.6f)).coerceIn(0f, 10f)
@@ -189,7 +190,7 @@ internal fun buildThermicChartFromData(
         }
 
         // Cloud marker at thermal top if we have enough lift
-        if (thermalTopKm > 0.5f && capeJKg > 50.0) {
+        if (thermalTopKm > elevationKm + 0.5f && capeJKg > 50.0) {
             cloudMarkers += ThermicForecastCloudMarkerUiModel(
                 startMinuteOfDayLocal = startMinute,
                 altitudeKm = thermalTopKm + 0.1f,
@@ -226,9 +227,10 @@ internal fun buildWindChartFromData(
     }
 
     val elevation = hourlyData.elevation ?: 0.0
+    val elevationKm = elevation.toFloat() / 1000f
     val hours = daytimePoints.map { it.hour }
 
-    // Collect all altitude bands from pressure level data
+    // Collect all altitude bands from pressure level data (ASL)
     val altitudeSet = sortedSetOf<Float>()
     val cellList = mutableListOf<WindForecastCellUiModel>()
 
@@ -237,7 +239,7 @@ internal fun buildWindChartFromData(
         val surfWindSpeed = hp.windSpeed10mKmh
         val surfWindDir = hp.windDirection10mDeg
         if (surfWindSpeed != null && surfWindDir != null) {
-            val surfAlt = 0.01f // ~10m AGL
+            val surfAlt = elevationKm + 0.01f // ~10m above terrain, ASL
             altitudeSet.add(surfAlt)
             cellList += WindForecastCellUiModel(
                 hour = hp.hour,
@@ -248,15 +250,14 @@ internal fun buildWindChartFromData(
         }
 
         hp.pressureLevels.forEach { pl ->
-            val heightAgl = ((pl.geopotentialHeightM ?: return@forEach) - elevation).toFloat() / 1000f
-            if (heightAgl < 0f || heightAgl > maxAltitudeKm) return@forEach
+            val heightAsl = (pl.geopotentialHeightM ?: return@forEach).toFloat() / 1000f
+            if (heightAsl < elevationKm || heightAsl > elevationKm + maxAltitudeKm) return@forEach
             val speed = pl.windSpeedKmh ?: return@forEach
             val dir = pl.windDirectionDeg ?: return@forEach
-            val roundedAlt = (heightAgl * 4f).toInt() / 4f // round to 0.25km
-            altitudeSet.add(roundedAlt)
+            altitudeSet.add(heightAsl)
             cellList += WindForecastCellUiModel(
                 hour = hp.hour,
-                altitudeKm = roundedAlt,
+                altitudeKm = heightAsl,
                 speedKmh = speed.toFloat(),
                 directionDeg = dir.toFloat(),
             )
@@ -267,15 +268,15 @@ internal fun buildWindChartFromData(
         return buildPlaceholderWindForecastChart(dayIndex, maxAltitudeKm = maxAltitudeKm)
     }
 
-    // Freezing level (0 °C isotherm) — from API or interpolated from pressure levels
+    // Freezing level (0 °C isotherm) — from API, ASL
     val freezingLevelMarkers = daytimePoints.mapNotNull { hp ->
         val flAsl = hp.freezingLevelHeightM ?: return@mapNotNull null
-        val flAgl = ((flAsl - elevation) / 1000.0).toFloat()
-        if (flAgl < 0f) return@mapNotNull null
-        WindLevelMarker(hour = hp.hour, altitudeKm = flAgl)
+        val flAslKm = (flAsl / 1000.0).toFloat()
+        if (flAslKm < elevationKm) return@mapNotNull null
+        WindLevelMarker(hour = hp.hour, altitudeKm = flAslKm)
     }
 
-    // CCL (Convective Condensation Level) — where surface mixing ratio meets env. temp
+    // CCL (Convective Condensation Level) — where surface mixing ratio meets env. temp, ASL
     val surfacePressure = estimateSurfacePressureHpa(elevation)
     val cclMarkers = daytimePoints.mapNotNull { hp ->
         val surfDew = hp.dewPoint2mC?.toFloat() ?: return@mapNotNull null
@@ -286,18 +287,31 @@ internal fun buildWindChartFromData(
         for (pl in pls) {
             val satMr = saturationMixingRatioGKg(pl.temperatureC.toFloat(), pl.pressureHpa.toFloat())
             if (satMr <= surfMr) {
-                val heightAgl = ((pl.geopotentialHeightM ?: continue) - elevation).toFloat() / 1000f
-                if (heightAgl > 0f) {
-                    return@mapNotNull WindLevelMarker(hour = hp.hour, altitudeKm = heightAgl)
+                val heightAsl = (pl.geopotentialHeightM ?: continue).toFloat() / 1000f
+                if (heightAsl > elevationKm) {
+                    return@mapNotNull WindLevelMarker(hour = hp.hour, altitudeKm = heightAsl)
                 }
             }
         }
         null
     }
 
+    // Compute altitude bands: each data level gets ±200m or half distance to neighbor
+    val sortedAlts = altitudeSet.toList()
+    val altitudeBands = sortedAlts.mapIndexed { idx, alt ->
+        val lowerDist = if (idx > 0) (alt - sortedAlts[idx - 1]) / 2f else 0.2f
+        val upperDist = if (idx < sortedAlts.lastIndex) (sortedAlts[idx + 1] - alt) / 2f else 0.2f
+        WindAltitudeBand(
+            centerKm = alt,
+            bottomKm = alt - lowerDist.coerceAtMost(0.2f),
+            topKm = alt + upperDist.coerceAtMost(0.2f),
+        )
+    }
+
     return WindForecastChartUiModel(
         hours = hours,
-        altitudeBandsKm = altitudeSet.toList(),
+        altitudeBandsKm = sortedAlts,
+        altitudeBands = altitudeBands,
         cells = cellList,
         freezingLevelKm = freezingLevelMarkers,
         cclKm = cclMarkers,

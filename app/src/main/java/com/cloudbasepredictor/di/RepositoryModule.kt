@@ -10,6 +10,8 @@ import com.cloudbasepredictor.data.forecast.InMemoryForecastModeRepository
 import com.cloudbasepredictor.data.forecast.InMemoryForecastModelRepository
 import com.cloudbasepredictor.data.place.DefaultPlaceRepository
 import com.cloudbasepredictor.data.place.PlaceRepository
+import com.cloudbasepredictor.data.theme.InMemoryThemeRepository
+import com.cloudbasepredictor.data.theme.ThemeRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -48,4 +50,10 @@ abstract class RepositoryModule {
     abstract fun bindDataSourceRepository(
         repository: InMemoryDataSourceRepository,
     ): DataSourceRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindThemeRepository(
+        repository: InMemoryThemeRepository,
+    ): ThemeRepository
 }

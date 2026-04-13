@@ -1,11 +1,18 @@
 package com.cloudbasepredictor.ui.screens.forecast.views
 
+import android.content.res.Configuration
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -16,6 +23,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -33,7 +41,9 @@ import com.cloudbasepredictor.ui.screens.forecast.zoomedTopAltitudeKm
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.util.Locale
 import kotlin.math.ceil
+import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.sin
 
 @Composable
 internal fun ThermicForecastView(
@@ -48,6 +58,7 @@ internal fun ThermicForecastView(
         ThermicForecastGrid(
             chart = uiState.thermicChart,
             visibleTopAltitudeKm = uiState.chartViewport.visibleTopAltitudeKm,
+            elevationKm = uiState.elevationKm,
             onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
             modifier = chartModifier,
         )
@@ -58,15 +69,20 @@ internal fun ThermicForecastView(
 private fun ThermicForecastGrid(
     chart: ThermicForecastChartUiModel,
     visibleTopAltitudeKm: Float,
+    elevationKm: Float,
     onVisibleTopAltitudeChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    val axisLabelColor = Color(0xFF667085)
-    val cellTextColor = Color(0xFF111827)
-    val cloudOutlineColor = Color(0xFF111111)
-    val gridBackgroundColor = Color(0xFFF7F7F6)
-    val outlineColor = Color(0xFF98A2B3)
+    val axisLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val cellTextColor = MaterialTheme.colorScheme.onSurface
+    val cloudOutlineColor = MaterialTheme.colorScheme.onSurface
+    val gridBackgroundColor = lerp(
+        start = MaterialTheme.colorScheme.surface,
+        stop = MaterialTheme.colorScheme.onSurface,
+        fraction = 0.035f,
+    )
+    val outlineColor = MaterialTheme.colorScheme.outlineVariant
 
     val axisLabelPaint = remember(density, axisLabelColor) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -98,11 +114,31 @@ private fun ThermicForecastGrid(
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
         }
     }
+    val tooltipPaint = remember(density, cellTextColor) {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = cellTextColor.toArgb()
+            textSize = with(density) { 12.sp.toPx() }
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        }
+    }
+    var crosshairPos by remember { mutableStateOf<Offset?>(null) }
 
     Canvas(
-        modifier = modifier.pointerInput(visibleTopAltitudeKm) {
-            detectTransformGestures { _, _, zoom, _ ->
-                onVisibleTopAltitudeChange(
+        modifier = modifier
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    crosshairPos = if (crosshairPos != null) null else offset
+                }
+            }
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { offset -> crosshairPos = offset },
+                    onDrag = { change, _ -> crosshairPos = change.position },
+                )
+            }
+            .pointerInput(visibleTopAltitudeKm) {
+                detectTransformGestures { _, _, zoom, _ ->
+                    onVisibleTopAltitudeChange(
                     zoomedTopAltitudeKm(
                         currentTopAltitudeKm = visibleTopAltitudeKm,
                         zoomChange = zoom,
@@ -130,18 +166,18 @@ private fun ThermicForecastGrid(
         val plotHeight = plotBottom - plotTop
 
         val effectiveTopAltitudeKm = max(
-            visibleTopAltitudeKm,
-            THERMIC_MIN_ALTITUDE_KM + MIN_VISIBLE_ALTITUDE_RANGE_KM,
+            elevationKm + visibleTopAltitudeKm,
+            elevationKm + MIN_VISIBLE_ALTITUDE_RANGE_KM,
         )
         val majorAltitudeTicks = buildAltitudeTicks(
-            minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
+            minAltitudeKm = elevationKm,
             maxAltitudeKm = effectiveTopAltitudeKm,
-            stepKm = thermicMajorAltitudeStepKm(effectiveTopAltitudeKm),
+            stepKm = thermicMajorAltitudeStepKm(effectiveTopAltitudeKm - elevationKm),
         )
         val minorAltitudeTicks = buildAltitudeTicks(
-            minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
+            minAltitudeKm = elevationKm,
             maxAltitudeKm = effectiveTopAltitudeKm,
-            stepKm = THERMIC_MINOR_ALTITUDE_STEP_KM,
+            stepKm = 0.25f,
         )
 
         if (plotWidth <= 0f || plotHeight <= 0f) {
@@ -181,7 +217,7 @@ private fun ThermicForecastGrid(
         minorAltitudeTicks.forEach { altitudeKm ->
             val y = altitudeToY(
                 altitudeKm = altitudeKm,
-                minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
+                minAltitudeKm = elevationKm,
                 maxAltitudeKm = effectiveTopAltitudeKm,
                 plotTop = plotTop,
                 plotBottom = plotBottom,
@@ -222,7 +258,7 @@ private fun ThermicForecastGrid(
 
         displayChart.cells.forEach { cell ->
             val timeIndex = timeIndexLookup[cell.startMinuteOfDayLocal] ?: return@forEach
-            val visibleStartAltitudeKm = cell.startAltitudeKm.coerceAtLeast(THERMIC_MIN_ALTITUDE_KM)
+            val visibleStartAltitudeKm = cell.startAltitudeKm.coerceAtLeast(elevationKm)
             val visibleEndAltitudeKm = cell.endAltitudeKm.coerceAtMost(effectiveTopAltitudeKm)
 
             if (visibleEndAltitudeKm <= visibleStartAltitudeKm) {
@@ -231,14 +267,14 @@ private fun ThermicForecastGrid(
 
             val topY = altitudeToY(
                 altitudeKm = visibleEndAltitudeKm,
-                minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
+                minAltitudeKm = elevationKm,
                 maxAltitudeKm = effectiveTopAltitudeKm,
                 plotTop = plotTop,
                 plotBottom = plotBottom,
             )
             val bottomY = altitudeToY(
                 altitudeKm = visibleStartAltitudeKm,
-                minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
+                minAltitudeKm = elevationKm,
                 maxAltitudeKm = effectiveTopAltitudeKm,
                 plotTop = plotTop,
                 plotBottom = plotBottom,
@@ -266,7 +302,7 @@ private fun ThermicForecastGrid(
         majorAltitudeTicks.forEach { altitudeKm ->
             val y = altitudeToY(
                 altitudeKm = altitudeKm,
-                minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
+                minAltitudeKm = elevationKm,
                 maxAltitudeKm = effectiveTopAltitudeKm,
                 plotTop = plotTop,
                 plotBottom = plotBottom,
@@ -297,7 +333,7 @@ private fun ThermicForecastGrid(
 
         displayChart.cloudMarkers.forEach { marker ->
             val timeIndex = timeIndexLookup[marker.startMinuteOfDayLocal] ?: return@forEach
-            if (marker.altitudeKm !in THERMIC_MIN_ALTITUDE_KM..effectiveTopAltitudeKm) {
+            if (marker.altitudeKm !in elevationKm..effectiveTopAltitudeKm) {
                 return@forEach
             }
 
@@ -306,7 +342,7 @@ private fun ThermicForecastGrid(
                     x = plotLeft + (timeIndex * columnWidth) + (columnWidth / 2f),
                     y = altitudeToY(
                         altitudeKm = marker.altitudeKm,
-                        minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
+                        minAltitudeKm = elevationKm,
                         maxAltitudeKm = effectiveTopAltitudeKm,
                         plotTop = plotTop,
                         plotBottom = plotBottom,
@@ -333,7 +369,7 @@ private fun ThermicForecastGrid(
                 val timeIndex = timeIndexLookup[cell.startMinuteOfDayLocal] ?: return@cellLoop
 
                 val visibleStartAltitudeKm =
-                    cell.startAltitudeKm.coerceAtLeast(THERMIC_MIN_ALTITUDE_KM)
+                    cell.startAltitudeKm.coerceAtLeast(elevationKm)
                 val visibleEndAltitudeKm =
                     cell.endAltitudeKm.coerceAtMost(effectiveTopAltitudeKm)
 
@@ -341,14 +377,14 @@ private fun ThermicForecastGrid(
 
                 val topY = altitudeToY(
                     altitudeKm = visibleEndAltitudeKm,
-                    minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
+                    minAltitudeKm = elevationKm,
                     maxAltitudeKm = effectiveTopAltitudeKm,
                     plotTop = plotTop,
                     plotBottom = plotBottom,
                 )
                 val bottomY = altitudeToY(
                     altitudeKm = visibleStartAltitudeKm,
-                    minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
+                    minAltitudeKm = elevationKm,
                     maxAltitudeKm = effectiveTopAltitudeKm,
                     plotTop = plotTop,
                     plotBottom = plotBottom,
@@ -383,7 +419,7 @@ private fun ThermicForecastGrid(
             majorAltitudeTicks.forEach { altitudeKm ->
                 val y = altitudeToY(
                     altitudeKm = altitudeKm,
-                    minAltitudeKm = THERMIC_MIN_ALTITUDE_KM,
+                    minAltitudeKm = elevationKm,
                     maxAltitudeKm = effectiveTopAltitudeKm,
                     plotTop = plotTop,
                     plotBottom = plotBottom,
@@ -418,6 +454,102 @@ private fun ThermicForecastGrid(
                     plotBottom + hourLabelPaint.textSize + 14.dp.toPx(),
                     hourLabelPaint,
                 )
+            }
+        }
+
+        // ── Crosshair overlay ──────────────────────────────────
+        crosshairPos?.let { pos ->
+            val cx = pos.x.coerceIn(plotLeft, plotRight)
+            val cy = pos.y.coerceIn(plotTop, plotBottom)
+
+            val dash = PathEffect.dashPathEffect(floatArrayOf(8f, 6f))
+            drawLine(
+                color = outlineColor.copy(alpha = 0.6f),
+                start = Offset(cx, plotTop),
+                end = Offset(cx, plotBottom),
+                strokeWidth = 1.dp.toPx(),
+                pathEffect = dash,
+            )
+            drawLine(
+                color = outlineColor.copy(alpha = 0.6f),
+                start = Offset(plotLeft, cy),
+                end = Offset(plotRight, cy),
+                strokeWidth = 1.dp.toPx(),
+                pathEffect = dash,
+            )
+
+            val reticleR = with(density) { 18.dp.toPx() }
+            drawCircle(
+                color = outlineColor.copy(alpha = 0.8f),
+                radius = reticleR,
+                center = Offset(cx, cy),
+                style = Stroke(width = 2.dp.toPx()),
+            )
+            val tick = with(density) { 4.dp.toPx() }
+            for (angleDeg in listOf(0f, 90f, 180f, 270f)) {
+                val rad = angleDeg * kotlin.math.PI.toFloat() / 180f
+                drawLine(
+                    color = outlineColor.copy(alpha = 0.8f),
+                    start = Offset(
+                        cx + cos(rad) * (reticleR - tick),
+                        cy + sin(rad) * (reticleR - tick),
+                    ),
+                    end = Offset(
+                        cx + cos(rad) * (reticleR + tick),
+                        cy + sin(rad) * (reticleR + tick),
+                    ),
+                    strokeWidth = 2.dp.toPx(),
+                )
+            }
+
+            val altKm = yToAltitude(cy, elevationKm, effectiveTopAltitudeKm, plotTop, plotBottom)
+            val timeIdx = ((cx - plotLeft) / columnWidth).toInt()
+                .coerceIn(0, displayChart.timeSlots.size - 1)
+            val timeSlot = displayChart.timeSlots[timeIdx]
+            val cell = displayChart.cells
+                .filter { it.startMinuteOfDayLocal == timeSlot }
+                .firstOrNull { altKm in it.startAltitudeKm..it.endAltitudeKm }
+
+            val tooltipLines = mutableListOf<String>()
+            tooltipLines += "${formatTimeLabel(timeSlot)}  ${formatAltitudeLabel(altKm)} km"
+            if (cell != null) {
+                tooltipLines += "${formatThermicStrengthLabel(cell.strengthMps)} m/s"
+            }
+
+            val lineH = tooltipPaint.textSize * 1.3f
+            val maxTextW = tooltipLines.maxOf { tooltipPaint.measureText(it) }
+            val padH = with(density) { 8.dp.toPx() }
+            val padV = with(density) { 6.dp.toPx() }
+            val ttW = maxTextW + padH * 2
+            val ttH = lineH * tooltipLines.size + padV * 2
+            val ttX = if (cx + reticleR + ttW + 8.dp.toPx() < plotRight)
+                cx + reticleR + 8.dp.toPx()
+            else
+                cx - reticleR - ttW - 8.dp.toPx()
+            val ttY = (cy - ttH / 2f).coerceIn(plotTop, plotBottom - ttH)
+
+            drawRoundRect(
+                color = gridBackgroundColor.copy(alpha = 0.92f),
+                topLeft = Offset(ttX, ttY),
+                size = Size(ttW, ttH),
+                cornerRadius = CornerRadius(4.dp.toPx()),
+            )
+            drawRoundRect(
+                color = outlineColor.copy(alpha = 0.4f),
+                topLeft = Offset(ttX, ttY),
+                size = Size(ttW, ttH),
+                cornerRadius = CornerRadius(4.dp.toPx()),
+                style = Stroke(width = 1.dp.toPx()),
+            )
+            drawIntoCanvas { canvas ->
+                tooltipLines.forEachIndexed { idx, line ->
+                    canvas.nativeCanvas.drawText(
+                        line,
+                        ttX + padH,
+                        ttY + padV + (idx + 1) * lineH - lineH * 0.15f,
+                        tooltipPaint,
+                    )
+                }
             }
         }
     }
@@ -489,6 +621,17 @@ private fun altitudeToY(
 ): Float {
     val normalizedAltitude = (altitudeKm - minAltitudeKm) / (maxAltitudeKm - minAltitudeKm)
     return plotBottom - (normalizedAltitude * (plotBottom - plotTop))
+}
+
+private fun yToAltitude(
+    y: Float,
+    minAltitudeKm: Float,
+    maxAltitudeKm: Float,
+    plotTop: Float,
+    plotBottom: Float,
+): Float {
+    val normalizedAltitude = (plotBottom - y) / (plotBottom - plotTop)
+    return minAltitudeKm + normalizedAltitude * (maxAltitudeKm - minAltitudeKm)
 }
 
 private fun thermicStrengthColor(strengthMps: Float): Color {
@@ -594,8 +737,6 @@ private fun formatTimeLabel(startMinuteOfDayLocal: Int): String {
     return String.format(Locale.US, "%02d:%02d", hour, minute)
 }
 
-private const val THERMIC_MIN_ALTITUDE_KM = 0f
-private const val THERMIC_MINOR_ALTITUDE_STEP_KM = 0.25f
 private const val MIN_VISIBLE_ALTITUDE_RANGE_KM = 0.75f
 private const val ALTITUDE_EPSILON = 0.001f
 private const val THERMIC_DATA_ALTITUDE_STEP_KM = 0.05f
@@ -623,6 +764,22 @@ private fun ThermicForecastViewZoomedOutPreview() {
                 mode = ForecastMode.THERMIC,
                 topAltitudeKm = 6.5f,
             ),
+        )
+    }
+}
+
+@Preview(
+    name = "Thermic Dark",
+    showBackground = true,
+    widthDp = 420,
+    heightDp = 720,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun ThermicForecastViewDarkPreview() {
+    CloudbasePredictorTheme(darkTheme = true) {
+        ThermicForecastView(
+            uiState = PreviewData.forecastUiStateForMode(ForecastMode.THERMIC),
         )
     }
 }

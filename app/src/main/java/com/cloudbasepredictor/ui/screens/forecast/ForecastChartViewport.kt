@@ -49,5 +49,5 @@ internal fun sanitizeTopAltitudeKm(
     return topAltitudeKm.coerceIn(minTopAltitudeKm, maxTopAltitudeKm)
 }
 
-internal const val DEFAULT_TOP_ALTITUDE_KM = 4f
+internal const val DEFAULT_TOP_ALTITUDE_KM = 4.5f
 internal const val MAX_TOP_ALTITUDE_KM = 7f

@@ -24,9 +24,9 @@ data class ThermicForecastChartUiModel(
 data class ThermicForecastCellUiModel(
     /** Start of the time slot, minute-of-day in local time (e.g. 720 = 12:00). */
     val startMinuteOfDayLocal: Int,
-    /** Bottom of the altitude band, km AGL (above ground level). */
+    /** Bottom of the altitude band, km ASL. */
     val startAltitudeKm: Float,
-    /** Top of the altitude band, km AGL. */
+    /** Top of the altitude band, km ASL. */
     val endAltitudeKm: Float,
     /** Thermal updraft strength, m/s (metres per second). */
     val strengthMps: Float,
@@ -35,7 +35,7 @@ data class ThermicForecastCellUiModel(
 data class ThermicForecastCloudMarkerUiModel(
     /** Time slot, minute-of-day in local time. */
     val startMinuteOfDayLocal: Int,
-    /** Cloud base altitude, km AGL. */
+    /** Cloud base altitude, km ASL. */
     val altitudeKm: Float,
 )
 

@@ -39,6 +39,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.data.datasource.DataSourcePreference
+import com.cloudbasepredictor.data.theme.ThemePreference
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
@@ -48,10 +49,13 @@ fun SettingsRoute(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val dataSource by viewModel.dataSourcePreference.collectAsStateWithLifecycle()
+    val theme by viewModel.themePreference.collectAsStateWithLifecycle()
 
     SettingsScreen(
         dataSource = dataSource,
         onDataSourceChanged = viewModel::setDataSource,
+        theme = theme,
+        onThemeChanged = viewModel::setTheme,
         onBack = onBack,
         onOpenAbout = onOpenAbout,
     )
@@ -62,6 +66,8 @@ fun SettingsRoute(
 fun SettingsScreen(
     dataSource: DataSourcePreference,
     onDataSourceChanged: (DataSourcePreference) -> Unit,
+    theme: ThemePreference,
+    onThemeChanged: (ThemePreference) -> Unit,
     onBack: () -> Unit,
     onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier,
@@ -139,6 +145,48 @@ fun SettingsScreen(
                 }
             }
 
+            // Theme dropdown
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Theme",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                val themeLabels = mapOf(
+                    ThemePreference.AUTO to "Auto (system)",
+                    ThemePreference.LIGHT to "Light",
+                    ThemePreference.DARK to "Dark",
+                )
+                var themeExpanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = themeExpanded,
+                    onExpandedChange = { themeExpanded = it },
+                ) {
+                    OutlinedTextField(
+                        value = themeLabels[theme] ?: theme.name,
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
+                        modifier = Modifier
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                            .fillMaxWidth(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = themeExpanded,
+                        onDismissRequest = { themeExpanded = false },
+                    ) {
+                        ThemePreference.entries.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(text = themeLabels[option] ?: option.name) },
+                                onClick = {
+                                    onThemeChanged(option)
+                                    themeExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+
             // About button
             Button(onClick = onOpenAbout) {
                 Icon(
@@ -159,6 +207,8 @@ private fun SettingsScreenPreview() {
         SettingsScreen(
             dataSource = DataSourcePreference.FAKE,
             onDataSourceChanged = {},
+            theme = ThemePreference.AUTO,
+            onThemeChanged = {},
             onBack = {},
             onOpenAbout = {},
         )
@@ -172,6 +222,26 @@ private fun SettingsScreenRealPreview() {
         SettingsScreen(
             dataSource = DataSourcePreference.REAL,
             onDataSourceChanged = {},
+            theme = ThemePreference.DARK,
+            onThemeChanged = {},
+            onBack = {},
+            onOpenAbout = {},
+        )
+    }
+}
+
+@Preview(
+    showBackground = true,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun SettingsScreenDarkPreview() {
+    CloudbasePredictorTheme(darkTheme = true) {
+        SettingsScreen(
+            dataSource = DataSourcePreference.REAL,
+            onDataSourceChanged = {},
+            theme = ThemePreference.DARK,
+            onThemeChanged = {},
             onBack = {},
             onOpenAbout = {},
         )

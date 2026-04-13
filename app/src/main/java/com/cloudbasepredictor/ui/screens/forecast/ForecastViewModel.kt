@@ -75,6 +75,8 @@ data class ForecastUiState(
     val resolvedModel: ForecastModel? = null,
     /** Timestamp (UTC millis) when the forecast data was last updated from the server. */
     val forecastUpdatedAtMillis: Long? = null,
+    /** Terrain elevation in km ASL for the selected place. */
+    val elevationKm: Float = 0f,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -190,6 +192,7 @@ class ForecastViewModel @Inject constructor(
             selectedModel = currentModel,
             resolvedModel = snapshot?.resolvedModel,
             forecastUpdatedAtMillis = snapshot?.updatedAtUtcMillis,
+            elevationKm = (snapshot?.hourlyData?.elevation ?: 0.0).toFloat() / 1000f,
         )
     }.stateIn(
         scope = viewModelScope,

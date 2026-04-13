@@ -1,5 +1,6 @@
 package com.cloudbasepredictor.ui.screens.forecast.views
 
+import android.content.res.Configuration
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
@@ -98,16 +99,16 @@ private fun CloudChartCanvas(
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
         }
     }
-    val legendPaint = remember(density) {
+    val legendPaint = remember(density, axisLabelColor) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color(0xFF444444).toArgb()
+            color = axisLabelColor.toArgb()
             textSize = with(density) { 10.sp.toPx() }
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
         }
     }
-    val percentPaint = remember(density) {
+    val percentPaint = remember(density, axisLabelColor) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color(0xFF333333).toArgb()
+            color = axisLabelColor.toArgb()
             textSize = with(density) { 9.sp.toPx() }
             textAlign = Paint.Align.CENTER
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
@@ -126,44 +127,54 @@ private fun CloudChartCanvas(
         val leftAxisWidth = with(density) { 60.dp.toPx() }
         val bottomAxisHeight = with(density) { 28.dp.toPx() }
         val precipBarHeight = with(density) { 48.dp.toPx() }
-        val maxLayerHeight = with(density) { 200.dp.toPx() }
+        val maxLayerHeight = with(density) { 400.dp.toPx() }
+        val layerSpacing = with(density) { 12.dp.toPx() }
+        val totalSpacing = layerSpacing * 2f // 2 gaps between 3 layers
 
         val plotLeft = leftAxisWidth
         val plotTop = 0f
         val plotRight = size.width
         val availableHeight = size.height - bottomAxisHeight - precipBarHeight
-        val plotBottom = plotTop + availableHeight.coerceAtMost(maxLayerHeight * 3f)
+        val maxCloudArea = maxLayerHeight * 3f + totalSpacing
+        val cloudAreaHeight = availableHeight.coerceAtMost(maxCloudArea)
+        val layerHeight = (cloudAreaHeight - totalSpacing).coerceAtLeast(0f) / 3f
+        val plotBottom = plotTop + cloudAreaHeight
         val plotWidth = plotRight - plotLeft
         val plotHeight = plotBottom - plotTop
 
+        // Y coordinate of the top of each layer
+        fun layerTopY(index: Int): Float =
+            plotTop + index * (layerHeight + layerSpacing)
+
         if (plotWidth <= 0f || plotHeight <= 0f || chart.hours.isEmpty()) return@Canvas
 
-        // Background for axis and plot
-        drawRect(
-            color = gridBackgroundColor,
-            topLeft = Offset(0f, plotTop),
-            size = Size(leftAxisWidth, plotHeight),
-        )
-        drawRect(
-            color = gridBackgroundColor,
-            topLeft = Offset(plotLeft, plotTop),
-            size = Size(plotWidth, plotHeight),
-        )
+        // Background for each layer (not the spacing gaps)
+        for (i in 0..2) {
+            val ly = layerTopY(i)
+            drawRect(
+                color = gridBackgroundColor,
+                topLeft = Offset(0f, ly),
+                size = Size(leftAxisWidth, layerHeight),
+            )
+            drawRect(
+                color = gridBackgroundColor,
+                topLeft = Offset(plotLeft, ly),
+                size = Size(plotWidth, layerHeight),
+            )
+        }
 
-        // Three equal rows for High, Mid, Low clouds (top to bottom)
-        val layerHeight = plotHeight / 3f
         val columnWidth = plotWidth / chart.hours.size
 
         // Draw layer backgrounds and labels
         val layerNames = listOf("High", "Mid", "Low")
-        val layerDividerYs = listOf(plotTop + layerHeight, plotTop + 2 * layerHeight)
 
-        // Horizontal layer dividers
-        layerDividerYs.forEach { y ->
+        // Horizontal layer dividers (at layer boundaries)
+        for (i in 1..2) {
+            val dividerY = layerTopY(i) - layerSpacing / 2f
             drawLine(
-                color = outlineColor.copy(alpha = 0.5f),
-                start = Offset(0f, y),
-                end = Offset(plotRight, y),
+                color = outlineColor.copy(alpha = 0.3f),
+                start = Offset(0f, dividerY),
+                end = Offset(plotRight, dividerY),
                 strokeWidth = 1.dp.toPx(),
             )
         }
@@ -189,7 +200,7 @@ private fun CloudChartCanvas(
             // High cloud (row 0)
             drawCloudCell(
                 x = x,
-                y = plotTop,
+                y = layerTopY(0),
                 width = columnWidth,
                 height = layerHeight,
                 percent = layer.highCloudPercent,
@@ -199,7 +210,7 @@ private fun CloudChartCanvas(
             // Mid cloud (row 1)
             drawCloudCell(
                 x = x,
-                y = plotTop + layerHeight,
+                y = layerTopY(1),
                 width = columnWidth,
                 height = layerHeight,
                 percent = layer.midCloudPercent,
@@ -209,7 +220,7 @@ private fun CloudChartCanvas(
             // Low cloud (row 2)
             drawCloudCell(
                 x = x,
-                y = plotTop + 2 * layerHeight,
+                y = layerTopY(2),
                 width = columnWidth,
                 height = layerHeight,
                 percent = layer.lowCloudPercent,
@@ -251,19 +262,22 @@ private fun CloudChartCanvas(
             }
         }
 
-        // Plot outline
-        drawRect(
-            color = outlineColor.copy(alpha = 0.4f),
-            topLeft = Offset(plotLeft, plotTop),
-            size = Size(plotWidth, plotHeight),
-            style = Stroke(width = 1.dp.toPx()),
-        )
+        // Plot outline per layer
+        for (i in 0..2) {
+            val ly = layerTopY(i)
+            drawRect(
+                color = outlineColor.copy(alpha = 0.4f),
+                topLeft = Offset(plotLeft, ly),
+                size = Size(plotWidth, layerHeight),
+                style = Stroke(width = 1.dp.toPx()),
+            )
+        }
 
         // Labels
         drawIntoCanvas { canvas ->
             // Layer names on the left axis
             layerNames.forEachIndexed { index, name ->
-                val layerCenterY = plotTop + index * layerHeight + layerHeight / 2f
+                val layerCenterY = layerTopY(index) + layerHeight / 2f
                 canvas.nativeCanvas.drawText(
                     name,
                     8.dp.toPx(),
@@ -311,7 +325,7 @@ private fun CloudChartCanvas(
                     canvas.nativeCanvas.drawText(
                         "${layer.highCloudPercent.toInt()}%",
                         cx,
-                        plotTop + layerHeight / 2f + percentPaint.textSize * 0.35f,
+                        layerTopY(0) + layerHeight / 2f + percentPaint.textSize * 0.35f,
                         percentPaint,
                     )
                 }
@@ -320,7 +334,7 @@ private fun CloudChartCanvas(
                     canvas.nativeCanvas.drawText(
                         "${layer.midCloudPercent.toInt()}%",
                         cx,
-                        plotTop + layerHeight + layerHeight / 2f + percentPaint.textSize * 0.35f,
+                        layerTopY(1) + layerHeight / 2f + percentPaint.textSize * 0.35f,
                         percentPaint,
                     )
                 }
@@ -329,7 +343,7 @@ private fun CloudChartCanvas(
                     canvas.nativeCanvas.drawText(
                         "${layer.lowCloudPercent.toInt()}%",
                         cx,
-                        plotTop + 2 * layerHeight + layerHeight / 2f +
+                        layerTopY(2) + layerHeight / 2f +
                             percentPaint.textSize * 0.35f,
                         percentPaint,
                     )
@@ -431,6 +445,22 @@ private fun CloudForecastViewErrorPreview() {
                 mode = ForecastMode.CLOUD,
                 errorMessage = "Unable to refresh cloud forecast.",
             ),
+        )
+    }
+}
+
+@Preview(
+    name = "Cloud Dark",
+    showBackground = true,
+    widthDp = 420,
+    heightDp = 720,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun CloudForecastViewDarkPreview() {
+    CloudbasePredictorTheme(darkTheme = true) {
+        CloudForecastView(
+            uiState = PreviewData.forecastUiStateForMode(ForecastMode.CLOUD),
         )
     }
 }
