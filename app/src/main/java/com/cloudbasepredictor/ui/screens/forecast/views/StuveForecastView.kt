@@ -230,8 +230,12 @@ private fun SkewTDiagramCanvas(
                 }
             },
     ) {
+        // Chart bottom matches the surface pressure (+ 20 hPa margin)
+        val chartBottomPressure = (chart.surfacePressureHpa + 20f)
+            .coerceAtMost(SKEWT_BOTTOM_PRESSURE)
+
         val topPressure = altitudeKmToApproxPressureHpa(visibleTopAltitudeKm)
-            .coerceIn(SKEWT_MIN_TOP_PRESSURE, SKEWT_BOTTOM_PRESSURE - 50f)
+            .coerceIn(SKEWT_MIN_TOP_PRESSURE, chartBottomPressure - 50f)
 
         val leftAxisWidth = with(density) { 40.dp.toPx() }
         val rightAltitudeWidth = with(density) { 40.dp.toPx() }
@@ -252,7 +256,7 @@ private fun SkewTDiagramCanvas(
         val skewFactor = plotWidth * SKEWT_SKEW_RATIO
 
         // Helper closures that capture the current plot geometry
-        fun pToY(p: Float) = pressureToY(p, plotTop, plotBottom, topPressure)
+        fun pToY(p: Float) = pressureToY(p, plotTop, plotBottom, topPressure, chartBottomPressure)
         fun tpToX(t: Float, p: Float) = skewTToX(
             t, p, TEMP_MIN, TEMP_MAX, plotLeft, plotRight, topPressure, skewFactor,
         )
@@ -271,7 +275,7 @@ private fun SkewTDiagramCanvas(
             var t = TEMP_MIN
             while (t <= TEMP_MAX) {
                 val alpha = if (t.toInt() % 20 == 0) 0.35f else 0.15f
-                val pBottom = SKEWT_BOTTOM_PRESSURE
+                val pBottom = chartBottomPressure
                 val pTop = topPressure
                 drawLine(
                     color = outlineColor.copy(alpha = alpha),
@@ -298,7 +302,7 @@ private fun SkewTDiagramCanvas(
             // ── Dry adiabats (green curved lines) ───────────────────────
             STUVE_DRY_ADIABAT_THETAS_K.forEach { theta ->
                 drawAdiabat(
-                    pressures = STUVE_PRESSURE_LEVELS.filter { it in topPressure..SKEWT_BOTTOM_PRESSURE },
+                    pressures = STUVE_PRESSURE_LEVELS.filter { it in topPressure..chartBottomPressure },
                     computeTemp = { p -> dryAdiabatTemperatureC(theta, p) },
                     mapXY = { temp, p -> Offset(tpToX(temp, p), pToY(p)) },
                     plotLeft = plotLeft, plotRight = plotRight,
@@ -310,7 +314,7 @@ private fun SkewTDiagramCanvas(
 
             // ── Moist adiabats (dashed teal curves) ─────────────────────
             val moistPressures = buildList {
-                var p = SKEWT_BOTTOM_PRESSURE; while (p >= topPressure) { add(p); p -= 25f }
+                var p = chartBottomPressure; while (p >= topPressure) { add(p); p -= 25f }
             }
             STUVE_MOIST_ADIABAT_THETAS_K.forEach { thetaW ->
                 drawAdiabat(
@@ -329,7 +333,7 @@ private fun SkewTDiagramCanvas(
 
             // ── Mixing ratio lines (dotted blue) ────────────────────────
             val mixPressures = buildList {
-                var p = SKEWT_BOTTOM_PRESSURE; while (p >= topPressure) { add(p); p -= 50f }
+                var p = chartBottomPressure; while (p >= topPressure) { add(p); p -= 50f }
             }
             STUVE_MIXING_RATIO_VALUES_GKG.forEach { w ->
                 drawAdiabat(
@@ -441,7 +445,7 @@ private fun SkewTDiagramCanvas(
             var tempLabel = TEMP_MIN
             while (tempLabel <= TEMP_MAX) {
                 if (tempLabel.toInt() % 10 == 0) {
-                    val x = tpToX(tempLabel, SKEWT_BOTTOM_PRESSURE)
+                    val x = tpToX(tempLabel, chartBottomPressure)
                     if (x in plotLeft..plotRight) {
                         canvas.nativeCanvas.drawText(
                             "${tempLabel.toInt()}°",
@@ -551,15 +555,16 @@ private val ISOBAR_LABELS = listOf(
     600f, 550f, 500f, 450f, 400f, 350f, 300f, 250f, 200f,
 )
 
-/** Y-axis: log-P scale, bottom = 1050 hPa, top = [topPressure]. */
+/** Y-axis: log-P scale, bottom = [bottomPressure], top = [topPressure]. */
 private fun pressureToY(
     pressureHpa: Float,
     plotTop: Float,
     plotBottom: Float,
     topPressure: Float,
+    bottomPressure: Float = SKEWT_BOTTOM_PRESSURE,
 ): Float {
     val logP = ln(pressureHpa)
-    val logBottom = ln(SKEWT_BOTTOM_PRESSURE)
+    val logBottom = ln(bottomPressure)
     val logTop = ln(topPressure)
     // logBottom → plotBottom, logTop → plotTop
     val frac = (logP - logTop) / (logBottom - logTop)

@@ -17,6 +17,9 @@ import kotlin.math.sin
  * The model is designed so that the external data source builds it and the Canvas
  * view just renders it — no atmospheric math in the view layer.
  */
+/** Parcel launch temperature offset above environmental T₂ₘ (convective heating). */
+const val PARCEL_SURFACE_HEATING_C = 3f
+
 data class StuveForecastChartUiModel(
     /** Pressure levels for the Y-axis, hPa (hectopascals), descending. */
     val pressureLevels: List<Float>,
@@ -32,6 +35,8 @@ data class StuveForecastChartUiModel(
     val lclPressureHpa: Float?,
     /** Currently displayed hour of the day (local time, 6–22). */
     val selectedHour: Int,
+    /** Station surface pressure, hPa. Used to set chart bottom. */
+    val surfacePressureHpa: Float = 1050f,
 )
 
 data class StuveProfilePoint(
@@ -172,8 +177,8 @@ internal fun buildPlaceholderStuveChart(
         )
     }
 
-    // Parcel ascent from surface: dry adiabat then moist (convective +3 °C)
-    val surfaceTemp = temperatureProfile.first().temperatureC + 3f
+    // Parcel ascent from surface: dry adiabat then moist
+    val surfaceTemp = temperatureProfile.first().temperatureC + PARCEL_SURFACE_HEATING_C
     val surfaceDewpoint = dewpointProfile.first().temperatureC
     val surfacePressure = temperatureProfile.first().pressureHpa
     val surfaceThetaK = (surfaceTemp + 273.15f) * (1000f / surfacePressure).pow(KAPPA)
@@ -181,24 +186,24 @@ internal fun buildPlaceholderStuveChart(
 
     var reachedLcl = false
     var lclPressure: Float? = null
-    val parcelPath = STUVE_PRESSURE_LEVELS.map { p ->
-        if (!reachedLcl) {
-            val dryTemp = dryAdiabatTemperatureC(surfaceThetaK, p)
-            val satMr = saturationMixingRatioGKg(dryTemp, p)
-            if (satMr <= surfaceMixingRatio) {
-                reachedLcl = true
-                lclPressure = p
-                StuveProfilePoint(p, dryTemp)
+    val parcelPath = STUVE_PRESSURE_LEVELS
+        .filter { it <= surfacePressure }
+        .map { p ->
+            if (!reachedLcl) {
+                val dryTemp = dryAdiabatTemperatureC(surfaceThetaK, p)
+                val satMr = saturationMixingRatioGKg(dryTemp, p)
+                if (satMr <= surfaceMixingRatio) {
+                    reachedLcl = true
+                    lclPressure = p
+                    StuveProfilePoint(p, dryTemp)
+                } else {
+                    StuveProfilePoint(p, dryTemp)
+                }
             } else {
-                StuveProfilePoint(p, dryTemp)
+                val moistTemp = moistAdiabatTemperatureC(surfaceThetaK, p)
+                StuveProfilePoint(p, moistTemp)
             }
-        } else {
-            // Simplified: moist adiabat from LCL
-            val thetaW = (surfaceTemp + 273.15f)
-            val moistTemp = moistAdiabatTemperatureC(thetaW, p)
-            StuveProfilePoint(p, moistTemp)
         }
-    }
 
     val windBarbs = STUVE_PRESSURE_LEVELS
         .filter { it <= 1000f && it >= 300f }
