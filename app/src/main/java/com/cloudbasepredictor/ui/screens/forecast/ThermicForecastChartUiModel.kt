@@ -230,7 +230,7 @@ private fun roundDisplayedStrength(value: Float): Float {
 private const val FORECAST_TIME_SLOT_STEP_MINUTES = 15
 private const val MINUTES_PER_HOUR = 60
 private const val THERMIC_ALTITUDE_STEP_KM = 0.05f
-private const val MAX_THERMIC_STRENGTH_MPS = 3f
+private const val MAX_THERMIC_STRENGTH_MPS = 10f
 private const val THERMIC_EPSILON = 0.0001f
 private val THERMIC_FORECAST_TIME_SLOTS = buildList {
     var currentMinute = 6 * MINUTES_PER_HOUR

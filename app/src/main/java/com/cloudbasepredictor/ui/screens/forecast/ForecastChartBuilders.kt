@@ -27,8 +27,6 @@ internal fun buildStuveChartFromData(
 
     val pressureLevels = hourPoint.pressureLevels.sortedByDescending { it.pressureHpa }
 
-    if (pressureLevels.isEmpty()) return buildPlaceholderStuveChart(hour, dayIndex)
-
     // Estimate surface pressure from station elevation (ISA)
     val surfacePressure = estimateSurfacePressureHpa(hourlyData.elevation ?: 0.0)
 
@@ -43,6 +41,8 @@ internal fun buildStuveChartFromData(
                 add(StuveProfilePoint(pl.pressureHpa.toFloat(), pl.temperatureC.toFloat(), isRealData = true))
             }
     }
+
+    if (temperatureProfile.isEmpty()) return buildPlaceholderStuveChart(hour, dayIndex)
 
     // Dewpoint profile: surface 2 m point + pressure levels above surface
     val dewpointProfile = buildList {
@@ -175,15 +175,15 @@ internal fun buildThermicChartFromData(
             val nextAlt = (currentAlt + altitudeStepKm).coerceAtMost(thermalTopKm)
             val bandCenter = (currentAlt + nextAlt) / 2f
             val altFraction = if (thermalTopKm > 0f) bandCenter / thermalTopKm else 0f
-            // Thermal strength from CAPE: roughly sqrt(2*CAPE) gives max updraft
-            val maxUpdraft = kotlin.math.sqrt(2.0 * capeJKg).toFloat().coerceAtMost(3f)
-            val strength = (maxUpdraft * (1f - altFraction * 0.6f)).coerceIn(0f, 3f)
+            // Thermal strength from CAPE: scaled sqrt(2*CAPE) for realistic thermal values
+            val maxUpdraft = (kotlin.math.sqrt(2.0 * capeJKg).toFloat() * 0.15f).coerceAtMost(10f)
+            val strength = (maxUpdraft * (1f - altFraction * 0.6f)).coerceIn(0f, 10f)
 
             cells += ThermicForecastCellUiModel(
                 startMinuteOfDayLocal = startMinute,
                 startAltitudeKm = currentAlt,
                 endAltitudeKm = nextAlt,
-                strengthMps = ((strength * 10f).toInt() / 10f).coerceIn(0f, 3f),
+                strengthMps = ((strength * 10f).toInt() / 10f).coerceIn(0f, 10f),
             )
             currentAlt = nextAlt
         }
@@ -267,10 +267,40 @@ internal fun buildWindChartFromData(
         return buildPlaceholderWindForecastChart(dayIndex, maxAltitudeKm = maxAltitudeKm)
     }
 
+    // Freezing level (0 °C isotherm) — from API or interpolated from pressure levels
+    val freezingLevelMarkers = daytimePoints.mapNotNull { hp ->
+        val flAsl = hp.freezingLevelHeightM ?: return@mapNotNull null
+        val flAgl = ((flAsl - elevation) / 1000.0).toFloat()
+        if (flAgl < 0f) return@mapNotNull null
+        WindLevelMarker(hour = hp.hour, altitudeKm = flAgl)
+    }
+
+    // CCL (Convective Condensation Level) — where surface mixing ratio meets env. temp
+    val surfacePressure = estimateSurfacePressureHpa(elevation)
+    val cclMarkers = daytimePoints.mapNotNull { hp ->
+        val surfDew = hp.dewPoint2mC?.toFloat() ?: return@mapNotNull null
+        val surfMr = saturationMixingRatioGKg(surfDew, surfacePressure)
+        val pls = hp.pressureLevels
+            .filter { it.pressureHpa.toFloat() < surfacePressure }
+            .sortedByDescending { it.pressureHpa }
+        for (pl in pls) {
+            val satMr = saturationMixingRatioGKg(pl.temperatureC.toFloat(), pl.pressureHpa.toFloat())
+            if (satMr <= surfMr) {
+                val heightAgl = ((pl.geopotentialHeightM ?: continue) - elevation).toFloat() / 1000f
+                if (heightAgl > 0f) {
+                    return@mapNotNull WindLevelMarker(hour = hp.hour, altitudeKm = heightAgl)
+                }
+            }
+        }
+        null
+    }
+
     return WindForecastChartUiModel(
         hours = hours,
         altitudeBandsKm = altitudeSet.toList(),
         cells = cellList,
+        freezingLevelKm = freezingLevelMarkers,
+        cclKm = cclMarkers,
     )
 }
 

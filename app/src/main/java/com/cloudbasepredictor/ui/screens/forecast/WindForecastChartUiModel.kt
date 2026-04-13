@@ -17,6 +17,15 @@ data class WindForecastChartUiModel(
     val altitudeBandsKm: List<Float>,
     /** Grid cells with wind speed and direction per hour × altitude. */
     val cells: List<WindForecastCellUiModel>,
+    /** Freezing level per hour (0 °C isotherm), km AGL. Null entries if unavailable. */
+    val freezingLevelKm: List<WindLevelMarker> = emptyList(),
+    /** Convective Condensation Level per hour, km AGL. Null entries if unavailable. */
+    val cclKm: List<WindLevelMarker> = emptyList(),
+)
+
+data class WindLevelMarker(
+    val hour: Int,
+    val altitudeKm: Float,
 )
 
 data class WindForecastCellUiModel(

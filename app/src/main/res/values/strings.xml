@@ -63,10 +63,7 @@
 
     <!-- Help dialog - Thermic -->
     <string name="help_thermic_title">Thermic forecast help</string>
-    <string name="help_thermic_summary">This chart shows estimated thermal strength by hour and altitude. Colored cells mark lift bands, and cloud markers indicate the top of usable convection.</string>
-    <string name="help_thermic_tip_1">Read stronger thermals from brighter cool colors and compare them across the day.</string>
-    <string name="help_thermic_tip_2">Use pinch zoom to inspect lower or higher altitude layers in more detail.</string>
-    <string name="help_thermic_tip_3">The current thermic chart uses generated UI data and is ready to be replaced by real forecast-derived output.</string>
+    <string name="help_thermic_summary">Thermal strength legend (m/s):</string>
 
     <!-- Help dialog - Skew-T -->
     <string name="help_stuve_title">Skew-T log-P diagram</string>
@@ -77,17 +74,13 @@
 
     <!-- Help dialog - Wind -->
     <string name="help_wind_title">Wind forecast help</string>
-    <string name="help_wind_summary">The wind screen is reserved for layered wind direction and strength through the day. It will help compare usable windows at different altitudes.</string>
-    <string name="help_wind_tip_1">Check several altitude bands instead of relying on surface wind alone.</string>
-    <string name="help_wind_tip_2">Compare wind mode with thermic mode before judging whether climbs are usable.</string>
-    <string name="help_wind_tip_3">The current wind screen still uses placeholder forecast content.</string>
+    <string name="help_wind_summary">Wind speed legend (km/h):</string>
 
     <!-- Help dialog - Cloud -->
     <string name="help_cloud_title">Cloud forecast help</string>
-    <string name="help_cloud_summary">The cloud screen is reserved for layered cloud coverage and cloud-base-related information across the day.</string>
+    <string name="help_cloud_summary">High / Mid / Low cloud layers with precipitation bars. Darker shading = more coverage.</string>
     <string name="help_cloud_tip_1">Use cloud mode together with thermic mode to estimate whether lift reaches cloud base or stays blue.</string>
     <string name="help_cloud_tip_2">Compare altitude bands to spot when cloud development starts climbing higher.</string>
-    <string name="help_cloud_tip_3">The current cloud screen still uses placeholder forecast content.</string>
 
     <!-- Help dialog - Status messages -->
     <string name="help_status_no_place">No place is selected yet. Open a point from the map to load forecast context for this screen.</string>

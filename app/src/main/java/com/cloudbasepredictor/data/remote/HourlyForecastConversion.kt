@@ -56,6 +56,7 @@ fun OpenMeteoHourlyForecastResponse.toHourlyForecastData(): HourlyForecastData {
             windSpeed10mKmh = hourly.windSpeed10m?.getOrNull(i),
             windDirection10mDeg = hourly.windDirection10m?.getOrNull(i),
             capeJKg = hourly.cape?.getOrNull(i),
+            freezingLevelHeightM = hourly.freezingLevelHeight?.getOrNull(i),
             pressureLevels = pressureLevelData,
         )
     }
@@ -118,6 +119,8 @@ data class HourlyPoint(
     val windDirection10mDeg: Double?,
     /** Convective Available Potential Energy, J/kg. */
     val capeJKg: Double?,
+    /** Freezing level (0 °C isotherm) height, metres above sea level. */
+    val freezingLevelHeightM: Double?,
     /** Data at each requested pressure level. */
     val pressureLevels: List<PressureLevelPoint>,
 )

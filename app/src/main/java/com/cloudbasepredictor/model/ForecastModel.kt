@@ -17,31 +17,13 @@ enum class ForecastModel(
     /** Typical update interval for this model, in milliseconds. */
     val updateIntervalMillis: Long,
 ) {
-    /** DWD ICON-D2: 2 km, Central Europe, ~2 days. */
-    ICON_D2(
-        apiName = "icon_d2",
-        displayName = "ICON D2",
-        description = "2 km, Central Europe, 2 days",
-        fallback = null, // resolved lazily below
+    /** Open-Meteo best-match: automatic model selection for the location. */
+    BEST_MATCH(
+        apiName = "best_match",
+        displayName = "Best Effort",
+        description = "Auto-selected (default)",
+        fallback = null,
         updateIntervalMillis = 3 * 3_600_000L, // 3 hours
-    ),
-
-    /** DWD ICON-EU: 7 km, Europe, ~5 days. */
-    ICON_EU(
-        apiName = "icon_eu",
-        displayName = "ICON EU",
-        description = "7 km, Europe, 5 days",
-        fallback = null,
-        updateIntervalMillis = 6 * 3_600_000L, // 6 hours
-    ),
-
-    /** DWD ICON Global: 11 km, worldwide, ~7 days. */
-    ICON_GLOBAL(
-        apiName = "icon_global",
-        displayName = "ICON Global",
-        description = "11 km, Global, 7 days",
-        fallback = null,
-        updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
 
     /** DWD ICON Seamless: auto-blends D2 → EU → Global (recommended default). */
@@ -51,6 +33,24 @@ enum class ForecastModel(
         description = "DWD blend (D2→EU→Global)",
         fallback = null,
         updateIntervalMillis = 3 * 3_600_000L, // 3 hours
+    ),
+
+    /** ECMWF IFS: 9 km, global, ~10 days. */
+    ECMWF_IFS(
+        apiName = "ecmwf_ifs025",
+        displayName = "ECMWF IFS",
+        description = "9 km, Global, 10 days",
+        fallback = null,
+        updateIntervalMillis = 6 * 3_600_000L, // 6 hours
+    ),
+
+    /** NCEP GFS Seamless: auto-blends HRRR → GFS, ~16 days. */
+    GFS_SEAMLESS(
+        apiName = "gfs_seamless",
+        displayName = "GFS Seamless",
+        description = "NCEP blend (HRRR→GFS), 16 days",
+        fallback = null,
+        updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
 
     /** Météo-France AROME: 1.3 km, France + neighbours, ~2 days. */
@@ -71,28 +71,37 @@ enum class ForecastModel(
         updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
 
-    /** ECMWF IFS: 9 km, global, ~10 days. */
-    ECMWF_IFS(
-        apiName = "ecmwf_ifs025",
-        displayName = "ECMWF IFS",
-        description = "9 km, Global, 10 days",
+    /** DWD ICON-D2: 2 km, Central Europe, ~2 days. */
+    ICON_D2(
+        apiName = "icon_d2",
+        displayName = "ICON D2",
+        description = "2 km, Central Europe, 2 days",
+        fallback = null,
+        updateIntervalMillis = 3 * 3_600_000L, // 3 hours
+    ),
+
+    /** DWD ICON-EU: 7 km, Europe, ~5 days. */
+    ICON_EU(
+        apiName = "icon_eu",
+        displayName = "ICON EU",
+        description = "7 km, Europe, 5 days",
         fallback = null,
         updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
 
-    /** Open-Meteo best-match: automatic model selection for the location. */
-    BEST_MATCH(
-        apiName = "best_match",
-        displayName = "Best Match",
-        description = "Auto-selected (default)",
+    /** DWD ICON Global: 11 km, worldwide, ~7 days. */
+    ICON_GLOBAL(
+        apiName = "icon_global",
+        displayName = "ICON Global",
+        description = "11 km, Global, 7 days",
         fallback = null,
-        updateIntervalMillis = 3 * 3_600_000L, // 3 hours
+        updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     );
 
     companion object {
         /**
          * Fallback chain: ICON D2 → ICON EU → ICON Global → BEST_MATCH.
-         * Separate chains for AROME and ECMWF lead to BEST_MATCH as ultimate fallback.
+         * Separate chains for AROME, ECMWF, and GFS lead to BEST_MATCH as ultimate fallback.
          */
         val FALLBACK_CHAINS: Map<ForecastModel, ForecastModel> = mapOf(
             ICON_D2 to ICON_EU,
@@ -102,6 +111,7 @@ enum class ForecastModel(
             METEOFRANCE_AROME to METEOFRANCE_ARPEGE,
             METEOFRANCE_ARPEGE to BEST_MATCH,
             ECMWF_IFS to BEST_MATCH,
+            GFS_SEAMLESS to BEST_MATCH,
         )
 
         fun fallbackFor(model: ForecastModel): ForecastModel {

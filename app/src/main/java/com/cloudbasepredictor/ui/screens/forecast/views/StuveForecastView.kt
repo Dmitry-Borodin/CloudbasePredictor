@@ -359,7 +359,7 @@ private fun SkewTDiagramCanvas(
                 color = Color(0xFFDD2222),
                 strokeWidth = 2.5f.dp.toPx(),
                 drawDataDots = true,
-                dataDotRadius = 2.5f.dp.toPx() * 1.5f, // 3× line half-width
+                dataDotRadius = 2.5f.dp.toPx(),
             )
 
             // ── Dewpoint sounding (blue) ────────────────────────────────
@@ -371,7 +371,7 @@ private fun SkewTDiagramCanvas(
                 color = Color(0xFF2255CC),
                 strokeWidth = 2f.dp.toPx(),
                 drawDataDots = true,
-                dataDotRadius = 2f.dp.toPx() * 1.5f,
+                dataDotRadius = 2f.dp.toPx(),
             )
 
             // ── Parcel ascent path (dashed) ──────────────────────────────

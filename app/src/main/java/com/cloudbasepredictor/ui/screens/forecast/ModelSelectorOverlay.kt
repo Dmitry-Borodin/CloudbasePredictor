@@ -42,7 +42,7 @@ internal fun ModelSelectorOverlay(
     modifier: Modifier = Modifier,
 ) {
     var showSheet by rememberSaveable { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val label = when {
         selectedModel == ForecastModel.BEST_MATCH &&

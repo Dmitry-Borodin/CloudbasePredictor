@@ -60,6 +60,10 @@ data class OpenMeteoHourlyResponse(
     // --- CAPE ---
     val cape: List<Double?>? = null,
 
+    // --- Freezing level ---
+    @SerialName("freezing_level_height")
+    val freezingLevelHeight: List<Double?>? = null,
+
     // --- Temperature at pressure levels (°C) ---
     @SerialName("temperature_1000hPa")
     val temperature1000hPa: List<Double?>? = null,

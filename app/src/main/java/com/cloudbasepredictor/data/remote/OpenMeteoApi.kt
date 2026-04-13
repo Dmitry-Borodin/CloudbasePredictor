@@ -41,7 +41,7 @@ private const val HOURLY_VARIABLES =
     "cloud_cover_low,cloud_cover_mid,cloud_cover_high," +
     "precipitation,precipitation_probability," +
     "wind_speed_10m,wind_direction_10m," +
-    "cape," +
+    "cape,freezing_level_height," +
     "temperature_1000hPa,temperature_950hPa,temperature_925hPa,temperature_900hPa," +
     "temperature_850hPa,temperature_800hPa,temperature_700hPa,temperature_600hPa,temperature_500hPa," +
     "dew_point_1000hPa,dew_point_950hPa,dew_point_925hPa,dew_point_900hPa," +

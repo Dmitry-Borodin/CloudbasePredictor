@@ -93,7 +93,7 @@ private fun ThermicForecastGrid(
     val cellLabelPaint = remember(density, cellTextColor) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = cellTextColor.toArgb()
-            textSize = with(density) { 20.sp.toPx() }
+            textSize = with(density) { 12.sp.toPx() }
             textAlign = Paint.Align.CENTER
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
         }
@@ -322,7 +322,7 @@ private fun ThermicForecastGrid(
         drawIntoCanvas { canvas ->
             // Radius-based dedup: skip labels whose center is within 30sp of an
             // already-drawn label, so numbers never overlap.
-            val dedupRadiusPx = with(density) { 30.sp.toPx() }
+            val dedupRadiusPx = with(density) { 18.sp.toPx() }
             val dedupRadiusSq = dedupRadiusPx * dedupRadiusPx
             val drawnCenters = mutableListOf<Offset>()
 
@@ -600,7 +600,7 @@ private const val MIN_VISIBLE_ALTITUDE_RANGE_KM = 0.75f
 private const val ALTITUDE_EPSILON = 0.001f
 private const val THERMIC_DATA_ALTITUDE_STEP_KM = 0.05f
 private const val THERMIC_MAJOR_TIME_STEP_MINUTES = 180
-private const val MAX_THERMIC_STRENGTH_MPS = 3f
+private const val MAX_THERMIC_STRENGTH_MPS = 10f
 private const val MIN_TIME_BUCKET_WIDTH_PX = 28f
 private const val MIN_ALTITUDE_BUCKET_HEIGHT_PX = 20f
 

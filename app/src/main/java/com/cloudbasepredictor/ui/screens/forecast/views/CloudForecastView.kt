@@ -126,11 +126,13 @@ private fun CloudChartCanvas(
         val leftAxisWidth = with(density) { 60.dp.toPx() }
         val bottomAxisHeight = with(density) { 28.dp.toPx() }
         val precipBarHeight = with(density) { 48.dp.toPx() }
+        val maxLayerHeight = with(density) { 200.dp.toPx() }
 
         val plotLeft = leftAxisWidth
         val plotTop = 0f
         val plotRight = size.width
-        val plotBottom = size.height - bottomAxisHeight - precipBarHeight
+        val availableHeight = size.height - bottomAxisHeight - precipBarHeight
+        val plotBottom = plotTop + availableHeight.coerceAtMost(maxLayerHeight * 3f)
         val plotWidth = plotRight - plotLeft
         val plotHeight = plotBottom - plotTop
 

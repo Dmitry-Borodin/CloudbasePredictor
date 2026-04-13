@@ -18,6 +18,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -161,11 +162,6 @@ private fun WindChartCanvas(
             topLeft = Offset(0f, plotTop),
             size = Size(axisWidth, plotHeight),
         )
-        drawRect(
-            color = gridBackgroundColor,
-            topLeft = Offset(plotLeft, plotTop),
-            size = Size(plotWidth, plotHeight),
-        )
 
         val columnWidth = plotWidth / chart.hours.size
 
@@ -186,6 +182,26 @@ private fun WindChartCanvas(
         // Clustering: skip arrows if cells are too small
         val altCluster = max(1, ceil(arrowSizePx * 1.1f / bandHeightPx).toInt())
         val hourCluster = max(1, ceil(arrowSizePx * 1.1f / columnWidth).toInt())
+
+        // ── Wind speed background (smooth color per cell) ──────────
+        chart.hours.forEachIndexed { hourIndex, hour ->
+            val x = plotLeft + hourIndex * columnWidth
+            visibleAltitudes.forEachIndexed { altIdx, altKm ->
+                val cell = chart.cells.find { it.hour == hour && it.altitudeKm == altKm }
+                    ?: return@forEachIndexed
+                val topY = altitudeToY(
+                    altKm + altStep, minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
+                )
+                val bottomY = altitudeToY(
+                    altKm, minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
+                )
+                drawRect(
+                    color = windSpeedBgColor(cell.speedKmh),
+                    topLeft = Offset(x, topY),
+                    size = Size(columnWidth, bottomY - topY),
+                )
+            }
+        }
 
         // Grid lines
         chart.hours.forEachIndexed { index, hour ->
@@ -222,6 +238,70 @@ private fun WindChartCanvas(
             style = Stroke(width = 1.dp.toPx()),
         )
 
+        // ── CCL line (orange, 2.5dp, rounded) ──────────────────────
+        if (chart.cclKm.isNotEmpty()) {
+            val cclPath = Path()
+            var started = false
+            chart.cclKm.forEach { marker ->
+                val hourIndex = chart.hours.indexOf(marker.hour)
+                if (hourIndex < 0) return@forEach
+                val x = plotLeft + hourIndex * columnWidth + columnWidth / 2f
+                val y = altitudeToY(
+                    marker.altitudeKm, minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
+                )
+                if (y !in plotTop..plotBottom) return@forEach
+                if (!started) {
+                    cclPath.moveTo(x, y)
+                    started = true
+                } else {
+                    cclPath.lineTo(x, y)
+                }
+            }
+            if (started) {
+                drawPath(
+                    path = cclPath,
+                    color = Color(0xFFFF8C00),
+                    style = Stroke(
+                        width = 2.5f.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                        join = androidx.compose.ui.graphics.StrokeJoin.Round,
+                    ),
+                )
+            }
+        }
+
+        // ── 0 °C level line (cyan, 2dp, rounded) ───────────────────
+        if (chart.freezingLevelKm.isNotEmpty()) {
+            val flPath = Path()
+            var started = false
+            chart.freezingLevelKm.forEach { marker ->
+                val hourIndex = chart.hours.indexOf(marker.hour)
+                if (hourIndex < 0) return@forEach
+                val x = plotLeft + hourIndex * columnWidth + columnWidth / 2f
+                val y = altitudeToY(
+                    marker.altitudeKm, minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
+                )
+                if (y !in plotTop..plotBottom) return@forEach
+                if (!started) {
+                    flPath.moveTo(x, y)
+                    started = true
+                } else {
+                    flPath.lineTo(x, y)
+                }
+            }
+            if (started) {
+                drawPath(
+                    path = flPath,
+                    color = Color(0xFF00BCD4),
+                    style = Stroke(
+                        width = 2f.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                        join = androidx.compose.ui.graphics.StrokeJoin.Round,
+                    ),
+                )
+            }
+        }
+
         // Draw wind arrows and speed labels with clustering
         val clusteredHours = chart.hours.filterIndexed { i, _ -> i % hourCluster == 0 }
         val clusteredAltitudes = visibleAltitudes.filterIndexed { i, _ -> i % altCluster == 0 }
@@ -242,7 +322,7 @@ private fun WindChartCanvas(
 
                 if (cellCenterY !in plotTop..plotBottom) return@forEach
 
-                // Draw arrow
+                // Draw arrow — black in light theme (onSurface)
                 val arrowDrawSize = min(
                     arrowSizePx,
                     min(columnWidth * hourCluster * 0.8f, bandHeightPx * altCluster * 0.8f),
@@ -253,7 +333,7 @@ private fun WindChartCanvas(
                     directionDeg = cell.directionDeg,
                     arrowSize = arrowDrawSize,
                     speedKmh = cell.speedKmh,
-                    color = windSpeedColor(cell.speedKmh),
+                    color = onSurfaceColor,
                 )
             }
         }
@@ -316,6 +396,46 @@ private fun WindChartCanvas(
                         cellCenterX,
                         cellCenterY + arrowDrawSize / 2f + speedLabelPaint.textSize + 1.dp.toPx(),
                         speedLabelPaint,
+                    )
+                }
+            }
+
+            // CCL label (left side, 30dp from left edge)
+            chart.cclKm.firstOrNull()?.let { firstCcl ->
+                val y = altitudeToY(
+                    firstCcl.altitudeKm, minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
+                )
+                if (y in plotTop..plotBottom) {
+                    val cclLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.rgb(0xFF, 0x8C, 0x00)
+                        textSize = with(density) { 10.sp.toPx() }
+                        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                    }
+                    canvas.nativeCanvas.drawText(
+                        "CCL",
+                        30.dp.toPx(),
+                        y - 4.dp.toPx(),
+                        cclLabelPaint,
+                    )
+                }
+            }
+
+            // 0°C level label with snowflake (left side, 30dp from left edge)
+            chart.freezingLevelKm.firstOrNull()?.let { firstFl ->
+                val y = altitudeToY(
+                    firstFl.altitudeKm, minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
+                )
+                if (y in plotTop..plotBottom) {
+                    val flLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.rgb(0x00, 0xBC, 0xD4)
+                        textSize = with(density) { 10.sp.toPx() }
+                        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                    }
+                    canvas.nativeCanvas.drawText(
+                        "❄ 0°C",
+                        30.dp.toPx(),
+                        y - 4.dp.toPx(),
+                        flLabelPaint,
                     )
                 }
             }
@@ -383,6 +503,11 @@ private fun windSpeedColor(speedKmh: Float): Color {
     } else {
         lerp(medium, high, (normalized - 0.5f) / 0.5f)
     }
+}
+
+/** Background color for wind cells — same scale as windSpeedColor but with low alpha. */
+private fun windSpeedBgColor(speedKmh: Float): Color {
+    return windSpeedColor(speedKmh).copy(alpha = 0.25f)
 }
 
 private fun altitudeToY(
