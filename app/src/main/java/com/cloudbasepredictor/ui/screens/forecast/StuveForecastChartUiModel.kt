@@ -172,8 +172,8 @@ internal fun buildPlaceholderStuveChart(
         )
     }
 
-    // Parcel ascent from surface: dry adiabat then moist
-    val surfaceTemp = temperatureProfile.first().temperatureC
+    // Parcel ascent from surface: dry adiabat then moist (convective +3 °C)
+    val surfaceTemp = temperatureProfile.first().temperatureC + 3f
     val surfaceDewpoint = dewpointProfile.first().temperatureC
     val surfacePressure = temperatureProfile.first().pressureHpa
     val surfaceThetaK = (surfaceTemp + 273.15f) * (1000f / surfacePressure).pow(KAPPA)

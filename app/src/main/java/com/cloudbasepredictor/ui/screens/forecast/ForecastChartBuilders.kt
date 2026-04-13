@@ -11,6 +11,9 @@ import kotlin.math.pow
 
 // --- Stüve chart from real data ---
 
+/** Parcel launch temperature is this many °C above the environmental T₂ₘ. */
+private const val PARCEL_SURFACE_HEATING_C = 3f
+
 internal fun buildStuveChartFromData(
     hourlyData: HourlyForecastData,
     dayIndex: Int,
@@ -47,9 +50,9 @@ internal fun buildStuveChartFromData(
         }
     }
 
-    // Parcel ascent from surface
+    // Parcel ascent from surface — lifted 3 °C above current T₂ₘ (convective heating)
     val surfacePoint = pressureLevels.firstOrNull() ?: return buildPlaceholderStuveChart(hour, dayIndex)
-    val surfaceTemp = hourPoint.temperature2mC?.toFloat() ?: surfacePoint.temperatureC.toFloat()
+    val surfaceTemp = (hourPoint.temperature2mC?.toFloat() ?: surfacePoint.temperatureC.toFloat()) + PARCEL_SURFACE_HEATING_C
     val surfaceDew = hourPoint.dewPoint2mC?.toFloat()
         ?: dewpointProfile.firstOrNull()?.temperatureC
         ?: (surfaceTemp - 8f)
