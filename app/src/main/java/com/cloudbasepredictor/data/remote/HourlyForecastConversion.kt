@@ -1,6 +1,7 @@
 package com.cloudbasepredictor.data.remote
 
 import com.cloudbasepredictor.model.DailyForecast
+import kotlinx.serialization.Serializable
 
 /**
  * Converts the hourly response into [HourlyForecastData] — an intermediate
@@ -75,6 +76,7 @@ fun OpenMeteoHourlyForecastResponse.toHourlyForecastData(): HourlyForecastData {
 /**
  * Intermediate domain model holding all forecast data needed for chart construction.
  */
+@Serializable
 data class HourlyForecastData(
     val latitude: Double,
     val longitude: Double,
@@ -90,6 +92,7 @@ data class HourlyForecastData(
 /**
  * One hour of forecast data combining surface and pressure-level variables.
  */
+@Serializable
 data class HourlyPoint(
     /** Date in yyyy-MM-dd format. */
     val date: String,
@@ -122,6 +125,7 @@ data class HourlyPoint(
 /**
  * Atmospheric data at a single pressure level for one hour.
  */
+@Serializable
 data class PressureLevelPoint(
     /** Pressure level, hPa. */
     val pressureHpa: Int,

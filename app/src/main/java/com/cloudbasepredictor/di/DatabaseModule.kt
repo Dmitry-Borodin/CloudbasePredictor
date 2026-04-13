@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.cloudbasepredictor.data.local.AppDatabase
+import com.cloudbasepredictor.data.local.ForecastCacheDao
 import com.cloudbasepredictor.data.local.SavedPlaceDao
 import dagger.Module
 import dagger.Provides
@@ -44,6 +45,11 @@ object DatabaseModule {
     fun provideSavedPlaceDao(
         appDatabase: AppDatabase,
     ): SavedPlaceDao = appDatabase.savedPlaceDao()
+
+    @Provides
+    fun provideForecastCacheDao(
+        appDatabase: AppDatabase,
+    ): ForecastCacheDao = appDatabase.forecastCacheDao()
 
     private fun getOrCreatePassphrase(context: Context): String {
         val masterKey = MasterKey.Builder(context)

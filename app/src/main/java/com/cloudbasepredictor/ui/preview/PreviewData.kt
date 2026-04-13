@@ -83,6 +83,7 @@ object PreviewData {
         errorMessage = null,
         selectedModel = ForecastModel.ICON_D2,
         resolvedModel = ForecastModel.ICON_D2,
+        forecastUpdatedAtMillis = 1_715_777_600_000L,
     )
 
     val forecastLoadingUiState = ForecastUiState(

@@ -95,4 +95,14 @@
     <string name="help_status_loading">Forecast data is currently loading for %1$s.</string>
     <string name="help_status_showing">Showing the %1$s forecast for %2$s on %3$s.</string>
     <string name="help_status_selected_day">the selected day</string>
+
+    <!-- Help dialog - Model info -->
+    <string name="help_model_label">Weather model</string>
+    <string name="help_data_updated_label">Data updated</string>
+
+    <!-- Database error dialog -->
+    <string name="db_error_title">Database Error</string>
+    <string name="db_error_message">The local database has encountered a schema error and cannot be used. You can clear the database to fix this issue (saved places will be lost) or close the app.</string>
+    <string name="db_error_clear">Clear Database</string>
+    <string name="db_error_close_app">Close App</string>
 </resources>

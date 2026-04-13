@@ -19,7 +19,9 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -71,6 +73,8 @@ data class ForecastUiState(
     val selectedModel: ForecastModel = ForecastModel.BEST_MATCH,
     /** Model actually used after fallback (may differ from [selectedModel]). */
     val resolvedModel: ForecastModel? = null,
+    /** Timestamp (UTC millis) when the forecast data was last updated from the server. */
+    val forecastUpdatedAtMillis: Long? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -86,6 +90,9 @@ class ForecastViewModel @Inject constructor(
     private val stuveHour = MutableStateFlow(12)
     private val isLoading = MutableStateFlow(false)
     private val errorMessage = MutableStateFlow<String?>(null)
+
+    private val _networkErrorEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val networkErrorEvent: SharedFlow<String> = _networkErrorEvent
 
     private val selectedPlace = placeRepository.selectedPlace
 
@@ -182,6 +189,7 @@ class ForecastViewModel @Inject constructor(
             errorMessage = currentError,
             selectedModel = currentModel,
             resolvedModel = snapshot?.resolvedModel,
+            forecastUpdatedAtMillis = snapshot?.updatedAtUtcMillis,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -218,8 +226,9 @@ class ForecastViewModel @Inject constructor(
                             place, model = model, forecastDays = 2,
                         )
                     }.onFailure { throwable ->
-                        errorMessage.value =
-                            throwable.message ?: "Unable to load forecast right now."
+                        val msg = throwable.message ?: "Unable to load forecast right now."
+                        errorMessage.value = msg
+                        _networkErrorEvent.tryEmit(msg)
                     }
                     isLoading.value = false
 
@@ -254,8 +263,9 @@ class ForecastViewModel @Inject constructor(
                         place, model = model, forecastDays = 7,
                     )
                 }.onFailure { throwable ->
-                    errorMessage.value =
-                        throwable.message ?: "Unable to load forecast right now."
+                    val msg = throwable.message ?: "Unable to load forecast right now."
+                    errorMessage.value = msg
+                    _networkErrorEvent.tryEmit(msg)
                 }
                 isLoading.value = false
             }
@@ -308,7 +318,9 @@ class ForecastViewModel @Inject constructor(
                     forecastDays = 2,
                 )
             }.onFailure { throwable ->
-                errorMessage.value = throwable.message ?: "Unable to load forecast right now."
+                val msg = throwable.message ?: "Unable to load forecast right now."
+                errorMessage.value = msg
+                _networkErrorEvent.tryEmit(msg)
             }
             isLoading.value = false
 

@@ -1,7 +1,12 @@
 package com.cloudbasepredictor.data.forecast
 
+import android.util.Log
 import com.cloudbasepredictor.data.datasource.DataSourcePreference
 import com.cloudbasepredictor.data.datasource.DataSourceRepository
+import com.cloudbasepredictor.data.local.CachedForecastEntity
+import com.cloudbasepredictor.data.local.DatabaseErrorManager
+import com.cloudbasepredictor.data.local.ForecastCacheDao
+import com.cloudbasepredictor.data.remote.HourlyForecastData
 import com.cloudbasepredictor.data.remote.OpenMeteoRemoteDataSource
 import com.cloudbasepredictor.di.IoDispatcher
 import com.cloudbasepredictor.model.DailyForecast
@@ -19,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 
 interface ForecastRepository {
     fun observeForecast(placeId: String, model: ForecastModel): Flow<ForecastSnapshot?>
@@ -34,12 +40,18 @@ interface ForecastRepository {
         model: ForecastModel = ForecastModel.BEST_MATCH,
         forecastDays: Int = 7,
     )
+
+    /** Delete cached forecasts older than [cutoffMillis]. */
+    suspend fun cleanupOldForecasts(cutoffMillis: Long)
 }
 
 @Singleton
 class InMemoryForecastRepository @Inject constructor(
     private val openMeteoRemoteDataSource: OpenMeteoRemoteDataSource,
     private val dataSourceRepository: DataSourceRepository,
+    private val forecastCacheDao: ForecastCacheDao,
+    private val databaseErrorManager: DatabaseErrorManager,
+    private val json: Json,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ForecastRepository {
     private val cachedForecasts = MutableStateFlow<Map<String, ForecastSnapshot>>(emptyMap())
@@ -66,6 +78,8 @@ class InMemoryForecastRepository @Inject constructor(
         forecastDays: Int,
     ) = withContext(ioDispatcher) {
         val key = cacheKey(place.id, model)
+
+        // 1. Check in-memory cache
         if (!forceRefresh && cachedForecasts.value.containsKey(key)) {
             val existing = cachedForecasts.value[key]
             if (existing != null && existing.forecastDays >= forecastDays) {
@@ -73,6 +87,16 @@ class InMemoryForecastRepository @Inject constructor(
             }
         }
 
+        // 2. Check DB cache (only for REAL data source)
+        if (!forceRefresh && dataSourceRepository.preference.value == DataSourcePreference.REAL) {
+            val dbSnapshot = loadFromDbCache(place.id, model, forecastDays)
+            if (dbSnapshot != null) {
+                cachedForecasts.value = cachedForecasts.value + (key to dbSnapshot)
+                return@withContext
+            }
+        }
+
+        // 3. Fetch from network (or generate fake data)
         val snapshot = if (dataSourceRepository.preference.value == DataSourcePreference.FAKE) {
             ForecastSnapshot(
                 days = generateFakeDays(forecastDays),
@@ -87,16 +111,99 @@ class InMemoryForecastRepository @Inject constructor(
                 requestedModel = model,
                 forecastDays = forecastDays,
             )
-            ForecastSnapshot(
+            val now = System.currentTimeMillis()
+            val snapshot = ForecastSnapshot(
                 days = hourlyData.dailyForecasts,
-                updatedAtUtcMillis = System.currentTimeMillis(),
+                updatedAtUtcMillis = now,
                 hourlyData = hourlyData,
                 resolvedModel = resolvedModel,
                 forecastDays = forecastDays,
             )
+
+            // Store in DB cache
+            saveToDbCache(place.id, model, resolvedModel, forecastDays, hourlyData, now)
+
+            snapshot
         }
 
         cachedForecasts.value = cachedForecasts.value + (key to snapshot)
+    }
+
+    override suspend fun cleanupOldForecasts(cutoffMillis: Long) = withContext(ioDispatcher) {
+        try {
+            val deleted = forecastCacheDao.deleteOlderThan(cutoffMillis)
+            if (deleted > 0) {
+                Log.d("ForecastRepository", "Cleaned up $deleted old cached forecasts")
+            }
+        } catch (e: Exception) {
+            Log.e("ForecastRepository", "Failed to clean up old forecasts", e)
+            handleDbError(e)
+        }
+    }
+
+    private suspend fun loadFromDbCache(
+        placeId: String,
+        model: ForecastModel,
+        minForecastDays: Int,
+    ): ForecastSnapshot? {
+        return try {
+            val entity = forecastCacheDao.getCachedForecast(placeId, model.apiName)
+                ?: return null
+
+            val now = System.currentTimeMillis()
+            if (now >= entity.nextExpectedUpdateMillis) return null
+            if (entity.forecastDays < minForecastDays) return null
+
+            val hourlyData = json.decodeFromString<HourlyForecastData>(entity.hourlyDataJson)
+            val resolvedModel = ForecastModel.fromApiName(entity.resolvedModelApiName) ?: model
+
+            ForecastSnapshot(
+                days = hourlyData.dailyForecasts,
+                updatedAtUtcMillis = entity.fetchedAtMillis,
+                hourlyData = hourlyData,
+                resolvedModel = resolvedModel,
+                forecastDays = entity.forecastDays,
+            )
+        } catch (e: Exception) {
+            Log.e("ForecastRepository", "Failed to load from DB cache", e)
+            handleDbError(e)
+            null
+        }
+    }
+
+    private suspend fun saveToDbCache(
+        placeId: String,
+        requestedModel: ForecastModel,
+        resolvedModel: ForecastModel,
+        forecastDays: Int,
+        hourlyData: HourlyForecastData,
+        fetchedAtMillis: Long,
+    ) {
+        try {
+            val hourlyJson = json.encodeToString(HourlyForecastData.serializer(), hourlyData)
+            val updateInterval = resolvedModel.updateIntervalMillis
+            val entity = CachedForecastEntity(
+                placeId = placeId,
+                modelApiName = requestedModel.apiName,
+                resolvedModelApiName = resolvedModel.apiName,
+                forecastDays = forecastDays,
+                hourlyDataJson = hourlyJson,
+                fetchedAtMillis = fetchedAtMillis,
+                nextExpectedUpdateMillis = fetchedAtMillis + updateInterval,
+            )
+            forecastCacheDao.upsertForecast(entity)
+        } catch (e: Exception) {
+            Log.e("ForecastRepository", "Failed to save to DB cache", e)
+            handleDbError(e)
+        }
+    }
+
+    private fun handleDbError(e: Exception) {
+        if (e is android.database.sqlite.SQLiteException ||
+            e is IllegalStateException
+        ) {
+            databaseErrorManager.reportError(e)
+        }
     }
 
     private fun cacheKey(placeId: String, model: ForecastModel): String {

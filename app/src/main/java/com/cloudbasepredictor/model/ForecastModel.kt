@@ -14,6 +14,8 @@ enum class ForecastModel(
     val displayName: String,
     val description: String,
     val fallback: ForecastModel?,
+    /** Typical update interval for this model, in milliseconds. */
+    val updateIntervalMillis: Long,
 ) {
     /** DWD ICON-D2: 2 km, Central Europe, ~2 days. */
     ICON_D2(
@@ -21,6 +23,7 @@ enum class ForecastModel(
         displayName = "ICON D2",
         description = "2 km, Central Europe, 2 days",
         fallback = null, // resolved lazily below
+        updateIntervalMillis = 3 * 3_600_000L, // 3 hours
     ),
 
     /** DWD ICON-EU: 7 km, Europe, ~5 days. */
@@ -29,6 +32,7 @@ enum class ForecastModel(
         displayName = "ICON EU",
         description = "7 km, Europe, 5 days",
         fallback = null,
+        updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
 
     /** DWD ICON Global: 11 km, worldwide, ~7 days. */
@@ -37,6 +41,7 @@ enum class ForecastModel(
         displayName = "ICON Global",
         description = "11 km, Global, 7 days",
         fallback = null,
+        updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
 
     /** DWD ICON Seamless: auto-blends D2 → EU → Global (recommended default). */
@@ -45,6 +50,7 @@ enum class ForecastModel(
         displayName = "ICON Seamless",
         description = "DWD blend (D2→EU→Global)",
         fallback = null,
+        updateIntervalMillis = 3 * 3_600_000L, // 3 hours
     ),
 
     /** Météo-France AROME: 1.3 km, France + neighbours, ~2 days. */
@@ -53,6 +59,7 @@ enum class ForecastModel(
         displayName = "AROME HD",
         description = "1.3 km, France, 2 days",
         fallback = null,
+        updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
 
     /** Météo-France ARPEGE: 11 km Europe / 25 km global, ~4 days. */
@@ -61,6 +68,7 @@ enum class ForecastModel(
         displayName = "ARPEGE EU",
         description = "11 km, Europe, 4 days",
         fallback = null,
+        updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
 
     /** ECMWF IFS: 9 km, global, ~10 days. */
@@ -69,6 +77,7 @@ enum class ForecastModel(
         displayName = "ECMWF IFS",
         description = "9 km, Global, 10 days",
         fallback = null,
+        updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
 
     /** Open-Meteo best-match: automatic model selection for the location. */
@@ -77,6 +86,7 @@ enum class ForecastModel(
         displayName = "Best Match",
         description = "Auto-selected (default)",
         fallback = null,
+        updateIntervalMillis = 3 * 3_600_000L, // 3 hours
     );
 
     companion object {

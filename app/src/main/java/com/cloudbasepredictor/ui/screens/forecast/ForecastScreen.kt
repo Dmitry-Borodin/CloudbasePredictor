@@ -1,5 +1,6 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,12 +22,14 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -43,6 +46,7 @@ import com.cloudbasepredictor.ui.screens.forecast.views.StuveForecastView
 import com.cloudbasepredictor.ui.screens.forecast.views.ThermicForecastView
 import com.cloudbasepredictor.ui.screens.forecast.views.WindForecastView
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
+import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun ForecastRoute(
@@ -50,6 +54,13 @@ fun ForecastRoute(
     viewModel: ForecastViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    LaunchedEffect(viewModel) {
+        viewModel.networkErrorEvent.collectLatest { errorMsg ->
+            Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     ForecastScreen(
         uiState = uiState,
@@ -238,8 +249,8 @@ private fun ForecastReadyContent(
         HelpButtonOverlay(
             uiState = uiState,
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 24.dp, bottom = 24.dp),
+                .align(Alignment.TopStart)
+                .padding(start = 8.dp, top = 8.dp),
         )
 
         ModelSelectorOverlay(
