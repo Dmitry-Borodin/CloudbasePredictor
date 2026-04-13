@@ -17,7 +17,7 @@ interface DataSourceRepository {
 
 @Singleton
 class InMemoryDataSourceRepository @Inject constructor() : DataSourceRepository {
-    override val preference = MutableStateFlow(DataSourcePreference.FAKE)
+    override val preference = MutableStateFlow(DataSourcePreference.REAL)
 
     override fun setPreference(preference: DataSourcePreference) {
         this.preference.value = preference

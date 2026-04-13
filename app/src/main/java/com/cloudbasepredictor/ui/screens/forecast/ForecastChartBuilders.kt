@@ -53,7 +53,8 @@ internal fun buildStuveChartFromData(
     val surfaceDew = hourPoint.dewPoint2mC?.toFloat()
         ?: dewpointProfile.firstOrNull()?.temperatureC
         ?: (surfaceTemp - 8f)
-    val surfacePressure = surfacePoint.pressureHpa.toFloat()
+    // Estimate surface pressure from station elevation (ISA)
+    val surfacePressure = estimateSurfacePressureHpa(hourlyData.elevation ?: 0.0)
     val kappa = 0.286f
     val surfaceThetaK = (surfaceTemp + 273.15f) * (1000f / surfacePressure).pow(kappa)
     val surfaceMixingRatio = saturationMixingRatioGKg(surfaceDew, surfacePressure)
@@ -132,7 +133,8 @@ internal fun buildThermicChartFromData(
 
         // Estimate thermal top from pressure level data
         val pressureLevels = hp.pressureLevels.sortedBy { it.pressureHpa }
-        val surfacePressure = pressureLevels.lastOrNull()?.pressureHpa?.toFloat() ?: 1013f
+        // Estimate surface pressure from station elevation (ISA)
+        val surfacePressure = estimateSurfacePressureHpa(elevation)
 
         // Compute parcel temperature at each level
         val kappa = 0.286f

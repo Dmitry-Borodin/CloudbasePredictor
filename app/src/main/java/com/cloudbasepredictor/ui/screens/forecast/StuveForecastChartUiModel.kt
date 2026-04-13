@@ -82,6 +82,14 @@ fun pressureToApproxHeightMeters(pressureHpa: Float): Int {
 // θ = T * (1000 / P)^(R/Cp), where R/Cp ≈ 0.286
 private const val KAPPA = 0.286f
 
+/**
+ * Estimate surface pressure from station elevation using the International
+ * Standard Atmosphere (ISA) barometric formula.
+ */
+fun estimateSurfacePressureHpa(elevationM: Double): Float {
+    return (1013.25 * (1.0 - 0.0065 * elevationM / 288.15).pow(5.2561)).toFloat()
+}
+
 fun dryAdiabatTemperatureC(thetaK: Float, pressureHpa: Float): Float {
     return thetaK * (pressureHpa / 1000f).pow(KAPPA) - 273.15f
 }
