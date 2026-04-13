@@ -10,3 +10,4 @@ agent-local/
 .externalNativeBuild
 .cxx
 local.properties
+app/screenshots/

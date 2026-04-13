@@ -20,3 +20,13 @@ Compile-check instrumentation tests without running:
 
 E2E tests (require running emulator/device AND real network to Open-Meteo backend):
 - `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.cloudbasepredictor.e2e.ForecastModelE2eTest`
+
+Screenshot capture (require running emulator/device, uses simulated data):
+- Capture all screens:
+  `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.cloudbasepredictor.screenshot.ScreenshotCaptureTest`
+- Capture a single screen (e.g. Stüve):
+  `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.cloudbasepredictor.screenshot.ScreenshotCaptureTest#captureStuveForecast`
+- Pull screenshots from device to local folder:
+  `adb pull /sdcard/Pictures/CloudbaseScreenshots/ app/screenshots/`
+- Screenshots are saved to `app/screenshots/` which is gitignored.
+- After pulling, the agent can view screenshots via the `view_image` tool to iterate on UI changes.

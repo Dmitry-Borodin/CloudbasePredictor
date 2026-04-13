@@ -23,8 +23,20 @@ class CloudbasePredictorApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Enable MapLibre ambient tile cache (50 MB).
+        // Enable MapLibre ambient tile cache (200 MB).
         MapLibre.getInstance(this)
+        org.maplibre.android.offline.OfflineManager.getInstance(this)
+            .setMaximumAmbientCacheSize(
+                200L * 1024 * 1024,
+                object : org.maplibre.android.offline.OfflineManager.FileSourceCallback {
+                    override fun onSuccess() {
+                        Log.d("CloudbaseApp", "Ambient tile cache set to 200 MB")
+                    }
+                    override fun onError(message: String) {
+                        Log.e("CloudbaseApp", "Failed to set ambient cache size: $message")
+                    }
+                },
+            )
 
         // Schedule DB cleanup after 10 seconds.
         appScope.launch {
