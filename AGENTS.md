@@ -13,17 +13,17 @@ Unit tests (JVM, no device needed):
 - `./gradlew :app:testDebugUnitTest`
 
 Instrumentation tests (require running emulator/device):
-- `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=com.cloudbasepredictor.e2e.ForecastModelE2eTest`
+- `./gradlew :app:connectedInstrumentationTest`
 
 Compile-check instrumentation tests without running:
 - `./gradlew :app:compileDebugAndroidTestKotlin`
 
 E2E tests (require running emulator/device AND real network to Open-Meteo backend):
-- `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.cloudbasepredictor.e2e.ForecastModelE2eTest`
+- `./gradlew :app:connectedE2eTest`
 
 Screenshot capture (require running emulator/device, uses simulated data):
 - Capture all screens:
-  `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.cloudbasepredictor.screenshot.ScreenshotCaptureTest`
+  `./gradlew :app:connectedScreenshotTest`
 - Capture a single screen (e.g. Stüve):
   `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.cloudbasepredictor.screenshot.ScreenshotCaptureTest#captureStuveForecast`
 - Pull screenshots from device to local folder:

@@ -6,6 +6,8 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+val requestedTasks = gradle.startParameter.taskNames
+
 android {
     namespace = "com.cloudbasepredictor"
     compileSdk {
@@ -22,6 +24,22 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "com.cloudbasepredictor.HiltTestRunner"
+
+        when {
+            requestedTasks.any { it.endsWith("connectedE2eTest") } ->
+                testInstrumentationRunnerArguments["class"] =
+                    "com.cloudbasepredictor.e2e.ForecastModelE2eTest"
+
+            requestedTasks.any { it.endsWith("connectedScreenshotTest") } ->
+                testInstrumentationRunnerArguments["class"] =
+                    "com.cloudbasepredictor.screenshot.ScreenshotCaptureTest"
+
+            else ->
+                testInstrumentationRunnerArguments["notClass"] = listOf(
+                    "com.cloudbasepredictor.e2e.ForecastModelE2eTest",
+                    "com.cloudbasepredictor.screenshot.ScreenshotCaptureTest",
+                ).joinToString(",")
+        }
     }
 
     buildTypes {
@@ -98,4 +116,22 @@ dependencies {
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+tasks.register("connectedInstrumentationTest") {
+    description = "Run instrumentation tests (excluding E2E and screenshot)"
+    group = "verification"
+    dependsOn("connectedDebugAndroidTest")
+}
+
+tasks.register("connectedE2eTest") {
+    description = "Run E2E tests (requires emulator/device and network)"
+    group = "verification"
+    dependsOn("connectedDebugAndroidTest")
+}
+
+tasks.register("connectedScreenshotTest") {
+    description = "Run screenshot capture tests (requires emulator/device)"
+    group = "verification"
+    dependsOn("connectedDebugAndroidTest")
 }
