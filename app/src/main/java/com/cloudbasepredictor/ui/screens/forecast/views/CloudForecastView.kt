@@ -148,6 +148,13 @@ private fun CloudChartCanvas(
 
         if (plotWidth <= 0f || plotHeight <= 0f || chart.hours.isEmpty()) return@Canvas
 
+        // Draw full background for the entire chart area (including gaps between layers)
+        drawRect(
+            color = gridBackgroundColor,
+            topLeft = Offset(0f, plotTop),
+            size = Size(size.width, size.height),
+        )
+
         // Background for each layer (not the spacing gaps)
         for (i in 0..2) {
             val ly = layerTopY(i)
@@ -409,9 +416,9 @@ private fun precipColor(amountMm: Float): Color {
     }
 }
 
-private val CLOUD_HIGH_COLOR = Color(0xFFB0BEC5) // Light slate
-private val CLOUD_MID_COLOR = Color(0xFF78909C)  // Medium slate
-private val CLOUD_LOW_COLOR = Color(0xFF546E7A)   // Dark slate
+private val CLOUD_HIGH_COLOR = Color(0xFF78909C) // Uniform slate
+private val CLOUD_MID_COLOR = Color(0xFF78909C)  // Uniform slate
+private val CLOUD_LOW_COLOR = Color(0xFF78909C)   // Uniform slate
 
 @Preview(name = "Cloud Default", showBackground = true, widthDp = 420, heightDp = 720)
 @Composable

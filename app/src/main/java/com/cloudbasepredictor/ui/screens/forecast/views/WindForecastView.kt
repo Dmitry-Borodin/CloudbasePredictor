@@ -4,8 +4,7 @@ import android.content.res.Configuration
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -143,15 +142,19 @@ private fun WindChartCanvas(
     Canvas(
         modifier = modifier
             .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    crosshairPos = if (crosshairPos != null) null else offset
+                awaitPointerEventScope {
+                    while (true) {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        crosshairPos = down.position
+                        do {
+                            val event = awaitPointerEvent()
+                            val primary = event.changes.firstOrNull() ?: break
+                            if (primary.pressed && event.changes.size == 1) {
+                                crosshairPos = primary.position
+                            }
+                        } while (event.changes.any { it.pressed })
+                    }
                 }
-            }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { offset -> crosshairPos = offset },
-                    onDrag = { change, _ -> crosshairPos = change.position },
-                )
             }
             .pointerInput(visibleTopAltitudeKm) {
                 detectTransformGestures { _, _, zoom, _ ->
@@ -190,6 +193,11 @@ private fun WindChartCanvas(
             color = gridBackgroundColor,
             topLeft = Offset(0f, plotTop),
             size = Size(axisWidth, plotHeight),
+        )
+        drawRect(
+            color = gridBackgroundColor,
+            topLeft = Offset(plotLeft, plotTop),
+            size = Size(plotWidth, plotHeight),
         )
 
         val columnWidth = plotWidth / chart.hours.size

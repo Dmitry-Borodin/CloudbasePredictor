@@ -247,6 +247,17 @@ fun MapScreen(
                     .padding(16.dp),
             )
         }
+
+        // Map tile service attribution
+        Text(
+            text = stringResource(R.string.about_openfreemap),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(end = 8.dp, bottom = 4.dp),
+        )
     }
 
     if (showFavoritesDialog) {

@@ -59,6 +59,7 @@ object PreviewData {
     val forecastSnapshot = ForecastSnapshot(
         days = dailyForecasts,
         updatedAtUtcMillis = 1_715_777_600_000L,
+        modelGeneratedAtMillis = 1_715_770_800_000L,
     )
 
     fun forecastDayChips(days: Int = 7): List<ForecastDayChipUiModel> {

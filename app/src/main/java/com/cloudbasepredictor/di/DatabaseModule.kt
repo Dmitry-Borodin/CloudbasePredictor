@@ -1,6 +1,7 @@
 package com.cloudbasepredictor.di
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.room.Room
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -50,6 +51,13 @@ object DatabaseModule {
     fun provideForecastCacheDao(
         appDatabase: AppDatabase,
     ): ForecastCacheDao = appDatabase.forecastCacheDao()
+
+    @Provides
+    @Singleton
+    fun provideSharedPreferences(
+        @ApplicationContext context: Context,
+    ): SharedPreferences =
+        context.getSharedPreferences("cloudbase_prefs", Context.MODE_PRIVATE)
 
     private fun getOrCreatePassphrase(context: Context): String {
         val masterKey = MasterKey.Builder(context)

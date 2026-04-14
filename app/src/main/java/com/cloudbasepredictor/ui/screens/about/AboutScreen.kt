@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.cloudbasepredictor.BuildConfig
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
@@ -93,12 +94,17 @@ fun AboutScreen(
             )
 
             Text(
-                text = stringResource(R.string.about_foss_label),
-                style = MaterialTheme.typography.titleMedium,
+                text = stringResource(
+                    R.string.about_version_format,
+                    BuildConfig.VERSION_NAME,
+                    if (BuildConfig.DEBUG) "debug" else "release",
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Text(
-                text = stringResource(R.string.about_license_text),
+                text = stringResource(R.string.about_foss_label),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

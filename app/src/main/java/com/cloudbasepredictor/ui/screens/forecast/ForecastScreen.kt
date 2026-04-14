@@ -1,9 +1,14 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
@@ -214,35 +219,51 @@ private fun ForecastReadyContent(
     onModelSelected: (ForecastModel) -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        when (uiState.selectedForecastMode) {
-            ForecastMode.THERMIC -> {
-                ThermicForecastView(
-                    uiState = uiState,
-                    onVisibleTopAltitudeChange = onForecastViewportTopChanged,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            ForecastMode.STUVE -> {
-                StuveForecastView(
-                    uiState = uiState,
-                    onVisibleTopAltitudeChange = onForecastViewportTopChanged,
-                    onStuveHourChanged = onStuveHourChanged,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            ForecastMode.WIND -> {
-                WindForecastView(
-                    uiState = uiState,
-                    onVisibleTopAltitudeChange = onForecastViewportTopChanged,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            ForecastMode.CLOUD -> {
-                CloudForecastView(
-                    uiState = uiState,
-                    onVisibleTopAltitudeChange = onForecastViewportTopChanged,
-                    modifier = Modifier.fillMaxSize(),
-                )
+        AnimatedContent(
+            targetState = uiState.selectedForecastMode,
+            transitionSpec = {
+                val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                (slideInHorizontally(
+                    animationSpec = tween(300),
+                    initialOffsetX = { fullWidth -> direction * fullWidth / 4 },
+                ) + fadeIn(animationSpec = tween(300))) togetherWith
+                    (slideOutHorizontally(
+                        animationSpec = tween(300),
+                        targetOffsetX = { fullWidth -> -direction * fullWidth / 4 },
+                    ) + fadeOut(animationSpec = tween(300)))
+            },
+            label = "forecast_mode_transition",
+        ) { mode ->
+            when (mode) {
+                ForecastMode.THERMIC -> {
+                    ThermicForecastView(
+                        uiState = uiState,
+                        onVisibleTopAltitudeChange = onForecastViewportTopChanged,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                ForecastMode.STUVE -> {
+                    StuveForecastView(
+                        uiState = uiState,
+                        onVisibleTopAltitudeChange = onForecastViewportTopChanged,
+                        onStuveHourChanged = onStuveHourChanged,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                ForecastMode.WIND -> {
+                    WindForecastView(
+                        uiState = uiState,
+                        onVisibleTopAltitudeChange = onForecastViewportTopChanged,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                ForecastMode.CLOUD -> {
+                    CloudForecastView(
+                        uiState = uiState,
+                        onVisibleTopAltitudeChange = onForecastViewportTopChanged,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
 

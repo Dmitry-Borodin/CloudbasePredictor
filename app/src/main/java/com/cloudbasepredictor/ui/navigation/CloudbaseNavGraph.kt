@@ -1,5 +1,8 @@
 package com.cloudbasepredictor.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
@@ -16,6 +19,8 @@ import com.cloudbasepredictor.ui.screens.forecast.ForecastRoute
 import com.cloudbasepredictor.ui.screens.map.MapRoute
 import com.cloudbasepredictor.ui.screens.settings.SettingsRoute
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
+
+private const val NAV_ANIM_DURATION = 300
 
 @Composable
 fun CloudbaseNavGraph(
@@ -47,7 +52,11 @@ fun CloudbaseNavGraph(
                 },
             )
         }
-        composable(route = TopLevelDestination.Forecast.route) {
+        composable(
+            route = TopLevelDestination.Forecast.route,
+            enterTransition = { fadeIn(animationSpec = tween(NAV_ANIM_DURATION)) },
+            exitTransition = { fadeOut(animationSpec = tween(NAV_ANIM_DURATION)) },
+        ) {
             forecastDestination {
                 val popped = navController.popBackStack(
                     route = TopLevelDestination.Map.route,
@@ -61,7 +70,11 @@ fun CloudbaseNavGraph(
                 }
             }
         }
-        composable(route = TopLevelDestination.Settings.route) {
+        composable(
+            route = TopLevelDestination.Settings.route,
+            enterTransition = { fadeIn(animationSpec = tween(NAV_ANIM_DURATION)) },
+            exitTransition = { fadeOut(animationSpec = tween(NAV_ANIM_DURATION)) },
+        ) {
             SettingsRoute(
                 onBack = { navController.popBackStack() },
                 onOpenAbout = {
@@ -71,7 +84,11 @@ fun CloudbaseNavGraph(
                 },
             )
         }
-        composable(route = TopLevelDestination.About.route) {
+        composable(
+            route = TopLevelDestination.About.route,
+            enterTransition = { fadeIn(animationSpec = tween(NAV_ANIM_DURATION)) },
+            exitTransition = { fadeOut(animationSpec = tween(NAV_ANIM_DURATION)) },
+        ) {
             AboutRoute(
                 onBack = { navController.popBackStack() },
             )

@@ -4,6 +4,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,19 +43,21 @@ fun CloudbasePredictorApp(
     }
 
     CloudbasePredictorTheme(darkTheme = darkTheme) {
-        val navController = rememberNavController()
-        navGraph(Modifier.fillMaxSize(), navController)
+        Surface(modifier = Modifier.fillMaxSize()) {
+            val navController = rememberNavController()
+            navGraph(Modifier.fillMaxSize(), navController)
 
-        if (databaseErrorManager != null) {
-            val showDbError by databaseErrorManager.showError.collectAsStateWithLifecycle()
-            if (showDbError) {
-                val context = LocalContext.current
-                DatabaseErrorDialog(
-                    onClearDatabase = { databaseErrorManager.clearDatabaseAndRestart() },
-                    onCloseApp = {
-                        (context as? android.app.Activity)?.finish()
-                    },
-                )
+            if (databaseErrorManager != null) {
+                val showDbError by databaseErrorManager.showError.collectAsStateWithLifecycle()
+                if (showDbError) {
+                    val context = LocalContext.current
+                    DatabaseErrorDialog(
+                        onClearDatabase = { databaseErrorManager.clearDatabaseAndRestart() },
+                        onCloseApp = {
+                            (context as? android.app.Activity)?.finish()
+                        },
+                    )
+                }
             }
         }
     }

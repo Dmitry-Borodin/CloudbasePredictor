@@ -112,12 +112,14 @@ class InMemoryForecastRepository @Inject constructor(
                 forecastDays = forecastDays,
             )
             val now = System.currentTimeMillis()
+            val modelGenEstimate = estimateModelRunTime(now, resolvedModel)
             val snapshot = ForecastSnapshot(
                 days = hourlyData.dailyForecasts,
                 updatedAtUtcMillis = now,
                 hourlyData = hourlyData,
                 resolvedModel = resolvedModel,
                 forecastDays = forecastDays,
+                modelGeneratedAtMillis = modelGenEstimate,
             )
 
             // Store in DB cache
@@ -163,6 +165,7 @@ class InMemoryForecastRepository @Inject constructor(
                 hourlyData = hourlyData,
                 resolvedModel = resolvedModel,
                 forecastDays = entity.forecastDays,
+                modelGeneratedAtMillis = estimateModelRunTime(entity.fetchedAtMillis, resolvedModel),
             )
         } catch (e: Exception) {
             Log.e("ForecastRepository", "Failed to load from DB cache", e)
@@ -209,6 +212,18 @@ class InMemoryForecastRepository @Inject constructor(
     private fun cacheKey(placeId: String, model: ForecastModel): String {
         return "$placeId:${model.apiName}"
     }
+
+    private fun estimateModelRunTime(fetchedAtMillis: Long, model: ForecastModel): Long =
+        estimateModelRunTimeInternal(fetchedAtMillis, model)
+}
+
+/**
+ * Estimate the model run time by rounding down the fetch time to the nearest
+ * multiple of the model's update interval.
+ */
+internal fun estimateModelRunTimeInternal(fetchedAtMillis: Long, model: ForecastModel): Long {
+    val interval = model.updateIntervalMillis
+    return (fetchedAtMillis / interval) * interval
 }
 
 private fun generateFakeDays(count: Int): List<DailyForecast> {

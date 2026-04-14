@@ -112,6 +112,26 @@ internal fun HelpButtonOverlay(
                         )
                     }
 
+                    // Estimated model generation time
+                    if (uiState.modelGeneratedAtMillis != null) {
+                        val localDateTimeFormat = DateFormat.getDateTimeInstance(
+                            DateFormat.MEDIUM,
+                            DateFormat.SHORT,
+                        )
+                        val formattedModelTime = localDateTimeFormat.format(
+                            Date(uiState.modelGeneratedAtMillis),
+                        )
+                        Text(
+                            text = stringResource(R.string.help_model_generated_label),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = formattedModelTime,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+
                     HorizontalDivider()
 
                     // Mode-specific content with legends
@@ -142,6 +162,12 @@ internal fun HelpButtonOverlay(
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             WindSpeedLegend()
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.help_wind_ccl_info),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         ForecastMode.CLOUD -> {
                             Text(

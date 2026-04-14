@@ -11,4 +11,6 @@ data class ForecastSnapshot(
     val resolvedModel: ForecastModel? = null,
     /** Number of forecast days loaded (2 for quick load, 7 for full). */
     val forecastDays: Int = 7,
+    /** Estimated UTC millis when the model run started, based on model update interval. */
+    val modelGeneratedAtMillis: Long? = null,
 )

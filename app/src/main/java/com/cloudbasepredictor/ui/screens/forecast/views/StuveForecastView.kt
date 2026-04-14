@@ -137,8 +137,10 @@ private fun StuveTimeSlider(
             )
             Slider(
                 value = sliderValue,
-                onValueChange = { sliderValue = it },
-                onValueChangeFinished = { onHourChanged(sliderValue.toInt()) },
+                onValueChange = {
+                    sliderValue = it
+                    onHourChanged(it.toInt())
+                },
                 valueRange = 6f..22f,
                 steps = 15,
                 colors = SliderDefaults.colors(

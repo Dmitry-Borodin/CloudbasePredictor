@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -188,7 +189,7 @@ fun SettingsScreen(
             }
 
             // About button
-            Button(onClick = onOpenAbout) {
+            OutlinedButton(onClick = onOpenAbout) {
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = null,

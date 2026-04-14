@@ -169,11 +169,27 @@ internal fun buildThermicChartFromData(
             thermalTopKm = heightAsl
         }
 
-        // Build thermal cells below the top
-        val altitudeStepKm = 0.2f
-        var currentAlt = elevationKm
-        while (currentAlt < thermalTopKm) {
-            val nextAlt = (currentAlt + altitudeStepKm).coerceAtMost(thermalTopKm)
+        // Build thermal cells below the top, using actual pressure level heights
+        // for granularity that matches model data resolution.
+        val levelHeightsKm = pressureLevels
+            .mapNotNull { pl -> (pl.geopotentialHeightM ?: return@mapNotNull null).toFloat() / 1000f }
+            .filter { it in elevationKm..thermalTopKm }
+            .sorted()
+            .toMutableList()
+
+        // Ensure we have boundaries at elevation and thermal top
+        if (levelHeightsKm.isEmpty() || levelHeightsKm.first() > elevationKm + 0.01f) {
+            levelHeightsKm.add(0, elevationKm)
+        }
+        if (levelHeightsKm.last() < thermalTopKm - 0.01f) {
+            levelHeightsKm.add(thermalTopKm)
+        }
+
+        for (i in 0 until levelHeightsKm.size - 1) {
+            val currentAlt = levelHeightsKm[i]
+            val nextAlt = levelHeightsKm[i + 1]
+            if (nextAlt <= currentAlt + 0.001f) continue
+
             val bandCenter = (currentAlt + nextAlt) / 2f
             val altFraction = if (thermalTopKm > elevationKm) (bandCenter - elevationKm) / (thermalTopKm - elevationKm) else 0f
             // Thermal strength from CAPE: scaled sqrt(2*CAPE) for realistic thermal values
@@ -186,7 +202,6 @@ internal fun buildThermicChartFromData(
                 endAltitudeKm = nextAlt,
                 strengthMps = ((strength * 10f).toInt() / 10f).coerceIn(0f, 10f),
             )
-            currentAlt = nextAlt
         }
 
         // Cloud marker at thermal top if we have enough lift

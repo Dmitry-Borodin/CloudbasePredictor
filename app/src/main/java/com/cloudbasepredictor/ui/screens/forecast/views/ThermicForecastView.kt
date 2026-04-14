@@ -4,8 +4,7 @@ import android.content.res.Configuration
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -26,6 +25,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
@@ -126,15 +126,19 @@ private fun ThermicForecastGrid(
     Canvas(
         modifier = modifier
             .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    crosshairPos = if (crosshairPos != null) null else offset
+                awaitPointerEventScope {
+                    while (true) {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        crosshairPos = down.position
+                        do {
+                            val event = awaitPointerEvent()
+                            val primary = event.changes.firstOrNull() ?: break
+                            if (primary.pressed && event.changes.size == 1) {
+                                crosshairPos = primary.position
+                            }
+                        } while (event.changes.any { it.pressed })
+                    }
                 }
-            }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { offset -> crosshairPos = offset },
-                    onDrag = { change, _ -> crosshairPos = change.position },
-                )
             }
             .pointerInput(visibleTopAltitudeKm) {
                 detectTransformGestures { _, _, zoom, _ ->
@@ -331,25 +335,40 @@ private fun ThermicForecastGrid(
             style = Stroke(width = 1.dp.toPx()),
         )
 
+        val cloudMarkerWidth = minOf(columnWidth * 2f, 96.dp.toPx())
+        val cloudMarkerHeight = 52.dp.toPx()
+        val drawnCloudMarkers = mutableListOf<Offset>()
+
         displayChart.cloudMarkers.forEach { marker ->
             val timeIndex = timeIndexLookup[marker.startMinuteOfDayLocal] ?: return@forEach
             if (marker.altitudeKm !in elevationKm..effectiveTopAltitudeKm) {
                 return@forEach
             }
 
-            drawCloudMarker(
-                center = Offset(
-                    x = plotLeft + (timeIndex * columnWidth) + (columnWidth / 2f),
-                    y = altitudeToY(
-                        altitudeKm = marker.altitudeKm,
-                        minAltitudeKm = elevationKm,
-                        maxAltitudeKm = effectiveTopAltitudeKm,
-                        plotTop = plotTop,
-                        plotBottom = plotBottom,
-                    ),
+            val center = Offset(
+                x = plotLeft + (timeIndex * columnWidth) + (columnWidth / 2f),
+                y = altitudeToY(
+                    altitudeKm = marker.altitudeKm,
+                    minAltitudeKm = elevationKm,
+                    maxAltitudeKm = effectiveTopAltitudeKm,
+                    plotTop = plotTop,
+                    plotBottom = plotBottom,
                 ),
-                width = minOf(columnWidth * 0.5f, 24.dp.toPx()),
-                height = 13.dp.toPx(),
+            )
+
+            // Skip if overlapping with an already-drawn marker
+            val tooClose = drawnCloudMarkers.any { existing ->
+                val dx = kotlin.math.abs(existing.x - center.x)
+                val dy = kotlin.math.abs(existing.y - center.y)
+                dx < cloudMarkerWidth * 0.8f && dy < cloudMarkerHeight * 0.8f
+            }
+            if (tooClose) return@forEach
+            drawnCloudMarkers += center
+
+            drawCloudMarker(
+                center = center,
+                width = cloudMarkerWidth,
+                height = cloudMarkerHeight,
                 fillColor = Color.White.copy(alpha = 0.94f),
                 outlineColor = cloudOutlineColor,
             )

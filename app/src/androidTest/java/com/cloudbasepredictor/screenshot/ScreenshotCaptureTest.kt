@@ -109,6 +109,60 @@ class ScreenshotCaptureTest {
         }
     }
 
+    // ── Dark theme variants ─────────────────────────────
+
+    @Test
+    fun captureThermicForecastDark() {
+        captureScreen("forecast_thermic_dark") {
+            CloudbasePredictorTheme(darkTheme = true) {
+                ForecastScreen(
+                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.THERMIC),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun captureStuveForecastDark() {
+        captureScreen("forecast_stuve_dark") {
+            CloudbasePredictorTheme(darkTheme = true) {
+                ForecastScreen(
+                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.STUVE),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun captureWindForecastDark() {
+        captureScreen("forecast_wind_dark") {
+            CloudbasePredictorTheme(darkTheme = true) {
+                ForecastScreen(
+                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.WIND),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun captureCloudForecastDark() {
+        captureScreen("forecast_cloud_dark") {
+            CloudbasePredictorTheme(darkTheme = true) {
+                ForecastScreen(
+                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.CLOUD),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                )
+            }
+        }
+    }
+
     private fun captureScreen(name: String, content: @Composable () -> Unit) {
         composeRule.setContent(content)
         composeRule.waitForIdle()
