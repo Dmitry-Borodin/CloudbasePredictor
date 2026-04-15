@@ -30,8 +30,11 @@ internal fun zoomedTopAltitudeKm(
         )
     }
 
+    // Amplify the zoom gesture for a more responsive feel similar to maps
+    val amplifiedZoom = 1f + (zoomChange - 1f) * ZOOM_AMPLIFICATION_FACTOR
+
     return sanitizeTopAltitudeKm(
-        topAltitudeKm = currentTopAltitudeKm / zoomChange,
+        topAltitudeKm = currentTopAltitudeKm / amplifiedZoom,
         minTopAltitudeKm = minTopAltitudeKm,
         maxTopAltitudeKm = maxTopAltitudeKm,
     )
@@ -51,3 +54,4 @@ internal fun sanitizeTopAltitudeKm(
 
 internal const val DEFAULT_TOP_ALTITUDE_KM = 4.5f
 internal const val MAX_TOP_ALTITUDE_KM = 7f
+private const val ZOOM_AMPLIFICATION_FACTOR = 2.5f

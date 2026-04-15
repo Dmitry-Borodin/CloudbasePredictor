@@ -9,6 +9,8 @@ import kotlin.math.pow
  * Falls back to placeholder builders when hourly data is not available.
  */
 
+private const val THERMIC_MIN_DISPLAY_STRENGTH_MPS = 0.2f
+
 // --- Stüve chart from real data ---
 
 internal fun buildStuveChartFromData(
@@ -213,7 +215,14 @@ internal fun buildThermicChartFromData(
         }
     }
 
-    if (cells.isEmpty()) return buildPlaceholderThermicForecastChart(dayIndex)
+    // Drop negligible thermals (rounding artefacts)
+    cells.removeAll { it.strengthMps < THERMIC_MIN_DISPLAY_STRENGTH_MPS }
+
+    if (cells.isEmpty()) return ThermicForecastChartUiModel(
+        timeSlots = timeSlots,
+        cells = emptyList(),
+        cloudMarkers = emptyList(),
+    )
 
     return ThermicForecastChartUiModel(
         timeSlots = timeSlots,

@@ -73,8 +73,12 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    Surface(
         modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -198,6 +202,7 @@ fun SettingsScreen(
                 Text(text = stringResource(R.string.action_about))
             }
         }
+    }
     }
 }
 

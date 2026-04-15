@@ -127,17 +127,35 @@ private fun CloudChartCanvas(
         val leftAxisWidth = with(density) { 60.dp.toPx() }
         val bottomAxisHeight = with(density) { 28.dp.toPx() }
         val precipBarHeight = with(density) { 48.dp.toPx() }
-        val maxLayerHeight = with(density) { 400.dp.toPx() }
-        val layerSpacing = with(density) { 12.dp.toPx() }
-        val totalSpacing = layerSpacing * 2f // 2 gaps between 3 layers
+        val maxLayerHeight = with(density) { 200.dp.toPx() }
+        val preferredLayerSpacing = with(density) { 12.dp.toPx() }
 
         val plotLeft = leftAxisWidth
         val plotTop = 0f
         val plotRight = size.width
         val availableHeight = size.height - bottomAxisHeight - precipBarHeight
-        val maxCloudArea = maxLayerHeight * 3f + totalSpacing
-        val cloudAreaHeight = availableHeight.coerceAtMost(maxCloudArea)
-        val layerHeight = (cloudAreaHeight - totalSpacing).coerceAtLeast(0f) / 3f
+
+        // Adaptive layout: first shrink spacing, then shrink layers
+        val maxCloudArea = maxLayerHeight * 3f + preferredLayerSpacing * 2f
+        val layerHeight: Float
+        val layerSpacing: Float
+        if (availableHeight >= maxCloudArea) {
+            layerHeight = maxLayerHeight
+            layerSpacing = preferredLayerSpacing
+        } else {
+            // First, try keeping full layer height and shrinking spacing
+            val minSpacing = with(density) { 2.dp.toPx() }
+            val heightWithMinSpacing = maxLayerHeight * 3f + minSpacing * 2f
+            if (availableHeight >= heightWithMinSpacing) {
+                layerHeight = maxLayerHeight
+                layerSpacing = ((availableHeight - maxLayerHeight * 3f) / 2f).coerceAtLeast(minSpacing)
+            } else {
+                // Then shrink layers uniformly
+                layerSpacing = minSpacing
+                layerHeight = ((availableHeight - minSpacing * 2f) / 3f).coerceAtLeast(0f)
+            }
+        }
+        val cloudAreaHeight = layerHeight * 3f + layerSpacing * 2f
         val plotBottom = plotTop + cloudAreaHeight
         val plotWidth = plotRight - plotLeft
         val plotHeight = plotBottom - plotTop
@@ -365,19 +383,25 @@ private fun CloudChartCanvas(
 
                 val cx = plotLeft + hourIndex * columnWidth + columnWidth / 2f
 
-                if (precip.probabilityPercent > 10f) {
+                if (precip.amountMm > 0f) {
+                    // Show both probability and amount when precipitation is present
                     canvas.nativeCanvas.drawText(
                         "${precip.probabilityPercent.toInt()}%",
                         cx,
                         precipTop + precipPaint.textSize + 2.dp.toPx(),
                         precipPaint,
                     )
-                }
-                if (precip.amountMm > 0.1f) {
                     canvas.nativeCanvas.drawText(
                         String.format(Locale.US, "%.1f", precip.amountMm),
                         cx,
                         precipTop + precipPaint.textSize * 2f + 4.dp.toPx(),
+                        precipPaint,
+                    )
+                } else if (precip.probabilityPercent > 10f) {
+                    canvas.nativeCanvas.drawText(
+                        "${precip.probabilityPercent.toInt()}%",
+                        cx,
+                        precipTop + precipPaint.textSize + 2.dp.toPx(),
                         precipPaint,
                     )
                 }

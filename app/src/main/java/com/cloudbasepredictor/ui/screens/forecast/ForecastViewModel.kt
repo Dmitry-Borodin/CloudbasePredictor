@@ -2,6 +2,7 @@ package com.cloudbasepredictor.ui.screens.forecast
 
 import com.cloudbasepredictor.data.forecast.ForecastModeRepository
 import com.cloudbasepredictor.data.forecast.ForecastModelRepository
+import com.cloudbasepredictor.data.forecast.ForecastViewportRepository
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cloudbasepredictor.data.forecast.ForecastRepository
@@ -79,6 +80,8 @@ data class ForecastUiState(
     val modelGeneratedAtMillis: Long? = null,
     /** Terrain elevation in km ASL for the selected place. */
     val elevationKm: Float = 0f,
+    /** Favorite places to show on the forecast map panel. */
+    val favoritePlaces: List<SavedPlace> = emptyList(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -88,9 +91,14 @@ class ForecastViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
     private val forecastModeRepository: ForecastModeRepository,
     private val forecastModelRepository: ForecastModelRepository,
+    private val forecastViewportRepository: ForecastViewportRepository,
 ) : ViewModel() {
     private val selectedDayIndex = MutableStateFlow(0)
-    private val chartViewport = MutableStateFlow(ForecastChartViewport())
+    private val chartViewport = MutableStateFlow(
+        ForecastChartViewport(
+            visibleTopAltitudeKm = forecastViewportRepository.visibleTopAltitudeKm.value,
+        ),
+    )
     private val stuveHour = MutableStateFlow(12)
     private val isLoading = MutableStateFlow(false)
     private val errorMessage = MutableStateFlow<String?>(null)
@@ -140,6 +148,7 @@ class ForecastViewModel @Inject constructor(
         isLoading,
         errorMessage,
         forecastModelRepository.selectedModel,
+        placeRepository.observeFavoritePlaces(),
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val place = values[0] as SavedPlace?
@@ -148,6 +157,7 @@ class ForecastViewModel @Inject constructor(
         val loading = values[3] as Boolean
         val currentError = values[4] as String?
         val currentModel = values[5] as ForecastModel
+        val favorites = values[6] as List<SavedPlace>
 
         val dayChips = snapshot?.days?.let(::buildDayChips)
             ?.takeIf { it.isNotEmpty() }
@@ -196,6 +206,7 @@ class ForecastViewModel @Inject constructor(
             forecastUpdatedAtMillis = snapshot?.updatedAtUtcMillis,
             modelGeneratedAtMillis = snapshot?.modelGeneratedAtMillis,
             elevationKm = (snapshot?.hourlyData?.elevation ?: 0.0).toFloat() / 1000f,
+            favoritePlaces = favorites,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -285,6 +296,14 @@ class ForecastViewModel @Inject constructor(
     fun updateChartTopAltitude(topAltitudeKm: Float) {
         chartViewport.update { currentViewport ->
             currentViewport.withVisibleTopAltitudeKm(topAltitudeKm)
+        }
+        forecastViewportRepository.setVisibleTopAltitudeKm(topAltitudeKm)
+    }
+
+    fun updateForecastLocation(latitude: Double, longitude: Double) {
+        val newPlace = SavedPlace.fromCoordinates(latitude, longitude)
+        viewModelScope.launch {
+            placeRepository.saveAndSelectPlace(newPlace)
         }
     }
 

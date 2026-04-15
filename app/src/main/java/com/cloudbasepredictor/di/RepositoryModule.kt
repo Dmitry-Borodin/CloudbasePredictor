@@ -5,9 +5,11 @@ import com.cloudbasepredictor.data.datasource.InMemoryDataSourceRepository
 import com.cloudbasepredictor.data.forecast.ForecastRepository
 import com.cloudbasepredictor.data.forecast.ForecastModeRepository
 import com.cloudbasepredictor.data.forecast.ForecastModelRepository
+import com.cloudbasepredictor.data.forecast.ForecastViewportRepository
 import com.cloudbasepredictor.data.forecast.InMemoryForecastRepository
 import com.cloudbasepredictor.data.forecast.InMemoryForecastModeRepository
 import com.cloudbasepredictor.data.forecast.InMemoryForecastModelRepository
+import com.cloudbasepredictor.data.forecast.SharedPrefsForecastViewportRepository
 import com.cloudbasepredictor.data.place.DefaultPlaceRepository
 import com.cloudbasepredictor.data.place.PlaceRepository
 import com.cloudbasepredictor.data.theme.InMemoryThemeRepository
@@ -56,4 +58,10 @@ abstract class RepositoryModule {
     abstract fun bindThemeRepository(
         repository: InMemoryThemeRepository,
     ): ThemeRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindForecastViewportRepository(
+        repository: SharedPrefsForecastViewportRepository,
+    ): ForecastViewportRepository
 }

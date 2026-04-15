@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Cloudbase predictor</string>
+    <string name="app_name">Cloudbase Predictor</string>
 
     <!-- Common actions -->
     <string name="action_save">Save</string>
@@ -50,6 +50,10 @@
     <string name="title_forecast">Forecast</string>
     <string name="loading_forecast_for_place">Loading forecast for %1$s…</string>
     <string name="loading_forecast">Loading forecast…</string>
+
+    <!-- Forecast information messages -->
+    <string name="forecast_no_thermals">Unfortunately, no thermals are expected.</string>
+    <string name="forecast_loading_location">Loading forecast for a new location…</string>
 
     <!-- Model selector -->
     <string name="title_weather_model">Weather Model</string>

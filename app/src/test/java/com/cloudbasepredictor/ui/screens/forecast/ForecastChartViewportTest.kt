@@ -33,4 +33,28 @@ class ForecastChartViewportTest {
             viewport.withVisibleTopAltitudeKm(Float.NaN).visibleTopAltitudeKm,
         )
     }
+
+    @Test
+    fun zoomedTopAltitudeKm_amplifiedZoomIn_producesMoreResponsiveChange() {
+        // Zoom in gesture (zoomChange > 1 means pinch out = zoom in = lower altitude ceiling)
+        val result = zoomedTopAltitudeKm(
+            currentTopAltitudeKm = 4.5f,
+            zoomChange = 1.2f,
+        )
+        // With amplification 2.5, effective zoom = 1 + (1.2 - 1) * 2.5 = 1.5
+        // Result = 4.5 / 1.5 = 3.0, but clamped to min 4.5
+        assertEquals(DEFAULT_TOP_ALTITUDE_KM, result)
+    }
+
+    @Test
+    fun zoomedTopAltitudeKm_amplifiedZoomOut_producesMoreResponsiveChange() {
+        // Zoom out gesture (zoomChange < 1 means pinch in = zoom out = raise altitude ceiling)
+        val result = zoomedTopAltitudeKm(
+            currentTopAltitudeKm = 5.0f,
+            zoomChange = 0.9f,
+        )
+        // With amplification 2.5, effective zoom = 1 + (0.9 - 1) * 2.5 = 0.75
+        // Result = 5.0 / 0.75 = 6.667
+        assertEquals(6.667f, result, 0.01f)
+    }
 }

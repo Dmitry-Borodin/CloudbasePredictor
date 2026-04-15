@@ -1,11 +1,13 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
@@ -58,23 +60,30 @@ internal fun ForecastTopBar(
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .heightIn(min = 64.dp)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            IconButton(onClick = onFavoriteClick) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onFavoriteClick),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                     contentDescription = stringResource(R.string.cd_favorites),
+                    modifier = Modifier.size(18.dp),
+                )
+
+                AutoScalingTitle(
+                    text = placeName ?: stringResource(R.string.title_forecast),
+                    modifier = Modifier
+                        .weight(1f)
+                        .widthIn(min = minimumTitleWidth),
                 )
             }
-
-            AutoScalingTitle(
-                text = placeName ?: stringResource(R.string.title_forecast),
-                modifier = Modifier
-                    .weight(1f)
-                    .widthIn(min = minimumTitleWidth),
-            )
 
             ForecastModePicker(
                 selectedMode = selectedMode,

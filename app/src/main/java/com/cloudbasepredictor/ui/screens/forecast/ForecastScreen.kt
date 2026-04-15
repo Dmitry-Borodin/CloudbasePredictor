@@ -78,6 +78,7 @@ fun ForecastRoute(
         onRetryLoad = viewModel::retryLoad,
         onModelSelected = viewModel::selectModel,
         onOpenMap = onOpenMap,
+        onMapLocationChanged = viewModel::updateForecastLocation,
     )
 }
 
@@ -93,6 +94,7 @@ fun ForecastScreen(
     onRetryLoad: () -> Unit = {},
     onModelSelected: (ForecastModel) -> Unit = {},
     onOpenMap: () -> Unit,
+    onMapLocationChanged: (Double, Double) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     var showFavoriteDialog by rememberSaveable { mutableStateOf(false) }
@@ -137,6 +139,13 @@ fun ForecastScreen(
                     )
                 }
             }
+
+            ForecastMapPanel(
+                currentPlace = uiState.selectedPlace,
+                favoritePlaces = uiState.favoritePlaces,
+                onLocationChanged = onMapLocationChanged,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
 
         ForecastDatePicker(

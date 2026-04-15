@@ -6,6 +6,8 @@ import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,9 +30,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
@@ -55,13 +59,20 @@ internal fun ThermicForecastView(
         uiState = uiState,
         modifier = modifier.testTag(THERMIC_VIEW),
     ) { chartModifier ->
-        ThermicForecastGrid(
-            chart = uiState.thermicChart,
-            visibleTopAltitudeKm = uiState.chartViewport.visibleTopAltitudeKm,
-            elevationKm = uiState.elevationKm,
-            onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
-            modifier = chartModifier,
-        )
+        Box(modifier = chartModifier) {
+            ThermicForecastGrid(
+                chart = uiState.thermicChart,
+                visibleTopAltitudeKm = uiState.chartViewport.visibleTopAltitudeKm,
+                elevationKm = uiState.elevationKm,
+                onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
+                modifier = Modifier.fillMaxSize(),
+            )
+            if (uiState.thermicChart.cells.isEmpty() && !uiState.isLoading) {
+                ForecastInformationView(
+                    message = stringResource(R.string.forecast_no_thermals),
+                )
+            }
+        }
     }
 }
 

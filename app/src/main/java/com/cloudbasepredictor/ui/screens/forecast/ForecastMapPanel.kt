@@ -1,0 +1,275 @@
+package com.cloudbasepredictor.ui.screens.forecast
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.cloudbasepredictor.model.SavedPlace
+import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
+import org.maplibre.compose.camera.CameraPosition
+import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.expressions.dsl.const
+import org.maplibre.compose.expressions.dsl.format
+import org.maplibre.compose.expressions.dsl.span
+import org.maplibre.compose.layers.SymbolLayer
+import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.compose.sources.rememberGeoJsonSource
+import org.maplibre.compose.style.BaseStyle
+import org.maplibre.compose.util.ClickResult
+import org.maplibre.spatialk.geojson.Position
+import kotlin.math.roundToInt
+
+private const val MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
+private const val DRAG_HANDLE_HEIGHT_DP = 24
+private const val MAP_INITIAL_ZOOM = 8.0
+
+/**
+ * A draggable map panel that sits at the bottom of the forecast screen.
+ * The user can drag the handle upward to reveal a map (up to [maxFraction] of the parent height).
+ * When the user moves the map to a new location, the forecast updates.
+ */
+@Composable
+fun ForecastMapPanel(
+    currentPlace: SavedPlace?,
+    favoritePlaces: List<SavedPlace>,
+    onLocationChanged: (latitude: Double, longitude: Double) -> Unit,
+    modifier: Modifier = Modifier,
+    maxFraction: Float = 1f / 3f,
+) {
+    val density = LocalDensity.current
+    var parentHeightPx by remember { mutableFloatStateOf(0f) }
+    var panelHeightPx by rememberSaveable { mutableFloatStateOf(0f) }
+    val handleHeightPx = with(density) { DRAG_HANDLE_HEIGHT_DP.dp.toPx() }
+
+    val maxPanelHeightPx = parentHeightPx * maxFraction
+
+    val cameraState = rememberCameraState(
+        firstPosition = CameraPosition(
+            target = if (currentPlace != null) {
+                Position(longitude = currentPlace.longitude, latitude = currentPlace.latitude)
+            } else {
+                Position(longitude = 13.4050, latitude = 52.5200)
+            },
+            zoom = MAP_INITIAL_ZOOM,
+        ),
+    )
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (panelHeightPx > handleHeightPx * 2) {
+                val pos = cameraState.position
+                onLocationChanged(pos.target.latitude, pos.target.longitude)
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .onSizeChanged { parentHeightPx = it.height.toFloat() },
+    ) {
+        // The panel is anchored at the bottom and extends upward based on panelHeightPx.
+        val totalPanelHeight = (panelHeightPx + handleHeightPx).coerceIn(handleHeightPx, maxPanelHeightPx + handleHeightPx)
+        val panelOffsetY = parentHeightPx - totalPanelHeight
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(with(density) { totalPanelHeight.toDp() })
+                .offset { IntOffset(0, panelOffsetY.roundToInt()) },
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
+            tonalElevation = 4.dp,
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Drag handle
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(DRAG_HANDLE_HEIGHT_DP.dp)
+                        .pointerInput(maxPanelHeightPx) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                panelHeightPx = (panelHeightPx - dragAmount.y)
+                                    .coerceIn(0f, maxPanelHeightPx)
+                            }
+                        }
+                        .align(Alignment.TopCenter),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // Visual handle indicator
+                    Box(
+                        modifier = Modifier
+                            .width(32.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+                    )
+                }
+
+                // Map content (only visible when dragged open)
+                if (panelHeightPx > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = DRAG_HANDLE_HEIGHT_DP.dp)
+                            .fillMaxSize(),
+                    ) {
+                        MaplibreMap(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)),
+                            baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
+                            cameraState = cameraState,
+                            onMapClick = { _, _ -> ClickResult.Consume },
+                        ) {
+                            // Favorites markers (below selected marker)
+                            val favoritesData = buildFavoritesGeoJson(favoritePlaces)
+                            val favoritesSource = rememberGeoJsonSource(
+                                data = GeoJsonData.JsonString(favoritesData),
+                            )
+                            SymbolLayer(
+                                id = "forecast-favorite-points",
+                                source = favoritesSource,
+                                textField = format(span("★")),
+                                textSize = const(14.sp),
+                                textColor = const(Color(0xFFFFD700)),
+                                textHaloColor = const(Color.White),
+                                textHaloWidth = const(2.dp),
+                            )
+
+                            // Selected place marker (on top)
+                            val markerData = currentPlace?.let(::buildPlaceGeoJson) ?: emptyGeoJson()
+                            val markerSource = rememberGeoJsonSource(
+                                data = GeoJsonData.JsonString(markerData),
+                            )
+                            SymbolLayer(
+                                id = "forecast-selected-point",
+                                source = markerSource,
+                                textField = format(span("★")),
+                                textSize = const(18.sp),
+                                textColor = const(Color(0xFFE64A5B)),
+                                textHaloColor = const(Color.White),
+                                textHaloWidth = const(2.dp),
+                            )
+                        }
+
+                        // Crosshair center indicator
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .width(2.dp)
+                                .height(20.dp)
+                                .background(Color.Black.copy(alpha = 0.4f)),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .width(20.dp)
+                                .height(2.dp)
+                                .background(Color.Black.copy(alpha = 0.4f)),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun buildPlaceGeoJson(place: SavedPlace): String {
+    return """
+        {
+          "type": "FeatureCollection",
+          "features": [{
+            "type": "Feature",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [${place.longitude}, ${place.latitude}]
+            },
+            "properties": {"name": "${place.name.replace("\"", "\\\"")}" }
+          }]
+        }
+    """.trimIndent()
+}
+
+private fun buildFavoritesGeoJson(places: List<SavedPlace>): String {
+    if (places.isEmpty()) return emptyGeoJson()
+    val features = places.joinToString(",") { place ->
+        """
+            {
+              "type": "Feature",
+              "geometry": {
+                "type": "Point",
+                "coordinates": [${place.longitude}, ${place.latitude}]
+              },
+              "properties": {"name": "${place.name.replace("\"", "\\\"")}" }
+            }
+        """
+    }
+    return """
+        {
+          "type": "FeatureCollection",
+          "features": [$features]
+        }
+    """.trimIndent()
+}
+
+private fun emptyGeoJson(): String {
+    return """
+        {
+          "type": "FeatureCollection",
+          "features": []
+        }
+    """.trimIndent()
+}
+
+@Preview(showBackground = true, heightDp = 400)
+@Composable
+private fun ForecastMapPanelPreview() {
+    CloudbasePredictorTheme {
+        ForecastMapPanel(
+            currentPlace = com.cloudbasepredictor.ui.preview.PreviewData.savedPlace,
+            favoritePlaces = com.cloudbasepredictor.ui.preview.PreviewData.favoritePlaces,
+            onLocationChanged = { _, _ -> },
+        )
+    }
+}
+
+@Preview(showBackground = true, heightDp = 400, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ForecastMapPanelDarkPreview() {
+    CloudbasePredictorTheme {
+        ForecastMapPanel(
+            currentPlace = com.cloudbasepredictor.ui.preview.PreviewData.savedPlace,
+            favoritePlaces = com.cloudbasepredictor.ui.preview.PreviewData.favoritePlaces,
+            onLocationChanged = { _, _ -> },
+        )
+    }
+}

@@ -43,6 +43,9 @@ interface ForecastRepository {
 
     /** Delete cached forecasts older than [cutoffMillis]. */
     suspend fun cleanupOldForecasts(cutoffMillis: Long)
+
+    /** Clear all forecast caches (in-memory and DB). */
+    suspend fun clearAllCaches()
 }
 
 @Singleton
@@ -139,6 +142,16 @@ class InMemoryForecastRepository @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e("ForecastRepository", "Failed to clean up old forecasts", e)
+            handleDbError(e)
+        }
+    }
+
+    override suspend fun clearAllCaches() = withContext(ioDispatcher) {
+        cachedForecasts.value = emptyMap()
+        try {
+            forecastCacheDao.deleteAll()
+        } catch (e: Exception) {
+            Log.e("ForecastRepository", "Failed to clear forecast cache", e)
             handleDbError(e)
         }
     }

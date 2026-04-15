@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.R
@@ -57,7 +58,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.expressions.dsl.const
+import org.maplibre.compose.expressions.dsl.format
+import org.maplibre.compose.expressions.dsl.span
 import org.maplibre.compose.layers.CircleLayer
+import org.maplibre.compose.layers.SymbolLayer
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
@@ -175,25 +179,27 @@ fun MapScreen(
                     val markerSource = rememberGeoJsonSource(
                         data = GeoJsonData.JsonString(markerData),
                     )
-                    CircleLayer(
+                    SymbolLayer(
                         id = "selected-point",
                         source = markerSource,
-                        color = const(Color(0xFFE64A5B)),
-                        radius = const(9.dp),
-                        strokeColor = const(Color.White),
-                        strokeWidth = const(3.dp),
+                        textField = format(span("★")),
+                        textSize = const(18.sp),
+                        textColor = const(Color(0xFFE64A5B)),
+                        textHaloColor = const(Color.White),
+                        textHaloWidth = const(2.dp),
                     )
 
                     val favoritesSource = rememberGeoJsonSource(
                         data = GeoJsonData.JsonString(favoritesData),
                     )
-                    CircleLayer(
+                    SymbolLayer(
                         id = "favorite-points",
                         source = favoritesSource,
-                        color = const(Color(0xFFFFD700)),
-                        radius = const(10.dp),
-                        strokeColor = const(Color.White),
-                        strokeWidth = const(2.dp),
+                        textField = format(span("★")),
+                        textSize = const(14.sp),
+                        textColor = const(Color(0xFFFFD700)),
+                        textHaloColor = const(Color.White),
+                        textHaloWidth = const(2.dp),
                     )
                 }
             }
