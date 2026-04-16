@@ -1,6 +1,8 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ThermicForecastChartUiModelTest {
@@ -98,5 +100,44 @@ class ThermicForecastChartUiModelTest {
         assertEquals(2, aggregated.cells.size)
         assertEquals(0.15f, aggregated.cells.last().endAltitudeKm, 0.0001f)
         assertEquals(listOf(1.2f, 1.6f), aggregated.cloudMarkers.map { it.altitudeKm })
+    }
+
+    @Test
+    fun visibleSegment_clipsCellAtCloudBaseClearance() {
+        val cell = ThermicForecastCellUiModel(
+            startMinuteOfDayLocal = 900,
+            startAltitudeKm = 2.0f,
+            endAltitudeKm = 3.1f,
+            strengthMps = 4.0f,
+        )
+
+        val visibleSegment = cell.visibleSegment(
+            minAltitudeKm = 1.1f,
+            maxAltitudeKm = 5.5f,
+            cloudBaseKm = 2.7f,
+        )
+
+        assertNotNull(visibleSegment)
+        visibleSegment!!
+        assertEquals(2.0f, visibleSegment.startAltitudeKm, 0.0001f)
+        assertEquals(2.65f, visibleSegment.endAltitudeKm, 0.0001f)
+    }
+
+    @Test
+    fun visibleSegment_hidesCellEntirelyAboveCloudBaseClearance() {
+        val cell = ThermicForecastCellUiModel(
+            startMinuteOfDayLocal = 900,
+            startAltitudeKm = 2.7f,
+            endAltitudeKm = 3.1f,
+            strengthMps = 4.0f,
+        )
+
+        val visibleSegment = cell.visibleSegment(
+            minAltitudeKm = 1.1f,
+            maxAltitudeKm = 5.5f,
+            cloudBaseKm = 2.7f,
+        )
+
+        assertNull(visibleSegment)
     }
 }

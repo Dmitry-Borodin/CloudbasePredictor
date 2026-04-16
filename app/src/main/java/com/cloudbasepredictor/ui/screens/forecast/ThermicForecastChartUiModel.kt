@@ -67,6 +67,34 @@ data class ThermicForecastCloudMarkerUiModel(
     val altitudeKm: Float,
 )
 
+internal data class ThermicVisibleCellSegment(
+    val startAltitudeKm: Float,
+    val endAltitudeKm: Float,
+)
+
+internal fun ThermicForecastCellUiModel.visibleSegment(
+    minAltitudeKm: Float,
+    maxAltitudeKm: Float,
+    cloudBaseKm: Float?,
+): ThermicVisibleCellSegment? {
+    val visibleStartAltitudeKm = startAltitudeKm.coerceAtLeast(minAltitudeKm)
+    val cloudLimitedTopKm = cloudBaseKm?.minus(THERMIC_CLOUD_BASE_CLEARANCE_KM)
+    val visibleEndAltitudeKm = minOf(
+        endAltitudeKm,
+        maxAltitudeKm,
+        cloudLimitedTopKm ?: Float.MAX_VALUE,
+    )
+
+    if (visibleEndAltitudeKm <= visibleStartAltitudeKm + THERMIC_EPSILON) {
+        return null
+    }
+
+    return ThermicVisibleCellSegment(
+        startAltitudeKm = visibleStartAltitudeKm,
+        endAltitudeKm = visibleEndAltitudeKm,
+    )
+}
+
 internal fun buildPlaceholderThermicForecastChart(
     dayIndex: Int,
     timeSlots: List<Int> = THERMIC_FORECAST_TIME_SLOTS,
@@ -304,6 +332,7 @@ private fun roundDisplayedStrength(value: Float): Float {
 private const val FORECAST_TIME_SLOT_STEP_MINUTES = 15
 private const val MINUTES_PER_HOUR = 60
 private const val THERMIC_ALTITUDE_STEP_KM = 0.05f
+private const val THERMIC_CLOUD_BASE_CLEARANCE_KM = 0.05f
 private const val MAX_THERMIC_STRENGTH_MPS = 10f
 private const val THERMIC_EPSILON = 0.0001f
 private val THERMIC_FORECAST_TIME_SLOTS = buildList {

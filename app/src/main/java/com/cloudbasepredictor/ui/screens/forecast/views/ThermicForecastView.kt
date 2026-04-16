@@ -42,6 +42,7 @@ import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ThermicForecastChartUiModel
 import com.cloudbasepredictor.ui.screens.forecast.ThermicSlotDiagnostics
 import com.cloudbasepredictor.ui.screens.forecast.aggregatedForDisplay
+import com.cloudbasepredictor.ui.screens.forecast.visibleSegment
 import com.cloudbasepredictor.ui.screens.forecast.zoomedTopAltitudeKm
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.util.Locale
@@ -264,35 +265,29 @@ private fun ThermicForecastGrid(
             )
         }
 
-        // Build cloud altitude lookup per time slot for masking top cells
+        // Build cloud altitude lookup per time slot for clipping cells at cloud base.
         val cloudAltitudeBySlot = displayChart.cloudMarkers
             .groupBy { it.startMinuteOfDayLocal }
             .mapValues { (_, markers) -> markers.minOf { it.altitudeKm } }
 
         displayChart.cells.forEach { cell ->
             val timeIndex = timeIndexLookup[cell.startMinuteOfDayLocal] ?: return@forEach
-            val visibleStartAltitudeKm = cell.startAltitudeKm.coerceAtLeast(elevationKm)
-            val visibleEndAltitudeKm = cell.endAltitudeKm.coerceAtMost(effectiveTopAltitudeKm)
-
-            if (visibleEndAltitudeKm <= visibleStartAltitudeKm) {
-                return@forEach
-            }
-
-            // Skip cells whose top reaches or exceeds the cloud base altitude
             val cloudAlt = cloudAltitudeBySlot[cell.startMinuteOfDayLocal]
-            if (cloudAlt != null && cell.endAltitudeKm >= cloudAlt - 0.05f) {
-                return@forEach
-            }
+            val visibleSegment = cell.visibleSegment(
+                minAltitudeKm = elevationKm,
+                maxAltitudeKm = effectiveTopAltitudeKm,
+                cloudBaseKm = cloudAlt,
+            ) ?: return@forEach
 
             val topY = altitudeToY(
-                altitudeKm = visibleEndAltitudeKm,
+                altitudeKm = visibleSegment.endAltitudeKm,
                 minAltitudeKm = elevationKm,
                 maxAltitudeKm = effectiveTopAltitudeKm,
                 plotTop = plotTop,
                 plotBottom = plotBottom,
             )
             val bottomY = altitudeToY(
-                altitudeKm = visibleStartAltitudeKm,
+                altitudeKm = visibleSegment.startAltitudeKm,
                 minAltitudeKm = elevationKm,
                 maxAltitudeKm = effectiveTopAltitudeKm,
                 plotTop = plotTop,
@@ -530,7 +525,14 @@ private fun ThermicForecastGrid(
             val timeSlot = displayChart.timeSlots[timeIdx]
             val cell = displayChart.cells
                 .filter { it.startMinuteOfDayLocal == timeSlot }
-                .firstOrNull { altKm in it.startAltitudeKm..it.endAltitudeKm }
+                .firstOrNull { candidate ->
+                    val visibleSegment = candidate.visibleSegment(
+                        minAltitudeKm = elevationKm,
+                        maxAltitudeKm = effectiveTopAltitudeKm,
+                        cloudBaseKm = cloudAltitudeBySlot[timeSlot],
+                    ) ?: return@firstOrNull false
+                    altKm in visibleSegment.startAltitudeKm..visibleSegment.endAltitudeKm
+                }
 
             val diag = diagnosticsBySlot[timeSlot]
             val tooltipLines = mutableListOf<String>()
