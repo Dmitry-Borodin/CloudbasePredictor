@@ -95,9 +95,16 @@ internal fun buildPlaceholderWindForecastChart(
         }
     }
 
+    val bands = altitudes.mapIndexed { index, center ->
+        val bottom = if (index > 0) (altitudes[index - 1] + center) / 2f else center - altitudeStepKm / 2f
+        val top = if (index < altitudes.lastIndex) (center + altitudes[index + 1]) / 2f else center + altitudeStepKm / 2f
+        WindAltitudeBand(centerKm = center, bottomKm = bottom, topKm = top)
+    }
+
     return WindForecastChartUiModel(
         hours = hours,
         altitudeBandsKm = altitudes,
+        altitudeBands = bands,
         cells = cells,
     )
 }

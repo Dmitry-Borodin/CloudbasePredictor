@@ -9,7 +9,7 @@ data class ForecastChartViewport(
         return copy(
             visibleTopAltitudeKm = sanitizeTopAltitudeKm(
                 topAltitudeKm = topAltitudeKm,
-                minTopAltitudeKm = defaultTopAltitudeKm,
+                minTopAltitudeKm = MIN_TOP_ALTITUDE_KM,
                 maxTopAltitudeKm = maxTopAltitudeKm,
             ),
         )
@@ -19,7 +19,7 @@ data class ForecastChartViewport(
 internal fun zoomedTopAltitudeKm(
     currentTopAltitudeKm: Float,
     zoomChange: Float,
-    minTopAltitudeKm: Float = DEFAULT_TOP_ALTITUDE_KM,
+    minTopAltitudeKm: Float = MIN_TOP_ALTITUDE_KM,
     maxTopAltitudeKm: Float = MAX_TOP_ALTITUDE_KM,
 ): Float {
     if (!zoomChange.isFinite() || zoomChange <= 0f) {
@@ -53,5 +53,6 @@ internal fun sanitizeTopAltitudeKm(
 }
 
 internal const val DEFAULT_TOP_ALTITUDE_KM = 4.5f
+internal const val MIN_TOP_ALTITUDE_KM = 1.5f
 internal const val MAX_TOP_ALTITUDE_KM = 7f
 private const val ZOOM_AMPLIFICATION_FACTOR = 2.5f

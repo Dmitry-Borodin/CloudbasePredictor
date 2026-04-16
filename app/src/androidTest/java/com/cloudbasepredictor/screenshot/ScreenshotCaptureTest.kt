@@ -7,6 +7,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.test.platform.app.InstrumentationRegistry
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastScreen
@@ -184,7 +185,8 @@ class ScreenshotCaptureTest {
             }
 
         val dir = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+            InstrumentationRegistry.getInstrumentation().targetContext
+                .getExternalFilesDir(Environment.DIRECTORY_PICTURES),
             "CloudbaseScreenshots",
         )
         dir.mkdirs()

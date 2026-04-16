@@ -42,7 +42,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.R
@@ -58,10 +57,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.expressions.dsl.const
-import org.maplibre.compose.expressions.dsl.format
-import org.maplibre.compose.expressions.dsl.span
 import org.maplibre.compose.layers.CircleLayer
-import org.maplibre.compose.layers.SymbolLayer
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
@@ -176,30 +172,28 @@ fun MapScreen(
                         ClickResult.Consume
                     },
                 ) {
-                    val markerSource = rememberGeoJsonSource(
-                        data = GeoJsonData.JsonString(markerData),
-                    )
-                    SymbolLayer(
-                        id = "selected-point",
-                        source = markerSource,
-                        textField = format(span("★")),
-                        textSize = const(18.sp),
-                        textColor = const(Color(0xFFE64A5B)),
-                        textHaloColor = const(Color.White),
-                        textHaloWidth = const(2.dp),
-                    )
-
                     val favoritesSource = rememberGeoJsonSource(
                         data = GeoJsonData.JsonString(favoritesData),
                     )
-                    SymbolLayer(
+                    CircleLayer(
                         id = "favorite-points",
                         source = favoritesSource,
-                        textField = format(span("★")),
-                        textSize = const(14.sp),
-                        textColor = const(Color(0xFFFFD700)),
-                        textHaloColor = const(Color.White),
-                        textHaloWidth = const(2.dp),
+                        color = const(Color(0xFFFFD700)),
+                        radius = const(8.dp),
+                        strokeColor = const(Color.White),
+                        strokeWidth = const(2.dp),
+                    )
+
+                    val markerSource = rememberGeoJsonSource(
+                        data = GeoJsonData.JsonString(markerData),
+                    )
+                    CircleLayer(
+                        id = "selected-point",
+                        source = markerSource,
+                        color = const(Color(0xFFE64A5B)),
+                        radius = const(9.dp),
+                        strokeColor = const(Color.White),
+                        strokeWidth = const(3.dp),
                     )
                 }
             }
@@ -209,7 +203,7 @@ fun MapScreen(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(12.dp),
+                .padding(start = 12.dp, top = 42.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             FloatingActionButton(
@@ -231,7 +225,7 @@ fun MapScreen(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(12.dp)
+                .padding(end = 12.dp, top = 42.dp)
                 .size(40.dp),
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -341,7 +335,7 @@ private fun SelectedPointCard(
     }
 }
 
-private fun buildMarkerFeatureCollection(place: SavedPlace): String {
+internal fun buildMarkerFeatureCollection(place: SavedPlace): String {
     return """
         {
           "type": "FeatureCollection",
@@ -361,7 +355,7 @@ private fun buildMarkerFeatureCollection(place: SavedPlace): String {
     """.trimIndent()
 }
 
-private fun buildFavoritesFeatureCollection(places: List<SavedPlace>): String {
+internal fun buildFavoritesFeatureCollection(places: List<SavedPlace>): String {
     if (places.isEmpty()) return emptyFeatureCollection()
     val features = places.joinToString(",") { place ->
         """
@@ -385,7 +379,7 @@ private fun buildFavoritesFeatureCollection(places: List<SavedPlace>): String {
     """.trimIndent()
 }
 
-private fun emptyFeatureCollection(): String {
+internal fun emptyFeatureCollection(): String {
     return """
         {
           "type": "FeatureCollection",

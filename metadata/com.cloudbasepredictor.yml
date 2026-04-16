@@ -1,0 +1,28 @@
+Categories:
+  - Navigation
+  - Sports & Health
+License: MIT
+AuthorName: CloudbasePredictor
+SourceCode: https://github.com/nicklist1/CloudbasePredictor
+IssueTracker: https://github.com/nicklist1/CloudbasePredictor/issues
+
+AutoName: Cloudbase Predictor
+
+RepoType: git
+Repo: https://github.com/nicklist1/CloudbasePredictor.git
+
+Builds:
+  - versionName: 0.0.1
+    versionCode: 1
+    commit: v0.0.1
+    subdir: app
+    gradle:
+      - yes
+    srclibs:
+      - rustup@stable
+    ndk: r27c
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v
+CurrentVersion: 0.0.1
+CurrentVersionCode: 1

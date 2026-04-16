@@ -54,6 +54,7 @@
     <!-- Forecast information messages -->
     <string name="forecast_no_thermals">Unfortunately, no thermals are expected.</string>
     <string name="forecast_loading_location">Loading forecast for a new location…</string>
+    <string name="forecast_map_rate_limited">Move the map to update the forecast</string>
 
     <!-- Model selector -->
     <string name="title_weather_model">Weather Model</string>

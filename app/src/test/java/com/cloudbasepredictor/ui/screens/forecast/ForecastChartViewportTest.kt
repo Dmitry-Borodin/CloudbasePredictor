@@ -15,13 +15,13 @@ class ForecastChartViewportTest {
     }
 
     @Test
-    fun zoomedTopAltitudeKm_keepsDefaultUpperBoundWhenZoomingIn() {
+    fun zoomedTopAltitudeKm_keepsMinBoundWhenZoomingIn() {
         val zoomedInTop = zoomedTopAltitudeKm(
-            currentTopAltitudeKm = 4.8f,
-            zoomChange = 1.5f,
+            currentTopAltitudeKm = 2.0f,
+            zoomChange = 2.0f,
         )
 
-        assertEquals(4.5f, zoomedInTop)
+        assertEquals(MIN_TOP_ALTITUDE_KM, zoomedInTop)
     }
 
     @Test
@@ -29,7 +29,7 @@ class ForecastChartViewportTest {
         val viewport = ForecastChartViewport()
 
         assertEquals(
-            4.5f,
+            MIN_TOP_ALTITUDE_KM,
             viewport.withVisibleTopAltitudeKm(Float.NaN).visibleTopAltitudeKm,
         )
     }
@@ -42,8 +42,8 @@ class ForecastChartViewportTest {
             zoomChange = 1.2f,
         )
         // With amplification 2.5, effective zoom = 1 + (1.2 - 1) * 2.5 = 1.5
-        // Result = 4.5 / 1.5 = 3.0, but clamped to min 4.5
-        assertEquals(DEFAULT_TOP_ALTITUDE_KM, result)
+        // Result = 4.5 / 1.5 = 3.0
+        assertEquals(3.0f, result, 0.01f)
     }
 
     @Test

@@ -117,14 +117,6 @@ private fun ThermicForecastGrid(
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
         }
     }
-    val cellLabelPaint = remember(density, cellTextColor) {
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = cellTextColor.toArgb()
-            textSize = with(density) { 12.sp.toPx() }
-            textAlign = Paint.Align.CENTER
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-        }
-    }
     val tooltipPaint = remember(density, cellTextColor) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = cellTextColor.toArgb()
@@ -271,12 +263,23 @@ private fun ThermicForecastGrid(
             )
         }
 
+        // Build cloud altitude lookup per time slot for masking top cells
+        val cloudAltitudeBySlot = displayChart.cloudMarkers
+            .groupBy { it.startMinuteOfDayLocal }
+            .mapValues { (_, markers) -> markers.minOf { it.altitudeKm } }
+
         displayChart.cells.forEach { cell ->
             val timeIndex = timeIndexLookup[cell.startMinuteOfDayLocal] ?: return@forEach
             val visibleStartAltitudeKm = cell.startAltitudeKm.coerceAtLeast(elevationKm)
             val visibleEndAltitudeKm = cell.endAltitudeKm.coerceAtMost(effectiveTopAltitudeKm)
 
             if (visibleEndAltitudeKm <= visibleStartAltitudeKm) {
+                return@forEach
+            }
+
+            // Skip cells whose top reaches or exceeds the cloud base altitude
+            val cloudAlt = cloudAltitudeBySlot[cell.startMinuteOfDayLocal]
+            if (cloudAlt != null && cell.endAltitudeKm >= cloudAlt - 0.05f) {
                 return@forEach
             }
 
@@ -346,8 +349,8 @@ private fun ThermicForecastGrid(
             style = Stroke(width = 1.dp.toPx()),
         )
 
-        val cloudMarkerWidth = minOf(columnWidth * 2f, 96.dp.toPx())
-        val cloudMarkerHeight = 52.dp.toPx()
+        val cloudMarkerWidth = minOf(columnWidth * 0.9f, 96.dp.toPx())
+        val cloudMarkerHeight = minOf(columnWidth * 0.6f, 40.dp.toPx())
         val drawnCloudMarkers = mutableListOf<Offset>()
 
         displayChart.cloudMarkers.forEach { marker ->
@@ -386,66 +389,6 @@ private fun ThermicForecastGrid(
         }
 
         drawIntoCanvas { canvas ->
-            // Radius-based dedup: skip labels whose center is within 30sp of an
-            // already-drawn label, so numbers never overlap.
-            val dedupRadiusPx = with(density) { 18.sp.toPx() }
-            val dedupRadiusSq = dedupRadiusPx * dedupRadiusPx
-            val drawnCenters = mutableListOf<Offset>()
-
-            // Sort cells so that strongest thermals get labels first
-            val sortedCells = displayChart.cells.sortedByDescending { it.strengthMps }
-
-            sortedCells.forEach cellLoop@{ cell ->
-                val timeIndex = timeIndexLookup[cell.startMinuteOfDayLocal] ?: return@cellLoop
-
-                val visibleStartAltitudeKm =
-                    cell.startAltitudeKm.coerceAtLeast(elevationKm)
-                val visibleEndAltitudeKm =
-                    cell.endAltitudeKm.coerceAtMost(effectiveTopAltitudeKm)
-
-                if (visibleEndAltitudeKm <= visibleStartAltitudeKm) return@cellLoop
-
-                val topY = altitudeToY(
-                    altitudeKm = visibleEndAltitudeKm,
-                    minAltitudeKm = elevationKm,
-                    maxAltitudeKm = effectiveTopAltitudeKm,
-                    plotTop = plotTop,
-                    plotBottom = plotBottom,
-                )
-                val bottomY = altitudeToY(
-                    altitudeKm = visibleStartAltitudeKm,
-                    minAltitudeKm = elevationKm,
-                    maxAltitudeKm = effectiveTopAltitudeKm,
-                    plotTop = plotTop,
-                    plotBottom = plotBottom,
-                )
-
-                if ((bottomY - topY) < cellLabelPaint.textSize + 2.dp.toPx()) {
-                    return@cellLoop
-                }
-
-                val centerX = plotLeft + (timeIndex * columnWidth) + (columnWidth / 2f)
-                val centerY = topY + ((bottomY - topY) / 2f)
-                val center = Offset(centerX, centerY)
-
-                // Skip if too close to an already-drawn label
-                val tooClose = drawnCenters.any { existing ->
-                    val dx = existing.x - center.x
-                    val dy = existing.y - center.y
-                    dx * dx + dy * dy < dedupRadiusSq
-                }
-                if (tooClose) return@cellLoop
-
-                drawnCenters += center
-
-                canvas.nativeCanvas.drawText(
-                    formatThermicStrengthLabel(cell.strengthMps),
-                    centerX,
-                    centerY + (cellLabelPaint.textSize * 0.35f),
-                    cellLabelPaint,
-                )
-            }
-
             majorAltitudeTicks.forEach { altitudeKm ->
                 val y = altitudeToY(
                     altitudeKm = altitudeKm,

@@ -1,5 +1,7 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
@@ -13,12 +15,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,18 +31,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.SavedPlace
+import com.cloudbasepredictor.ui.screens.forecast.views.ForecastInformationView
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.expressions.dsl.const
-import org.maplibre.compose.expressions.dsl.format
-import org.maplibre.compose.expressions.dsl.span
-import org.maplibre.compose.layers.SymbolLayer
+import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
@@ -48,7 +56,9 @@ import kotlin.math.roundToInt
 
 private const val MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
 private const val DRAG_HANDLE_HEIGHT_DP = 24
-private const val MAP_INITIAL_ZOOM = 8.0
+private const val MAP_INITIAL_ZOOM = 12.0
+private const val SNAP_THRESHOLD_FRACTION = 0.25f
+private const val LOCATION_UPDATE_RATE_LIMIT_MS = 3_000L
 
 /**
  * A draggable map panel that sits at the bottom of the forecast screen.
@@ -64,8 +74,10 @@ fun ForecastMapPanel(
     maxFraction: Float = 1f / 3f,
 ) {
     val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
     var parentHeightPx by remember { mutableFloatStateOf(0f) }
-    var panelHeightPx by rememberSaveable { mutableFloatStateOf(0f) }
+    val panelHeightAnim = remember { Animatable(0f) }
+    val panelHeightPx = panelHeightAnim.value
     val handleHeightPx = with(density) { DRAG_HANDLE_HEIGHT_DP.dp.toPx() }
 
     val maxPanelHeightPx = parentHeightPx * maxFraction
@@ -81,13 +93,27 @@ fun ForecastMapPanel(
         ),
     )
 
-    DisposableEffect(Unit) {
-        onDispose {
-            if (panelHeightPx > handleHeightPx * 2) {
-                val pos = cameraState.position
-                onLocationChanged(pos.target.latitude, pos.target.longitude)
+    var lastUpdateTimeMs by remember { mutableLongStateOf(0L) }
+    var isRateLimited by remember { mutableStateOf(false) }
+
+    // When camera stops moving, update forecast location (rate-limited)
+    LaunchedEffect(cameraState) {
+        snapshotFlow { cameraState.isCameraMoving }
+            .drop(1) // skip initial value
+            .collectLatest { isMoving ->
+                if (!isMoving && panelHeightAnim.value > handleHeightPx * 2) {
+                    val now = System.currentTimeMillis()
+                    val elapsed = now - lastUpdateTimeMs
+                    if (elapsed >= LOCATION_UPDATE_RATE_LIMIT_MS) {
+                        lastUpdateTimeMs = now
+                        isRateLimited = false
+                        val pos = cameraState.position
+                        onLocationChanged(pos.target.latitude, pos.target.longitude)
+                    } else {
+                        isRateLimited = true
+                    }
+                }
             }
-        }
     }
 
     Box(
@@ -95,7 +121,6 @@ fun ForecastMapPanel(
             .fillMaxWidth()
             .onSizeChanged { parentHeightPx = it.height.toFloat() },
     ) {
-        // The panel is anchored at the bottom and extends upward based on panelHeightPx.
         val totalPanelHeight = (panelHeightPx + handleHeightPx).coerceIn(handleHeightPx, maxPanelHeightPx + handleHeightPx)
         val panelOffsetY = parentHeightPx - totalPanelHeight
 
@@ -109,17 +134,30 @@ fun ForecastMapPanel(
             tonalElevation = 4.dp,
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                // Drag handle
+                // Drag handle with snap behavior
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(DRAG_HANDLE_HEIGHT_DP.dp)
                         .pointerInput(maxPanelHeightPx) {
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                panelHeightPx = (panelHeightPx - dragAmount.y)
-                                    .coerceIn(0f, maxPanelHeightPx)
-                            }
+                            detectDragGestures(
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    val newHeight = (panelHeightAnim.value - dragAmount.y)
+                                        .coerceIn(0f, maxPanelHeightPx)
+                                    scope.launch { panelHeightAnim.snapTo(newHeight) }
+                                },
+                                onDragEnd = {
+                                    scope.launch {
+                                        val target = if (panelHeightAnim.value > maxPanelHeightPx * SNAP_THRESHOLD_FRACTION) {
+                                            maxPanelHeightPx
+                                        } else {
+                                            0f
+                                        }
+                                        panelHeightAnim.animateTo(target, animationSpec = tween(200))
+                                    }
+                                },
+                            )
                         }
                         .align(Alignment.TopCenter),
                     contentAlignment = Alignment.Center,
@@ -155,14 +193,13 @@ fun ForecastMapPanel(
                             val favoritesSource = rememberGeoJsonSource(
                                 data = GeoJsonData.JsonString(favoritesData),
                             )
-                            SymbolLayer(
+                            CircleLayer(
                                 id = "forecast-favorite-points",
                                 source = favoritesSource,
-                                textField = format(span("★")),
-                                textSize = const(14.sp),
-                                textColor = const(Color(0xFFFFD700)),
-                                textHaloColor = const(Color.White),
-                                textHaloWidth = const(2.dp),
+                                color = const(Color(0xFFFFD700)),
+                                radius = const(6.dp),
+                                strokeColor = const(Color.White),
+                                strokeWidth = const(2.dp),
                             )
 
                             // Selected place marker (on top)
@@ -170,14 +207,13 @@ fun ForecastMapPanel(
                             val markerSource = rememberGeoJsonSource(
                                 data = GeoJsonData.JsonString(markerData),
                             )
-                            SymbolLayer(
+                            CircleLayer(
                                 id = "forecast-selected-point",
                                 source = markerSource,
-                                textField = format(span("★")),
-                                textSize = const(18.sp),
-                                textColor = const(Color(0xFFE64A5B)),
-                                textHaloColor = const(Color.White),
-                                textHaloWidth = const(2.dp),
+                                color = const(Color(0xFFE64A5B)),
+                                radius = const(7.dp),
+                                strokeColor = const(Color.White),
+                                strokeWidth = const(2.dp),
                             )
                         }
 
@@ -196,6 +232,12 @@ fun ForecastMapPanel(
                                 .height(2.dp)
                                 .background(Color.Black.copy(alpha = 0.4f)),
                         )
+
+                        if (isRateLimited) {
+                            ForecastInformationView(
+                                message = stringResource(R.string.forecast_map_rate_limited),
+                            )
+                        }
                     }
                 }
             }
