@@ -12,15 +12,18 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.testutil.SimulatedTestData
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_LAYERS_ROW
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_RADIATION_ROW
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_RAIN_ROW
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_SCROLL
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_SUNSHINE_ROW
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.FORECAST_CHART_AREA
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.MAP_PANEL
-import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_ALTITUDE_UNIT
-import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_TIME_AXIS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_SELECTED_HOUR
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_TIME_SLIDER
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_VIEW
-import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_ALTITUDE_UNIT
-import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_TIME_AXIS
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_VIEW
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -105,7 +108,7 @@ class ForecastScreenTest {
     }
 
     @Test
-    fun forecastScreen_windModeShowsVisibleTimeAxis() {
+    fun forecastScreen_windModeShowsWindView() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         composeRule.setContent {
             CloudbasePredictorTheme {
@@ -117,8 +120,7 @@ class ForecastScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(WIND_TIME_AXIS).assertIsDisplayed()
-        composeRule.onNodeWithText("06").assertIsDisplayed()
+        composeRule.onNodeWithTag(WIND_VIEW).assertIsDisplayed()
     }
 
     @Test
@@ -141,7 +143,7 @@ class ForecastScreenTest {
     }
 
     @Test
-    fun forecastScreen_thermicModeShowsAltitudeUnitAndHourLabels() {
+    fun forecastScreen_thermicModeShowsThermicView() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         composeRule.setContent {
             CloudbasePredictorTheme {
@@ -153,14 +155,11 @@ class ForecastScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(THERMIC_TIME_AXIS).assertIsDisplayed()
-        composeRule.onNodeWithTag(THERMIC_ALTITUDE_UNIT).assertIsDisplayed()
-        composeRule.onNodeWithText("km").assertIsDisplayed()
-        composeRule.onNodeWithText("06:00").assertIsDisplayed()
+        composeRule.onNodeWithTag(THERMIC_VIEW).assertIsDisplayed()
     }
 
     @Test
-    fun forecastScreen_windModeShowsAltitudeUnitKm() {
+    fun forecastScreen_windModeShowsChartArea() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         composeRule.setContent {
             CloudbasePredictorTheme {
@@ -172,39 +171,7 @@ class ForecastScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag(WIND_ALTITUDE_UNIT).assertIsDisplayed()
-    }
-
-    @Test
-    fun forecastScreen_windBottomAxisDoesNotCoverChartArea() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        composeRule.setContent {
-            CloudbasePredictorTheme {
-                ForecastScreen(
-                    uiState = SimulatedTestData.forecastUiState(context, mode = ForecastMode.WIND),
-                    onDateSelected = {},
-                    onOpenMap = {},
-                )
-            }
-        }
-
-        val chartBounds = composeRule.onNodeWithTag(FORECAST_CHART_AREA)
-            .fetchSemanticsNode().boundsInRoot
-        val axisBounds = composeRule.onNodeWithTag(WIND_TIME_AXIS)
-            .fetchSemanticsNode().boundsInRoot
-        val unitBounds = composeRule.onNodeWithTag(WIND_ALTITUDE_UNIT)
-            .fetchSemanticsNode().boundsInRoot
-
-        // The altitude unit label must be fully inside the chart area
-        assertTrue(
-            "km label bottom (${unitBounds.bottom}) exceeds chart area bottom (${chartBounds.bottom})",
-            unitBounds.bottom <= chartBounds.bottom + 1f,
-        )
-        // The time axis must be within the chart area
-        assertTrue(
-            "Time axis bottom (${axisBounds.bottom}) exceeds chart area (${chartBounds.bottom})",
-            axisBounds.bottom <= chartBounds.bottom + 1f,
-        )
+        composeRule.onNodeWithTag(FORECAST_CHART_AREA).assertIsDisplayed()
     }
 
     @Test
@@ -230,5 +197,53 @@ class ForecastScreenTest {
             "Thermic view exceeds chart area",
             thermicBounds.bottom <= chartBounds.bottom + 1f,
         )
+    }
+
+    @Test
+    fun forecastScreen_cloudModeShowsAllRows() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = SimulatedTestData.forecastUiState(context, mode = ForecastMode.CLOUD),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(CLOUD_VIEW).assertIsDisplayed()
+        composeRule.onNodeWithTag(CLOUD_SCROLL).assertIsDisplayed()
+        composeRule.onNodeWithTag(CLOUD_SUNSHINE_ROW).assertIsDisplayed()
+        composeRule.onNodeWithTag(CLOUD_RADIATION_ROW).assertIsDisplayed()
+        composeRule.onNodeWithTag(CLOUD_LAYERS_ROW).assertIsDisplayed()
+        composeRule.onNodeWithTag(CLOUD_RAIN_ROW).assertIsDisplayed()
+    }
+
+    @Test
+    fun forecastScreen_cloudModeRowsAreOrderedTopToBottom() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = SimulatedTestData.forecastUiState(context, mode = ForecastMode.CLOUD),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                )
+            }
+        }
+
+        val sunshineTop = composeRule.onNodeWithTag(CLOUD_SUNSHINE_ROW)
+            .fetchSemanticsNode().boundsInRoot.top
+        val radiationTop = composeRule.onNodeWithTag(CLOUD_RADIATION_ROW)
+            .fetchSemanticsNode().boundsInRoot.top
+        val layersTop = composeRule.onNodeWithTag(CLOUD_LAYERS_ROW)
+            .fetchSemanticsNode().boundsInRoot.top
+        val rainTop = composeRule.onNodeWithTag(CLOUD_RAIN_ROW)
+            .fetchSemanticsNode().boundsInRoot.top
+
+        assertTrue("Sunshine should be above radiation", sunshineTop < radiationTop)
+        assertTrue("Radiation should be above cloud layers", radiationTop < layersTop)
+        assertTrue("Cloud layers should be above rain", layersTop < rainTop)
     }
 }

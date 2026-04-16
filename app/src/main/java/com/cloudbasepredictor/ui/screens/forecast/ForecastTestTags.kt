@@ -25,4 +25,9 @@ object ForecastTestTags {
     const val FORECAST_CHART_AREA = "forecast_chart_area"
     const val MAP_PANEL = "forecast_map_panel"
     const val DAY_CHIP_PREFIX = "forecast_day_chip_"
+    const val CLOUD_SCROLL = "forecast_cloud_scroll"
+    const val CLOUD_SUNSHINE_ROW = "forecast_cloud_sunshine"
+    const val CLOUD_RADIATION_ROW = "forecast_cloud_radiation"
+    const val CLOUD_RAIN_ROW = "forecast_cloud_rain"
+    const val CLOUD_LAYERS_ROW = "forecast_cloud_layers"
 }

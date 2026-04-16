@@ -121,6 +121,64 @@ class ScreenshotCaptureTest {
         }
     }
 
+    // ── Raised map variants ───────────────────────────
+
+    @Test
+    fun captureThermicForecastWithMap() {
+        captureScreen("forecast_thermic_map") {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = simulatedState(ForecastMode.THERMIC),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                    initiallyExpandedMap = true,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun captureWindForecastWithMap() {
+        captureScreen("forecast_wind_map") {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = simulatedState(ForecastMode.WIND),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                    initiallyExpandedMap = true,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun captureCloudForecastWithMap() {
+        captureScreen("forecast_cloud_map") {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = simulatedState(ForecastMode.CLOUD),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                    initiallyExpandedMap = true,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun captureStuveForecastWithMap() {
+        captureScreen("forecast_stuve_map") {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = simulatedState(ForecastMode.STUVE),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                    initiallyExpandedMap = true,
+                )
+            }
+        }
+    }
+
     // ── Dark theme variants ─────────────────────────────
 
     @Test
@@ -196,8 +254,7 @@ class ScreenshotCaptureTest {
             }
 
         val dir = File(
-            InstrumentationRegistry.getInstrumentation().targetContext
-                .getExternalFilesDir(Environment.DIRECTORY_PICTURES),
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
             "CloudbaseScreenshots",
         )
         dir.mkdirs()

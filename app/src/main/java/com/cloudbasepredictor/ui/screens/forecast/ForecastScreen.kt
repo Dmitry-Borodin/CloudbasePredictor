@@ -104,6 +104,7 @@ fun ForecastScreen(
     onModelSelected: (ForecastModel) -> Unit = {},
     onOpenMap: () -> Unit,
     onMapLocationChanged: (Double, Double) -> Unit = { _, _ -> },
+    initiallyExpandedMap: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     var showFavoriteDialog by rememberSaveable { mutableStateOf(false) }
@@ -160,6 +161,7 @@ fun ForecastScreen(
                 currentPlace = uiState.selectedPlace,
                 favoritePlaces = uiState.favoritePlaces,
                 onLocationChanged = onMapLocationChanged,
+                initiallyExpanded = initiallyExpandedMap,
                 onPanelHeightChanged = { mapPanelHeightPx = it },
                 modifier = Modifier.fillMaxSize().testTag(ForecastTestTags.MAP_PANEL),
             )

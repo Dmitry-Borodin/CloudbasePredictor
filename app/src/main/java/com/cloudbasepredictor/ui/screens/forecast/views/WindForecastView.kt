@@ -6,18 +6,12 @@ import android.graphics.Typeface
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,8 +40,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
-import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_ALTITUDE_UNIT
-import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_TIME_AXIS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.screens.forecast.WindForecastChartUiModel
@@ -80,29 +72,6 @@ internal fun WindForecastView(
             modifier = Modifier.fillMaxSize(),
         )
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(WIND_BOTTOM_AXIS_HEIGHT)
-                .align(Alignment.BottomCenter)
-                .testTag(WIND_TIME_AXIS),
-        ) {
-            WindBottomAxis(
-                hours = uiState.windChart.hours,
-                modifier = Modifier.fillMaxSize(),
-            )
-            // "km" unit label aligned with the Y-axis
-            Text(
-                text = "km",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 8.dp, bottom = 8.dp)
-                    .testTag(WIND_ALTITUDE_UNIT),
-            )
-        }
-
         if (uiState.isLoading) {
             LinearProgressIndicator(
                 modifier = Modifier
@@ -110,35 +79,6 @@ internal fun WindForecastView(
                     .height(3.dp)
                     .align(Alignment.TopCenter),
             )
-        }
-    }
-}
-
-@Composable
-private fun WindBottomAxis(
-    hours: List<Int>,
-    modifier: Modifier = Modifier,
-) {
-    val firstHour = hours.firstOrNull() ?: return
-    val visibleLabels = hours.filter { (it - firstHour) % 3 == 0 }
-
-    Row(
-        modifier = modifier.padding(end = 8.dp, bottom = 8.dp),
-    ) {
-        Spacer(modifier = Modifier.width(WIND_AXIS_WIDTH))
-        if (visibleLabels.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                visibleLabels.forEach { hour ->
-                    Text(
-                        text = String.format(Locale.US, "%02d", hour),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
         }
     }
 }
@@ -466,7 +406,7 @@ private fun WindChartCanvas(
             canvas.nativeCanvas.drawText(
                 "km",
                 8.dp.toPx(),
-                plotBottom + unitLabelPaint.textSize + 12.dp.toPx(),
+                plotTop + unitLabelPaint.textSize + 4.dp.toPx(),
                 unitLabelPaint,
             )
 

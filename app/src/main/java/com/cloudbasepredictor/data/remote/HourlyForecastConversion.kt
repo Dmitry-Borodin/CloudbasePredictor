@@ -59,6 +59,7 @@ fun OpenMeteoHourlyForecastResponse.toHourlyForecastData(): HourlyForecastData {
             freezingLevelHeightM = hourly.freezingLevelHeight?.getOrNull(i),
             surfacePressureHpa = hourly.surfacePressure?.getOrNull(i),
             shortwaveRadiationWm2 = hourly.shortwaveRadiation?.getOrNull(i),
+            sunshineDurationS = hourly.sunshineDuration?.getOrNull(i),
             isDay = hourly.isDay?.getOrNull(i),
             pressureLevels = pressureLevelData,
         )
@@ -128,6 +129,8 @@ data class HourlyPoint(
     val surfacePressureHpa: Double? = null,
     /** Shortwave solar radiation (preceding hour mean), W/m². Null if not available. */
     val shortwaveRadiationWm2: Double? = null,
+    /** Sunshine duration in the preceding hour, seconds (0–3600). Null if not available. */
+    val sunshineDurationS: Double? = null,
     /** 1 if daytime, 0 if night. Null if not available. */
     val isDay: Double? = null,
     /** Data at each requested pressure level. */

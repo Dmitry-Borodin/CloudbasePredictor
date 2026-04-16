@@ -17,6 +17,10 @@ data class CloudForecastChartUiModel(
     val layers: List<CloudLayerUiModel>,
     /** Precipitation forecast per hour. */
     val precipitation: List<CloudPrecipitationUiModel>,
+    /** Shortwave radiation per hour, W/m². */
+    val radiation: List<CloudRadiationUiModel> = emptyList(),
+    /** Sunshine duration per hour, seconds (0–3600). */
+    val sunshine: List<CloudSunshineUiModel> = emptyList(),
 )
 
 data class CloudLayerUiModel(
@@ -37,6 +41,20 @@ data class CloudPrecipitationUiModel(
     val probabilityPercent: Float,
     /** Precipitation amount in preceding hour, mm (millimetres). */
     val amountMm: Float,
+)
+
+data class CloudRadiationUiModel(
+    /** Local hour of day (0–23). */
+    val hour: Int,
+    /** Shortwave solar radiation (preceding hour mean), W/m². */
+    val radiationWm2: Float,
+)
+
+data class CloudSunshineUiModel(
+    /** Local hour of day (0–23). */
+    val hour: Int,
+    /** Sunshine duration in the preceding hour, seconds (0–3600). */
+    val durationS: Float,
 )
 
 internal fun buildPlaceholderCloudForecastChart(
@@ -82,5 +100,19 @@ internal fun buildPlaceholderCloudForecastChart(
         hours = hours,
         layers = layers,
         precipitation = precipitation,
+        radiation = hours.map { hour ->
+            val solarPeak = (1f - abs(hour - 13f) / 7f).coerceIn(0f, 1f)
+            CloudRadiationUiModel(
+                hour = hour,
+                radiationWm2 = (solarPeak * 600f * (0.7f + 0.3f * sin(dayPhase))).coerceIn(0f, 800f),
+            )
+        },
+        sunshine = hours.map { hour ->
+            val solarPeak = (1f - abs(hour - 13f) / 7f).coerceIn(0f, 1f)
+            CloudSunshineUiModel(
+                hour = hour,
+                durationS = (solarPeak * 3600f * (0.5f + 0.5f * sin(dayPhase + 0.5f))).coerceIn(0f, 3600f),
+            )
+        },
     )
 }

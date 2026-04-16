@@ -72,6 +72,7 @@ fun ForecastMapPanel(
     onLocationChanged: (latitude: Double, longitude: Double) -> Unit,
     modifier: Modifier = Modifier,
     maxFraction: Float = 1f / 3f,
+    initiallyExpanded: Boolean = false,
     onPanelHeightChanged: (Float) -> Unit = {},
 ) {
     val density = LocalDensity.current
@@ -82,6 +83,13 @@ fun ForecastMapPanel(
     val handleHeightPx = with(density) { DRAG_HANDLE_HEIGHT_DP.dp.toPx() }
 
     val maxPanelHeightPx = parentHeightPx * maxFraction
+
+    // Snap to expanded when initiallyExpanded is true and parent height is known
+    LaunchedEffect(initiallyExpanded, maxPanelHeightPx) {
+        if (initiallyExpanded && maxPanelHeightPx > 0f) {
+            panelHeightAnim.snapTo(maxPanelHeightPx)
+        }
+    }
 
     // Report panel height changes to parent so chart can resize
     LaunchedEffect(panelHeightPx, handleHeightPx) {

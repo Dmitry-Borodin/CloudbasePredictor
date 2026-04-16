@@ -298,10 +298,12 @@ internal fun buildWindChartFromData(
         }
 
         hp.pressureLevels.forEach { pl ->
-            val heightAsl = (pl.geopotentialHeightM ?: return@forEach).toFloat() / 1000f
-            if (heightAsl < elevationKm || heightAsl > elevationKm + maxAltitudeKm) return@forEach
+            val rawHeightAsl = (pl.geopotentialHeightM ?: return@forEach).toFloat() / 1000f
+            if (rawHeightAsl < elevationKm || rawHeightAsl > elevationKm + maxAltitudeKm) return@forEach
             val speed = pl.windSpeedKmh ?: return@forEach
             val dir = pl.windDirectionDeg ?: return@forEach
+            // Round to nearest 50m to collapse per-hour geopotential height variations
+            val heightAsl = kotlin.math.round(rawHeightAsl * 20f) / 20f
             altitudeSet.add(heightAsl)
             cellList += WindForecastCellUiModel(
                 hour = hp.hour,
@@ -399,9 +401,25 @@ internal fun buildCloudChartFromData(
         )
     }
 
+    val radiation = daytimePoints.map { hp ->
+        CloudRadiationUiModel(
+            hour = hp.hour,
+            radiationWm2 = hp.shortwaveRadiationWm2?.toFloat() ?: 0f,
+        )
+    }
+
+    val sunshine = daytimePoints.map { hp ->
+        CloudSunshineUiModel(
+            hour = hp.hour,
+            durationS = hp.sunshineDurationS?.toFloat() ?: 0f,
+        )
+    }
+
     return CloudForecastChartUiModel(
         hours = hours,
         layers = layers,
         precipitation = precipitation,
+        radiation = radiation,
+        sunshine = sunshine,
     )
 }

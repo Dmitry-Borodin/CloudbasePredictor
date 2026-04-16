@@ -7,15 +7,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,8 +40,6 @@ import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
-import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_ALTITUDE_UNIT
-import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_TIME_AXIS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ThermicForecastChartUiModel
@@ -84,60 +77,6 @@ internal fun ThermicForecastView(
                 ForecastInformationView(
                     message = stringResource(R.string.forecast_no_thermals),
                 )
-            }
-
-            ThermicBottomAxis(
-                timeSlots = uiState.thermicChart.timeSlots,
-                modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ThermicBottomAxis(
-    timeSlots: List<Int>,
-    modifier: Modifier = Modifier,
-) {
-    val visibleLabels = timeSlots
-        .filter { shouldDrawTimeLabel(it, timeSlots.size) }
-        .map(::formatTimeLabel)
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(THERMIC_BOTTOM_AXIS_HEIGHT)
-            .padding(end = 8.dp, bottom = 8.dp)
-            .testTag(THERMIC_TIME_AXIS),
-    ) {
-        Box(
-            modifier = Modifier
-                .width(THERMIC_AXIS_WIDTH)
-                .fillMaxSize(),
-        ) {
-            Text(
-                text = "km",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .align(androidx.compose.ui.Alignment.BottomStart)
-                    .padding(start = 8.dp)
-                    .testTag(THERMIC_ALTITUDE_UNIT),
-            )
-        }
-
-        if (visibleLabels.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                visibleLabels.forEach { label ->
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
         }
     }
@@ -514,7 +453,7 @@ private fun ThermicForecastGrid(
             canvas.nativeCanvas.drawText(
                 "km",
                 outerHorizontalPadding + 8.dp.toPx(),
-                plotBottom + unitLabelPaint.textSize + 12.dp.toPx(),
+                plotTop + unitLabelPaint.textSize + 4.dp.toPx(),
                 unitLabelPaint,
             )
 

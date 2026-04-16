@@ -72,6 +72,10 @@ data class OpenMeteoHourlyResponse(
     @SerialName("shortwave_radiation")
     val shortwaveRadiation: List<Double?>? = null,
 
+    // --- Sunshine duration (seconds per preceding hour) ---
+    @SerialName("sunshine_duration")
+    val sunshineDuration: List<Double?>? = null,
+
     // --- Day/night flag ---
     @SerialName("is_day")
     val isDay: List<Double?>? = null,

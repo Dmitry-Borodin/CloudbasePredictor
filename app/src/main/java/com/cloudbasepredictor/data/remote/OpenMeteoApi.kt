@@ -43,7 +43,7 @@ private const val HOURLY_VARIABLES =
     "precipitation,precipitation_probability," +
     "wind_speed_10m,wind_direction_10m," +
     "cape,freezing_level_height," +
-    "surface_pressure,shortwave_radiation,is_day," +
+    "surface_pressure,shortwave_radiation,sunshine_duration,is_day," +
     "temperature_1000hPa,temperature_975hPa,temperature_950hPa,temperature_925hPa,temperature_900hPa," +
     "temperature_875hPa,temperature_850hPa,temperature_800hPa,temperature_750hPa," +
     "temperature_700hPa,temperature_650hPa,temperature_600hPa,temperature_550hPa,temperature_500hPa," +
