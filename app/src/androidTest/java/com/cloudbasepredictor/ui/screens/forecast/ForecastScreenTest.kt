@@ -10,6 +10,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_ALTITUDE_UNIT
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_TIME_AXIS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_SELECTED_HOUR
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_TIME_SLIDER
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_VIEW
@@ -105,6 +107,7 @@ class ForecastScreenTest {
         }
 
         composeRule.onNodeWithTag(WIND_TIME_AXIS).assertIsDisplayed()
+        composeRule.onNodeWithText("06").assertIsDisplayed()
     }
 
     @Test
@@ -123,5 +126,23 @@ class ForecastScreenTest {
         composeRule.onNodeWithTag(STUVE_SELECTED_HOUR)
             .assertIsDisplayed()
             .assertTextEquals("12:00")
+    }
+
+    @Test
+    fun forecastScreen_thermicModeShowsAltitudeUnitAndHourLabels() {
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.THERMIC),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(THERMIC_TIME_AXIS).assertIsDisplayed()
+        composeRule.onNodeWithTag(THERMIC_ALTITUDE_UNIT).assertIsDisplayed()
+        composeRule.onNodeWithText("km").assertIsDisplayed()
+        composeRule.onNodeWithText("06:00").assertIsDisplayed()
     }
 }

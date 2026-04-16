@@ -3,11 +3,19 @@ package com.cloudbasepredictor.ui.screens.forecast.views
 import android.content.res.Configuration
 import android.graphics.Paint
 import android.graphics.Typeface
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_ALTITUDE_UNIT
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_TIME_AXIS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ThermicForecastChartUiModel
@@ -60,7 +70,9 @@ internal fun ThermicForecastView(
         uiState = uiState,
         modifier = modifier.testTag(THERMIC_VIEW),
     ) { chartModifier ->
-        Box(modifier = chartModifier) {
+        Box(
+            modifier = chartModifier.background(MaterialTheme.colorScheme.surface),
+        ) {
             ThermicForecastGrid(
                 chart = uiState.thermicChart,
                 visibleTopAltitudeKm = uiState.chartViewport.visibleTopAltitudeKm,
@@ -72,6 +84,60 @@ internal fun ThermicForecastView(
                 ForecastInformationView(
                     message = stringResource(R.string.forecast_no_thermals),
                 )
+            }
+
+            ThermicBottomAxis(
+                timeSlots = uiState.thermicChart.timeSlots,
+                modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThermicBottomAxis(
+    timeSlots: List<Int>,
+    modifier: Modifier = Modifier,
+) {
+    val visibleLabels = timeSlots
+        .filter { shouldDrawTimeLabel(it, timeSlots.size) }
+        .map(::formatTimeLabel)
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(THERMIC_BOTTOM_AXIS_HEIGHT)
+            .padding(end = 8.dp, bottom = 8.dp)
+            .testTag(THERMIC_TIME_AXIS),
+    ) {
+        Box(
+            modifier = Modifier
+                .width(THERMIC_AXIS_WIDTH)
+                .fillMaxSize(),
+        ) {
+            Text(
+                text = "km",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(androidx.compose.ui.Alignment.BottomStart)
+                    .padding(start = 8.dp)
+                    .testTag(THERMIC_ALTITUDE_UNIT),
+            )
+        }
+
+        if (visibleLabels.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                visibleLabels.forEach { label ->
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -775,6 +841,8 @@ private const val THERMIC_MAJOR_TIME_STEP_MINUTES = 180
 private const val MAX_THERMIC_STRENGTH_MPS = 10f
 private const val MIN_TIME_BUCKET_WIDTH_PX = 28f
 private const val MIN_ALTITUDE_BUCKET_HEIGHT_PX = 20f
+private val THERMIC_AXIS_WIDTH = 60.dp
+private val THERMIC_BOTTOM_AXIS_HEIGHT = 38.dp
 
 @Preview(name = "Thermic Default", showBackground = true, widthDp = 420, heightDp = 720)
 @Composable

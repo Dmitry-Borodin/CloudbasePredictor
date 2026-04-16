@@ -3,10 +3,7 @@ package com.cloudbasepredictor.ui.screens.forecast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.FilterChip
@@ -28,7 +25,7 @@ internal fun ForecastDatePicker(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.windowInsetsPadding(WindowInsets.navigationBars),
+        modifier = modifier,
         tonalElevation = 3.dp,
         shadowElevation = 3.dp,
     ) {

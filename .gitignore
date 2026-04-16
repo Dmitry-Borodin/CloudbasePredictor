@@ -2,6 +2,7 @@
 .gradle
 agent-local/
 /local.properties
+/.kotlin/*
 /.idea/*
 /.vscode/
 .DS_Store

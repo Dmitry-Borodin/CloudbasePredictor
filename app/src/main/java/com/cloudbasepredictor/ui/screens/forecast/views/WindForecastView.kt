@@ -6,12 +6,18 @@ import android.graphics.Typeface
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -76,10 +82,15 @@ internal fun WindForecastView(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(38.dp)
+                .height(WIND_BOTTOM_AXIS_HEIGHT)
                 .align(Alignment.BottomCenter)
                 .testTag(WIND_TIME_AXIS),
-        )
+        ) {
+            WindBottomAxis(
+                hours = uiState.windChart.hours,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
 
         if (uiState.isLoading) {
             LinearProgressIndicator(
@@ -88,6 +99,35 @@ internal fun WindForecastView(
                     .height(3.dp)
                     .align(Alignment.TopCenter),
             )
+        }
+    }
+}
+
+@Composable
+private fun WindBottomAxis(
+    hours: List<Int>,
+    modifier: Modifier = Modifier,
+) {
+    val firstHour = hours.firstOrNull() ?: return
+    val visibleLabels = hours.filter { (it - firstHour) % 3 == 0 }
+
+    Row(
+        modifier = modifier.padding(end = 8.dp, bottom = 8.dp),
+    ) {
+        Spacer(modifier = Modifier.width(WIND_AXIS_WIDTH))
+        if (visibleLabels.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                visibleLabels.forEach { hour ->
+                    Text(
+                        text = String.format(Locale.US, "%02d", hour),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
@@ -721,6 +761,8 @@ private fun buildAltitudeTicks(
 }
 
 private const val WIND_MIN_VISIBLE_ALTITUDE_RANGE_KM = 0.75f
+private val WIND_AXIS_WIDTH = 60.dp
+private val WIND_BOTTOM_AXIS_HEIGHT = 38.dp
 
 /** Average wind directions by decomposing into unit vectors and recombining. */
 private fun averageWindDirection(directions: List<Float>): Float {
