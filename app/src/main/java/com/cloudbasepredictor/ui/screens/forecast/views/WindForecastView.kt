@@ -3,6 +3,7 @@ package com.cloudbasepredictor.ui.screens.forecast.views
 import android.content.res.Configuration
 import android.graphics.Paint
 import android.graphics.Typeface
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_TIME_AXIS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.screens.forecast.WindForecastChartUiModel
@@ -60,6 +62,7 @@ internal fun WindForecastView(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
             .testTag(WIND_VIEW),
     ) {
         WindChartCanvas(
@@ -68,6 +71,14 @@ internal fun WindForecastView(
             elevationKm = uiState.elevationKm,
             onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
             modifier = Modifier.fillMaxSize(),
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .align(Alignment.BottomCenter)
+                .testTag(WIND_TIME_AXIS),
         )
 
         if (uiState.isLoading) {
@@ -92,6 +103,7 @@ private fun WindChartCanvas(
     val density = LocalDensity.current
     val axisLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val surfaceColor = MaterialTheme.colorScheme.surface
     val gridBackgroundColor = lerp(
         start = MaterialTheme.colorScheme.surface,
         stop = MaterialTheme.colorScheme.onSurface,
@@ -163,6 +175,11 @@ private fun WindChartCanvas(
                 )
             },
     ) {
+        drawRect(
+            color = surfaceColor,
+            size = size,
+        )
+
         val axisWidth = with(density) { 60.dp.toPx() }
         val bottomAxisHeight = with(density) { 38.dp.toPx() }
         val arrowSizePx = with(density) { 48.dp.toPx() }

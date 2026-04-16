@@ -2,6 +2,7 @@ package com.cloudbasepredictor.ui.screens.forecast.views
 
 import android.graphics.Paint
 import android.graphics.Typeface
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_SELECTED_HOUR
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_TIME_SLIDER
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.screens.forecast.STUVE_DRY_ADIABAT_THETAS_K
@@ -80,6 +83,7 @@ internal fun StuveForecastView(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
             .testTag(STUVE_VIEW),
     ) {
         Box(
@@ -127,7 +131,9 @@ private fun StuveTimeSlider(
     Column(modifier = modifier) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(STUVE_TIME_SLIDER),
         ) {
             Text(
                 text = "06",
@@ -158,7 +164,9 @@ private fun StuveTimeSlider(
             text = String.format(Locale.US, "%02d:00", sliderValue.toInt()),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .testTag(STUVE_SELECTED_HOUR),
         )
     }
 }
@@ -177,6 +185,7 @@ private fun SkewTDiagramCanvas(
     val density = LocalDensity.current
     val axisLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val surfaceColor = MaterialTheme.colorScheme.surface
     val gridBackgroundColor = lerp(
         start = MaterialTheme.colorScheme.surface,
         stop = MaterialTheme.colorScheme.onSurface,
@@ -228,6 +237,11 @@ private fun SkewTDiagramCanvas(
                 )
             },
     ) {
+        drawRect(
+            color = surfaceColor,
+            size = size,
+        )
+
         // Chart bottom matches the surface pressure (+ 20 hPa margin)
         val chartBottomPressure = (chart.surfacePressureHpa + 20f)
             .coerceAtMost(SKEWT_BOTTOM_PRESSURE)

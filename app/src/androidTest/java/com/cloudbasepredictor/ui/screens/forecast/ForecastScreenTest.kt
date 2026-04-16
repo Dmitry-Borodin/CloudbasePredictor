@@ -1,10 +1,19 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.test.platform.app.InstrumentationRegistry
+import com.cloudbasepredictor.R
+import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_SELECTED_HOUR
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_TIME_SLIDER
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_VIEW
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_TIME_AXIS
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -16,18 +25,21 @@ class ForecastScreenTest {
 
     @Test
     fun forecastScreen_rendersProvidedUiState() {
+        val uiState = PreviewData.forecastReadyUiState
+
         composeRule.setContent {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = PreviewData.forecastReadyUiState,
+                    uiState = uiState,
                     onDateSelected = {},
                     onOpenMap = {},
                 )
             }
         }
 
-        composeRule.onNodeWithText("Sat in Interlaken. Partly cloudy. High 20.0°C, low 10.2°C.")
-            .assertIsDisplayed()
+        composeRule.onNodeWithTag(THERMIC_VIEW).assertIsDisplayed()
+        composeRule.onNodeWithText(uiState.selectedPlace?.name.orEmpty()).assertIsDisplayed()
+        composeRule.onNodeWithText(uiState.dayChips[uiState.selectedDayIndex].title).assertIsDisplayed()
     }
 
     @Test
@@ -63,6 +75,10 @@ class ForecastScreenTest {
 
     @Test
     fun forecastScreen_loadingStateShowsProgress() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val placeName = PreviewData.forecastLoadingUiState.selectedPlace?.name.orEmpty()
+        val expectedLoadingMessage = context.getString(R.string.loading_forecast_for_place, placeName)
+
         composeRule.setContent {
             CloudbasePredictorTheme {
                 ForecastScreen(
@@ -73,6 +89,39 @@ class ForecastScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Loading thermic forecast for Interlaken.").assertIsDisplayed()
+        composeRule.onNodeWithText(expectedLoadingMessage).assertIsDisplayed()
+    }
+
+    @Test
+    fun forecastScreen_windModeShowsVisibleTimeAxis() {
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.WIND),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(WIND_TIME_AXIS).assertIsDisplayed()
+    }
+
+    @Test
+    fun forecastScreen_stuveModeShowsSelectedHour() {
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.STUVE),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(STUVE_TIME_SLIDER).assertIsDisplayed()
+        composeRule.onNodeWithTag(STUVE_SELECTED_HOUR)
+            .assertIsDisplayed()
+            .assertTextEquals("12:00")
     }
 }
