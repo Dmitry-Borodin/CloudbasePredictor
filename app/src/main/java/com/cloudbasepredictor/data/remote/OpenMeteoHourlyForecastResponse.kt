@@ -64,6 +64,18 @@ data class OpenMeteoHourlyResponse(
     @SerialName("freezing_level_height")
     val freezingLevelHeight: List<Double?>? = null,
 
+    // --- Surface pressure ---
+    @SerialName("surface_pressure")
+    val surfacePressure: List<Double?>? = null,
+
+    // --- Solar radiation ---
+    @SerialName("shortwave_radiation")
+    val shortwaveRadiation: List<Double?>? = null,
+
+    // --- Day/night flag ---
+    @SerialName("is_day")
+    val isDay: List<Double?>? = null,
+
     // --- Temperature at pressure levels (°C) ---
     @SerialName("temperature_1000hPa")
     val temperature1000hPa: List<Double?>? = null,

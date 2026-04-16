@@ -40,6 +40,7 @@ import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ThermicForecastChartUiModel
+import com.cloudbasepredictor.ui.screens.forecast.ThermicSlotDiagnostics
 import com.cloudbasepredictor.ui.screens.forecast.aggregatedForDisplay
 import com.cloudbasepredictor.ui.screens.forecast.zoomedTopAltitudeKm
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
@@ -349,6 +350,54 @@ private fun ThermicForecastGrid(
             style = Stroke(width = 1.dp.toPx()),
         )
 
+        // ── Diagnostic lines: dry top, cloud base, moist top ──────
+        val diagnosticsBySlot = displayChart.slotDiagnostics
+            .associateBy { it.startMinuteOfDayLocal }
+        val dryTopDash = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
+        val cloudBaseDash = PathEffect.dashPathEffect(floatArrayOf(10f, 4f))
+        val moistTopDash = PathEffect.dashPathEffect(floatArrayOf(4f, 6f))
+        val dryTopColor = Color(0xFFE07020)       // warm orange
+        val cloudBaseColor = Color(0xFF2088E0)     // blue
+        val moistTopColor = Color(0xFFA040C0)      // purple
+        val diagLineWidth = 2.dp.toPx()
+
+        fun drawDiagnosticLine(
+            color: Color,
+            pathEffect: PathEffect,
+            valueSelector: (ThermicSlotDiagnostics) -> Float?,
+        ) {
+            var prevX: Float? = null
+            var prevY: Float? = null
+            displayChart.timeSlots.forEachIndexed { index, minute ->
+                val diag = diagnosticsBySlot[minute] ?: return@forEachIndexed
+                val altKm = valueSelector(diag) ?: run {
+                    prevX = null; prevY = null; return@forEachIndexed
+                }
+                if (altKm < elevationKm || altKm > effectiveTopAltitudeKm) {
+                    prevX = null; prevY = null; return@forEachIndexed
+                }
+                val x = plotLeft + (index * columnWidth) + (columnWidth / 2f)
+                val y = altitudeToY(altKm, elevationKm, effectiveTopAltitudeKm, plotTop, plotBottom)
+                if (prevX != null && prevY != null) {
+                    drawLine(
+                        color = color,
+                        start = Offset(prevX!!, prevY!!),
+                        end = Offset(x, y),
+                        strokeWidth = diagLineWidth,
+                        pathEffect = pathEffect,
+                    )
+                }
+                prevX = x; prevY = y
+            }
+        }
+
+        // Moist/cloud top (draw first, behind others)
+        drawDiagnosticLine(moistTopColor, moistTopDash) { it.moistEquilibriumTopKm }
+        // Cloud base line
+        drawDiagnosticLine(cloudBaseColor, cloudBaseDash) { it.cloudBaseKm }
+        // Dry thermal top line
+        drawDiagnosticLine(dryTopColor, dryTopDash) { it.dryThermalTopKm }
+
         val cloudMarkerWidth = minOf(columnWidth * 0.9f, 96.dp.toPx())
         val cloudMarkerHeight = minOf(columnWidth * 0.6f, 40.dp.toPx())
         val drawnCloudMarkers = mutableListOf<Offset>()
@@ -483,10 +532,21 @@ private fun ThermicForecastGrid(
                 .filter { it.startMinuteOfDayLocal == timeSlot }
                 .firstOrNull { altKm in it.startAltitudeKm..it.endAltitudeKm }
 
+            val diag = diagnosticsBySlot[timeSlot]
             val tooltipLines = mutableListOf<String>()
             tooltipLines += "${formatTimeLabel(timeSlot)}  ${formatAltitudeLabel(altKm)} km"
             if (cell != null) {
                 tooltipLines += "${formatThermicStrengthLabel(cell.strengthMps)} m/s"
+            }
+            if (diag != null) {
+                tooltipLines += "Dry top ${formatAltitudeLabel(diag.dryThermalTopKm)} km"
+                diag.cloudBaseKm?.let {
+                    tooltipLines += "Cu base ${formatAltitudeLabel(it)} km"
+                }
+                diag.modelCapeJKg?.let {
+                    tooltipLines += "CAPE ${it.toInt()} (model)"
+                }
+                tooltipLines += "CAPE ${diag.computedCapeJKg.toInt()} (calc)"
             }
 
             val lineH = tooltipPaint.textSize * 1.3f

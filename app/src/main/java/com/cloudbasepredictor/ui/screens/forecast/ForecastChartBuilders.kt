@@ -2,6 +2,10 @@ package com.cloudbasepredictor.ui.screens.forecast
 
 import com.cloudbasepredictor.data.remote.HourlyForecastData
 import com.cloudbasepredictor.data.remote.HourlyPoint
+import com.cloudbasepredictor.domain.forecast.ProfileLevel
+import com.cloudbasepredictor.domain.forecast.SurfaceHeatingInput
+import com.cloudbasepredictor.domain.forecast.analyzeParcel
+import com.cloudbasepredictor.domain.forecast.estimateSurfacePressure
 import kotlin.math.pow
 
 /**
@@ -134,7 +138,6 @@ internal fun buildThermicChartFromData(
     val daytimePoints = dayPoints.filter { it.hour in 6..22 }
     if (daytimePoints.isEmpty()) return buildPlaceholderThermicForecastChart(dayIndex)
 
-    val minuteStep = 60 // one slot per hour from real data
     val timeSlots = daytimePoints.map { it.hour * 60 }
 
     val elevation = hourlyData.elevation ?: 0.0
@@ -142,77 +145,82 @@ internal fun buildThermicChartFromData(
 
     val cells = mutableListOf<ThermicForecastCellUiModel>()
     val cloudMarkers = mutableListOf<ThermicForecastCloudMarkerUiModel>()
+    val diagnostics = mutableListOf<ThermicSlotDiagnostics>()
 
     daytimePoints.forEach { hp ->
         val startMinute = hp.hour * 60
-        val capeJKg = hp.capeJKg ?: 0.0
-        val surfaceTemp = hp.temperature2mC ?: return@forEach
-        val surfaceDew = hp.dewPoint2mC ?: return@forEach
+        val surfaceTemp = hp.temperature2mC?.toFloat() ?: return@forEach
+        val surfaceDew = hp.dewPoint2mC?.toFloat() ?: return@forEach
 
-        // Estimate thermal top from pressure level data
-        val pressureLevels = hp.pressureLevels.sortedBy { it.pressureHpa }
-        // Estimate surface pressure from station elevation (ISA)
-        val surfacePressure = estimateSurfacePressureHpa(elevation)
+        // Surface pressure: prefer model value, fall back to ISA estimate
+        val surfacePressure = hp.surfacePressureHpa?.toFloat()
+            ?: estimateSurfacePressure(elevation)
 
-        // Compute parcel temperature at each level
-        val kappa = 0.286f
-        val surfaceThetaK = (surfaceTemp.toFloat() + 273.15f) * (1000f / surfacePressure).pow(kappa)
-
-        // Find thermal top: where parcel temp < environment temp
-        var thermalTopKm = elevationKm
-        for (pl in pressureLevels.reversed()) {
-            val heightAsl = (pl.geopotentialHeightM ?: 0.0).toFloat() / 1000f
-            if (heightAsl < elevationKm) continue
-            val parcelTemp = dryAdiabatTemperatureC(surfaceThetaK, pl.pressureHpa.toFloat())
-            if (parcelTemp < pl.temperatureC.toFloat()) {
-                thermalTopKm = heightAsl.coerceAtLeast(elevationKm)
-                break
+        // Build atmospheric profile from pressure levels
+        val profile = hp.pressureLevels
+            .filter { it.geopotentialHeightM != null }
+            .map { pl ->
+                ProfileLevel(
+                    pressureHpa = pl.pressureHpa.toFloat(),
+                    temperatureC = pl.temperatureC.toFloat(),
+                    dewPointC = pl.dewPointC?.toFloat(),
+                    heightKm = (pl.geopotentialHeightM!! / 1000.0).toFloat(),
+                )
             }
-            thermalTopKm = heightAsl
-        }
+            .sortedByDescending { it.pressureHpa }
 
-        // Build thermal cells below the top, using actual pressure level heights
-        // for granularity that matches model data resolution.
-        val levelHeightsKm = pressureLevels
-            .mapNotNull { pl -> (pl.geopotentialHeightM ?: return@mapNotNull null).toFloat() / 1000f }
-            .filter { it in elevationKm..thermalTopKm }
-            .sorted()
-            .toMutableList()
+        if (profile.size < 2) return@forEach
 
-        // Ensure we have boundaries at elevation and thermal top
-        if (levelHeightsKm.isEmpty() || levelHeightsKm.first() > elevationKm + 0.01f) {
-            levelHeightsKm.add(0, elevationKm)
-        }
-        if (levelHeightsKm.last() < thermalTopKm - 0.01f) {
-            levelHeightsKm.add(thermalTopKm)
-        }
+        val heatingInput = SurfaceHeatingInput(
+            hourOfDay = hp.hour,
+            shortwaveRadiationWm2 = hp.shortwaveRadiationWm2?.toFloat(),
+            cloudCoverLowPercent = hp.cloudCoverLowPercent?.toFloat(),
+            cloudCoverMidPercent = hp.cloudCoverMidPercent?.toFloat(),
+            cloudCoverHighPercent = hp.cloudCoverHighPercent?.toFloat(),
+            precipitationMm = hp.precipitationMm?.toFloat(),
+            isDay = hp.isDay?.let { it > 0.5 },
+        )
 
-        for (i in 0 until levelHeightsKm.size - 1) {
-            val currentAlt = levelHeightsKm[i]
-            val nextAlt = levelHeightsKm[i + 1]
-            if (nextAlt <= currentAlt + 0.001f) continue
+        val analysis = analyzeParcel(
+            profile = profile,
+            surfaceTemperatureC = surfaceTemp,
+            surfaceDewPointC = surfaceDew,
+            surfacePressureHpa = surfacePressure,
+            elevationKm = elevationKm,
+            heatingInput = heatingInput,
+            modelCapeJKg = hp.capeJKg?.toFloat(),
+        ) ?: return@forEach
 
-            val bandCenter = (currentAlt + nextAlt) / 2f
-            val altFraction = if (thermalTopKm > elevationKm) (bandCenter - elevationKm) / (thermalTopKm - elevationKm) else 0f
-            // Thermal strength from CAPE: scaled sqrt(2*CAPE) for realistic thermal values
-            val maxUpdraft = (kotlin.math.sqrt(2.0 * capeJKg).toFloat() * 0.15f).coerceAtMost(10f)
-            val strength = (maxUpdraft * (1f - altFraction * 0.6f)).coerceIn(0f, 10f)
-
+        // Add thermal cells (usable thermals up to dry top)
+        analysis.thermalCells.forEach { tc ->
             cells += ThermicForecastCellUiModel(
                 startMinuteOfDayLocal = startMinute,
-                startAltitudeKm = currentAlt,
-                endAltitudeKm = nextAlt,
-                strengthMps = ((strength * 10f).toInt() / 10f).coerceIn(0f, 10f),
+                startAltitudeKm = tc.startAltitudeKm,
+                endAltitudeKm = tc.endAltitudeKm,
+                strengthMps = tc.strengthMps,
             )
         }
 
-        // Cloud marker at thermal top if we have enough lift
-        if (thermalTopKm > elevationKm + 0.5f && capeJKg > 50.0) {
+        // Cloud marker at cloud base if cumulus formation is expected
+        val cloudBase = analysis.cloudBaseKm
+        if (cloudBase != null && cloudBase > elevationKm + 0.3f) {
             cloudMarkers += ThermicForecastCloudMarkerUiModel(
                 startMinuteOfDayLocal = startMinute,
-                altitudeKm = thermalTopKm + 0.1f,
+                altitudeKm = cloudBase,
             )
         }
+
+        diagnostics += ThermicSlotDiagnostics(
+            startMinuteOfDayLocal = startMinute,
+            dryThermalTopKm = analysis.dryThermalTopKm,
+            cloudBaseKm = analysis.cloudBaseKm,
+            moistEquilibriumTopKm = analysis.moistEquilibriumTopKm,
+            modelCapeJKg = analysis.modelCapeJKg,
+            computedCapeJKg = analysis.computedCapeJKg,
+            computedCinJKg = analysis.computedCinJKg,
+            lclKm = analysis.lclKm,
+            cclKm = analysis.cclKm,
+        )
     }
 
     // Drop negligible thermals (rounding artefacts)
@@ -222,12 +230,14 @@ internal fun buildThermicChartFromData(
         timeSlots = timeSlots,
         cells = emptyList(),
         cloudMarkers = emptyList(),
+        slotDiagnostics = diagnostics,
     )
 
     return ThermicForecastChartUiModel(
         timeSlots = timeSlots,
         cells = cells,
         cloudMarkers = cloudMarkers,
+        slotDiagnostics = diagnostics,
     )
 }
 

@@ -10,7 +10,8 @@ import kotlin.math.sin
  * UI model for the thermic forecast chart.
  *
  * Shows thermal strength grid for each time slot × altitude band,
- * plus cloud markers where cumulus formation is expected.
+ * diagnostic lines for dry thermal top / cloud base / moist top,
+ * and cloud markers where cumulus formation is expected.
  */
 data class ThermicForecastChartUiModel(
     /** Local time slots as minute-of-day (e.g. 360 = 06:00, 1320 = 22:00). */
@@ -19,6 +20,33 @@ data class ThermicForecastChartUiModel(
     val cells: List<ThermicForecastCellUiModel>,
     /** Points where cumulus cloud formation is predicted. */
     val cloudMarkers: List<ThermicForecastCloudMarkerUiModel>,
+    /** Per-time-slot diagnostic data from parcel analysis. */
+    val slotDiagnostics: List<ThermicSlotDiagnostics> = emptyList(),
+)
+
+/**
+ * Per-time-slot diagnostic data from the parcel analysis.
+ * Used for drawing dry-top / cloud-base / moist-top lines and tooltip info.
+ */
+data class ThermicSlotDiagnostics(
+    /** Time slot, minute-of-day in local time. */
+    val startMinuteOfDayLocal: Int,
+    /** Dry thermal top altitude, km ASL. */
+    val dryThermalTopKm: Float,
+    /** Cloud base altitude, km ASL. Null if cumulus not expected. */
+    val cloudBaseKm: Float?,
+    /** Moist/cloud equilibrium top, km ASL. Null if no moist convection. */
+    val moistEquilibriumTopKm: Float?,
+    /** Model-supplied CAPE, J/kg. */
+    val modelCapeJKg: Float?,
+    /** Computed CAPE from parcel analysis, J/kg. */
+    val computedCapeJKg: Float,
+    /** Computed CIN from parcel analysis, J/kg. */
+    val computedCinJKg: Float,
+    /** LCL altitude, km ASL. */
+    val lclKm: Float,
+    /** CCL altitude, km ASL. */
+    val cclKm: Float,
 )
 
 data class ThermicForecastCellUiModel(
@@ -102,10 +130,29 @@ internal fun buildPlaceholderThermicForecastChart(
         }
     }
 
+    val diagnostics = timeSlots.map { startMinute ->
+        val slotCells = cells.filter { it.startMinuteOfDayLocal == startMinute }
+        val topCell = slotCells.maxByOrNull(ThermicForecastCellUiModel::endAltitudeKm)
+        val dryTop = topCell?.endAltitudeKm ?: 0f
+        val cloudBase = if (dryTop > 1f) dryTop + 0.3f else null
+        ThermicSlotDiagnostics(
+            startMinuteOfDayLocal = startMinute,
+            dryThermalTopKm = dryTop,
+            cloudBaseKm = cloudBase,
+            moistEquilibriumTopKm = cloudBase?.let { it + 1.5f },
+            modelCapeJKg = 400f + dryTop * 100f,
+            computedCapeJKg = 350f + dryTop * 90f,
+            computedCinJKg = 15f,
+            lclKm = dryTop * 0.8f,
+            cclKm = dryTop * 0.85f,
+        )
+    }
+
     return ThermicForecastChartUiModel(
         timeSlots = timeSlots,
         cells = cells,
         cloudMarkers = cloudMarkers,
+        slotDiagnostics = diagnostics,
     )
 }
 
@@ -182,10 +229,37 @@ internal fun ThermicForecastChartUiModel.aggregatedForDisplay(
             }
     }
 
+    // Aggregate diagnostics: take the first (or average) for each time bucket
+    val diagnosticsBySlot = slotDiagnostics.associateBy { it.startMinuteOfDayLocal }
+    val aggregatedDiagnostics = groupedSlots.mapNotNull { slotGroup ->
+        val groupStartMinute = slotGroup.first()
+        val slotDiags = slotGroup.mapNotNull { diagnosticsBySlot[it] }
+        if (slotDiags.isEmpty()) return@mapNotNull null
+        // Average numeric values, take first non-null for optional fields
+        ThermicSlotDiagnostics(
+            startMinuteOfDayLocal = groupStartMinute,
+            dryThermalTopKm = slotDiags.map { it.dryThermalTopKm }.average().toFloat(),
+            cloudBaseKm = slotDiags.mapNotNull { it.cloudBaseKm }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
+            moistEquilibriumTopKm = slotDiags.mapNotNull { it.moistEquilibriumTopKm }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
+            modelCapeJKg = slotDiags.mapNotNull { it.modelCapeJKg }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
+            computedCapeJKg = slotDiags.map { it.computedCapeJKg }.average().toFloat(),
+            computedCinJKg = slotDiags.map { it.computedCinJKg }.average().toFloat(),
+            lclKm = slotDiags.map { it.lclKm }.average().toFloat(),
+            cclKm = slotDiags.map { it.cclKm }.average().toFloat(),
+        )
+    }
+
     return ThermicForecastChartUiModel(
         timeSlots = groupedSlots.map(List<Int>::first),
         cells = aggregatedCells,
         cloudMarkers = aggregatedCloudMarkers,
+        slotDiagnostics = aggregatedDiagnostics,
     )
 }
 
