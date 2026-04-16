@@ -6,6 +6,7 @@ package com.cloudbasepredictor.model
  * @property apiName Value passed to the `models` query parameter.
  * @property displayName Human-readable label shown in the UI.
  * @property description Short description of resolution and coverage.
+ * @property availableForecastDays Maximum forecast horizon typically exposed by this model.
  * @property fallback Next model to try when this one is unavailable for the requested location.
  *                    `null` means the model is always available (global).
  */
@@ -13,6 +14,7 @@ enum class ForecastModel(
     val apiName: String,
     val displayName: String,
     val description: String,
+    val availableForecastDays: Int,
     val fallback: ForecastModel?,
     /** Typical update interval for this model, in milliseconds. */
     val updateIntervalMillis: Long,
@@ -22,6 +24,7 @@ enum class ForecastModel(
         apiName = "best_match",
         displayName = "Best Effort",
         description = "Auto-selected (default)",
+        availableForecastDays = 7,
         fallback = null,
         updateIntervalMillis = 3 * 3_600_000L, // 3 hours
     ),
@@ -31,6 +34,7 @@ enum class ForecastModel(
         apiName = "icon_seamless",
         displayName = "ICON Seamless",
         description = "DWD blend (D2→EU→Global)",
+        availableForecastDays = 7,
         fallback = null,
         updateIntervalMillis = 3 * 3_600_000L, // 3 hours
     ),
@@ -40,6 +44,7 @@ enum class ForecastModel(
         apiName = "ecmwf_ifs025",
         displayName = "ECMWF IFS",
         description = "9 km, Global, 10 days",
+        availableForecastDays = 10,
         fallback = null,
         updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
@@ -49,6 +54,7 @@ enum class ForecastModel(
         apiName = "gfs_seamless",
         displayName = "GFS Seamless",
         description = "NCEP blend (HRRR→GFS), 16 days",
+        availableForecastDays = 16,
         fallback = null,
         updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
@@ -58,6 +64,7 @@ enum class ForecastModel(
         apiName = "meteofrance_arome_france_hd",
         displayName = "AROME HD",
         description = "1.3 km, France, 2 days",
+        availableForecastDays = 2,
         fallback = null,
         updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
@@ -67,6 +74,7 @@ enum class ForecastModel(
         apiName = "meteofrance_arpege_europe",
         displayName = "ARPEGE EU",
         description = "11 km, Europe, 4 days",
+        availableForecastDays = 4,
         fallback = null,
         updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
@@ -76,6 +84,7 @@ enum class ForecastModel(
         apiName = "icon_d2",
         displayName = "ICON D2",
         description = "2 km, Central Europe, 2 days",
+        availableForecastDays = 2,
         fallback = null,
         updateIntervalMillis = 3 * 3_600_000L, // 3 hours
     ),
@@ -85,6 +94,7 @@ enum class ForecastModel(
         apiName = "icon_eu",
         displayName = "ICON EU",
         description = "7 km, Europe, 5 days",
+        availableForecastDays = 5,
         fallback = null,
         updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     ),
@@ -94,6 +104,7 @@ enum class ForecastModel(
         apiName = "icon_global",
         displayName = "ICON Global",
         description = "11 km, Global, 7 days",
+        availableForecastDays = 7,
         fallback = null,
         updateIntervalMillis = 6 * 3_600_000L, // 6 hours
     );

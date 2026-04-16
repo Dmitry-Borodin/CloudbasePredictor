@@ -73,6 +73,6 @@ class ForecastScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Loading a 14-day forecast for Interlaken.").assertIsDisplayed()
+        composeRule.onNodeWithText("Loading thermic forecast for Interlaken.").assertIsDisplayed()
     }
 }

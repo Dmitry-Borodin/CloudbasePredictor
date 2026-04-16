@@ -2,10 +2,14 @@ package com.cloudbasepredictor.ui.screens.forecast
 
 import com.cloudbasepredictor.data.forecast.ForecastModeRepository
 import com.cloudbasepredictor.data.forecast.ForecastModelRepository
+import com.cloudbasepredictor.data.forecast.INITIAL_FORECAST_DAYS
+import com.cloudbasepredictor.data.forecast.MAX_FORECAST_DAYS
 import com.cloudbasepredictor.data.forecast.ForecastViewportRepository
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cloudbasepredictor.data.forecast.ForecastRepository
+import com.cloudbasepredictor.data.forecast.exposedForecastDayCount
+import com.cloudbasepredictor.data.forecast.requestedForecastDaysForDayIndex
 import com.cloudbasepredictor.data.place.PlaceRepository
 import com.cloudbasepredictor.model.DailyForecast
 import com.cloudbasepredictor.model.ForecastMode
@@ -63,7 +67,7 @@ data class ForecastUiState(
     /** Cloud coverage & precipitation chart data. */
     val cloudChart: CloudForecastChartUiModel = buildPlaceholderCloudForecastChart(),
     /** Day chips for the date picker (title + subtitle). */
-    val dayChips: List<ForecastDayChipUiModel> = placeholderDayChips(),
+    val dayChips: List<ForecastDayChipUiModel> = placeholderDayChips(INITIAL_FORECAST_DAYS),
     /** Summary text shown at the bottom of the chart. */
     val forecastText: String = "Select a point on the map to open a forecast.",
     /** True while the forecast is being fetched from the network. */
@@ -159,9 +163,17 @@ class ForecastViewModel @Inject constructor(
         val currentModel = values[5] as ForecastModel
         val favorites = values[6] as List<SavedPlace>
 
-        val dayChips = snapshot?.days?.let(::buildDayChips)
-            ?.takeIf { it.isNotEmpty() }
-            ?: placeholderDayChips()
+        val loadedForecastDays = snapshot?.days?.size ?: 0
+        val availableForecastDays = (snapshot?.resolvedModel ?: currentModel).visibleForecastDays()
+        val displayedForecastDays = exposedForecastDayCount(
+            loadedForecastDays = loadedForecastDays,
+            selectedDayIndex = currentChartContext.selectedDayIndex,
+            maxForecastDays = availableForecastDays,
+        )
+        val dayChips = buildDisplayedDayChips(
+            loadedDays = snapshot?.days.orEmpty(),
+            displayedDayCount = displayedForecastDays,
+        )
         val safeDayIndex = currentChartContext.selectedDayIndex.coerceIn(0, dayChips.lastIndex)
 
         ForecastUiState(
@@ -228,64 +240,56 @@ class ForecastViewModel @Inject constructor(
                         return@collect
                     }
 
-                    if (forecastRepository.isCached(place.id, model)) {
+                    val requiredForecastDays = requestedForecastDaysForDayIndex(
+                        dayIndex = selectedDayIndex.value,
+                        maxForecastDays = model.visibleForecastDays(),
+                    )
+                    if (forecastRepository.isCached(
+                            placeId = place.id,
+                            model = model,
+                            minimumForecastDays = requiredForecastDays,
+                        )
+                    ) {
                         isLoading.value = false
-                        // Prefetch full range in background if only quick load was done.
-                        if (!forecastRepository.isFullyCached(place.id, model)) {
-                            prefetchFullForecast(place, model)
-                        }
                         return@collect
                     }
 
                     isLoading.value = true
-                    runCatching {
-                        forecastRepository.loadForecast(
-                            place, model = model, forecastDays = 2,
-                        )
-                    }.onFailure { throwable ->
-                        val msg = throwable.message ?: "Unable to load forecast right now."
-                        errorMessage.value = msg
-                        _networkErrorEvent.tryEmit(msg)
-                    }
+                    loadForecastWindow(
+                        place = place,
+                        model = model,
+                        forecastDays = requiredForecastDays,
+                    )
                     isLoading.value = false
-
-                    // Prefetch full range in background.
-                    if (errorMessage.value == null) {
-                        prefetchFullForecast(place, model)
-                    }
                 }
-        }
-    }
-
-    private fun prefetchFullForecast(place: SavedPlace, model: ForecastModel) {
-        viewModelScope.launch {
-            runCatching {
-                forecastRepository.loadForecast(
-                    place, model = model, forecastDays = 7,
-                )
-            }
         }
     }
 
     fun selectDay(index: Int) {
         selectedDayIndex.value = index
-        // If the selected day is beyond the currently loaded range, trigger a full load.
         val place = selectedPlace.value ?: return
         val model = forecastModelRepository.selectedModel.value
-        if (!forecastRepository.isFullyCached(place.id, model) && index >= 2) {
-            viewModelScope.launch {
-                isLoading.value = true
-                runCatching {
-                    forecastRepository.loadForecast(
-                        place, model = model, forecastDays = 7,
-                    )
-                }.onFailure { throwable ->
-                    val msg = throwable.message ?: "Unable to load forecast right now."
-                    errorMessage.value = msg
-                    _networkErrorEvent.tryEmit(msg)
-                }
-                isLoading.value = false
-            }
+        val requiredForecastDays = requestedForecastDaysForDayIndex(
+            dayIndex = index,
+            maxForecastDays = (uiState.value.resolvedModel ?: model).visibleForecastDays(),
+        )
+        if (forecastRepository.isCached(
+                placeId = place.id,
+                model = model,
+                minimumForecastDays = requiredForecastDays,
+            )
+        ) {
+            return
+        }
+        errorMessage.value = null
+        viewModelScope.launch {
+            isLoading.value = true
+            loadForecastWindow(
+                place = place,
+                model = model,
+                forecastDays = requiredForecastDays,
+            )
+            isLoading.value = false
         }
     }
 
@@ -332,26 +336,40 @@ class ForecastViewModel @Inject constructor(
     fun retryLoad() {
         val place = selectedPlace.value ?: return
         val model = forecastModelRepository.selectedModel.value
+        val requiredForecastDays = requestedForecastDaysForDayIndex(
+            dayIndex = selectedDayIndex.value,
+            maxForecastDays = (uiState.value.resolvedModel ?: model).visibleForecastDays(),
+        )
         errorMessage.value = null
         viewModelScope.launch {
             isLoading.value = true
-            runCatching {
-                forecastRepository.loadForecast(
-                    place,
-                    forceRefresh = true,
-                    model = model,
-                    forecastDays = 2,
-                )
-            }.onFailure { throwable ->
-                val msg = throwable.message ?: "Unable to load forecast right now."
-                errorMessage.value = msg
-                _networkErrorEvent.tryEmit(msg)
-            }
+            loadForecastWindow(
+                place = place,
+                model = model,
+                forecastDays = requiredForecastDays,
+                forceRefresh = true,
+            )
             isLoading.value = false
+        }
+    }
 
-            if (errorMessage.value == null) {
-                prefetchFullForecast(place, model)
-            }
+    private suspend fun loadForecastWindow(
+        place: SavedPlace,
+        model: ForecastModel,
+        forecastDays: Int,
+        forceRefresh: Boolean = false,
+    ) {
+        runCatching {
+            forecastRepository.loadForecast(
+                place = place,
+                forceRefresh = forceRefresh,
+                model = model,
+                forecastDays = forecastDays,
+            )
+        }.onFailure { throwable ->
+            val msg = throwable.message ?: "Unable to load forecast right now."
+            errorMessage.value = msg
+            _networkErrorEvent.tryEmit(msg)
         }
     }
 }
@@ -381,28 +399,28 @@ private fun buildForecastText(
         return when (mode) {
             ForecastMode.THERMIC -> {
                 if (isLoading) {
-                    "Loading a 14-day forecast for ${place.name}."
+                    "Loading thermic forecast for ${place.name}."
                 } else {
                     "Forecast content for ${place.name} will appear here."
                 }
             }
             ForecastMode.STUVE -> {
                 if (isLoading) {
-                    "Loading a 14-day stuve forecast for ${place.name}."
+                    "Loading stuve forecast for ${place.name}."
                 } else {
                     "Stuve forecast content for ${place.name} will appear here."
                 }
             }
             ForecastMode.WIND -> {
                 if (isLoading) {
-                    "Loading a 14-day wind forecast for ${place.name}."
+                    "Loading wind forecast for ${place.name}."
                 } else {
                     "Wind forecast content for ${place.name} will appear here."
                 }
             }
             ForecastMode.CLOUD -> {
                 if (isLoading) {
-                    "Loading a 14-day cloud forecast for ${place.name}."
+                    "Loading cloud forecast for ${place.name}."
                 } else {
                     "Cloud forecast content for ${place.name} will appear here."
                 }
@@ -469,7 +487,7 @@ private fun buildForecastText(
 }
 
 private fun buildDayChips(days: List<DailyForecast>): List<ForecastDayChipUiModel> {
-    return days.take(14).mapIndexed { index, day ->
+    return days.take(MAX_FORECAST_DAYS).mapIndexed { index, day ->
         ForecastDayChipUiModel(
             title = if (index == 0) "Today" else formatDayTitle(day.date),
             subtitle = formatDaySubtitle(day.date, index),
@@ -477,16 +495,35 @@ private fun buildDayChips(days: List<DailyForecast>): List<ForecastDayChipUiMode
     }
 }
 
-private fun placeholderDayChips(): List<ForecastDayChipUiModel> {
-    return List(14) { index ->
-        val calendar = Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, index)
-        }
-        ForecastDayChipUiModel(
-            title = if (index == 0) "Today" else SimpleDateFormat("EEE", Locale.US).format(calendar.time),
-            subtitle = SimpleDateFormat("d MMM", Locale.US).format(calendar.time),
-        )
+private fun buildDisplayedDayChips(
+    loadedDays: List<DailyForecast>,
+    displayedDayCount: Int,
+): List<ForecastDayChipUiModel> {
+    val loadedDayChips = buildDayChips(loadedDays).take(displayedDayCount)
+    if (loadedDayChips.size >= displayedDayCount) {
+        return loadedDayChips
     }
+
+    return buildList(displayedDayCount) {
+        addAll(loadedDayChips)
+        for (index in loadedDayChips.size until displayedDayCount) {
+            add(placeholderDayChip(index))
+        }
+    }
+}
+
+private fun placeholderDayChips(dayCount: Int = INITIAL_FORECAST_DAYS): List<ForecastDayChipUiModel> {
+    return List(dayCount, ::placeholderDayChip)
+}
+
+private fun placeholderDayChip(index: Int): ForecastDayChipUiModel {
+    val calendar = Calendar.getInstance().apply {
+        add(Calendar.DAY_OF_YEAR, index)
+    }
+    return ForecastDayChipUiModel(
+        title = if (index == 0) "Today" else SimpleDateFormat("EEE", Locale.US).format(calendar.time),
+        subtitle = SimpleDateFormat("d MMM", Locale.US).format(calendar.time),
+    )
 }
 
 private fun formatDayTitle(date: String): String {
@@ -516,4 +553,8 @@ private fun parseForecastDate(date: String): Date? {
 
 private fun formatTemperature(value: Double): String {
     return String.format(Locale.US, "%.1f°C", value)
+}
+
+private fun ForecastModel.visibleForecastDays(): Int {
+    return availableForecastDays.coerceAtMost(MAX_FORECAST_DAYS)
 }

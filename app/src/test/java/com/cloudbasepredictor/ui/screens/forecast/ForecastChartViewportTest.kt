@@ -1,6 +1,7 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ForecastChartViewportTest {
@@ -56,5 +57,20 @@ class ForecastChartViewportTest {
         // With amplification 2.5, effective zoom = 1 + (0.9 - 1) * 2.5 = 0.75
         // Result = 5.0 / 0.75 = 6.667
         assertEquals(6.667f, result, 0.01f)
+    }
+
+    @Test
+    fun zoomedTopAltitudeKm_strongerPinchOutProducesDeeperZoom() {
+        val gentleZoom = zoomedTopAltitudeKm(
+            currentTopAltitudeKm = 4.5f,
+            zoomChange = 1.2f,
+        )
+        val strongZoom = zoomedTopAltitudeKm(
+            currentTopAltitudeKm = 4.5f,
+            zoomChange = 1.6f,
+        )
+
+        assertTrue(strongZoom < gentleZoom)
+        assertEquals(1.8f, strongZoom, 0.01f)
     }
 }

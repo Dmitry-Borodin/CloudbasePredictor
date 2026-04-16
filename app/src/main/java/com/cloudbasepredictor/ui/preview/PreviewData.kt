@@ -92,7 +92,7 @@ object PreviewData {
         selectedPlace = savedPlace,
         selectedDayIndex = 0,
         dayChips = forecastDayChips(7),
-        forecastText = "Loading a 14-day forecast for Interlaken.",
+        forecastText = "Loading thermic forecast for Interlaken.",
         isLoading = true,
         errorMessage = null,
     )

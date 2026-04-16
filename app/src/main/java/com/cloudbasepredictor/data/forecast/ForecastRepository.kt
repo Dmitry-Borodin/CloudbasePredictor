@@ -29,16 +29,20 @@ import kotlinx.serialization.json.Json
 interface ForecastRepository {
     fun observeForecast(placeId: String, model: ForecastModel): Flow<ForecastSnapshot?>
 
-    fun isCached(placeId: String, model: ForecastModel): Boolean
+    fun isCached(
+        placeId: String,
+        model: ForecastModel,
+        minimumForecastDays: Int = 1,
+    ): Boolean
 
-    /** Returns true if the cache already has the full 7-day forecast. */
+    /** Returns true if the cache already has the full visible forecast horizon. */
     fun isFullyCached(placeId: String, model: ForecastModel): Boolean
 
     suspend fun loadForecast(
         place: SavedPlace,
         forceRefresh: Boolean = false,
         model: ForecastModel = ForecastModel.BEST_MATCH,
-        forecastDays: Int = 7,
+        forecastDays: Int = MAX_FORECAST_DAYS,
     )
 
     /** Delete cached forecasts older than [cutoffMillis]. */
@@ -65,13 +69,21 @@ class InMemoryForecastRepository @Inject constructor(
             .distinctUntilChanged()
     }
 
-    override fun isCached(placeId: String, model: ForecastModel): Boolean {
-        return cachedForecasts.value.containsKey(cacheKey(placeId, model))
+    override fun isCached(
+        placeId: String,
+        model: ForecastModel,
+        minimumForecastDays: Int,
+    ): Boolean {
+        val snapshot = cachedForecasts.value[cacheKey(placeId, model)] ?: return false
+        return snapshot.forecastDays >= minimumForecastDays
     }
 
     override fun isFullyCached(placeId: String, model: ForecastModel): Boolean {
-        val snapshot = cachedForecasts.value[cacheKey(placeId, model)] ?: return false
-        return snapshot.forecastDays >= 7
+        return isCached(
+            placeId = placeId,
+            model = model,
+            minimumForecastDays = MAX_FORECAST_DAYS,
+        )
     }
 
     override suspend fun loadForecast(
@@ -101,11 +113,12 @@ class InMemoryForecastRepository @Inject constructor(
 
         // 3. Fetch from network (or generate fake data)
         val snapshot = if (dataSourceRepository.preference.value == DataSourcePreference.FAKE) {
+            val fakeDays = generateFakeDays(forecastDays)
             ForecastSnapshot(
-                days = generateFakeDays(forecastDays),
+                days = fakeDays,
                 updatedAtUtcMillis = System.currentTimeMillis(),
                 resolvedModel = model,
-                forecastDays = forecastDays,
+                forecastDays = fakeDays.size,
             )
         } else {
             val (resolvedModel, hourlyData) = openMeteoRemoteDataSource.getHourlyForecastWithFallback(
@@ -116,17 +129,18 @@ class InMemoryForecastRepository @Inject constructor(
             )
             val now = System.currentTimeMillis()
             val modelGenEstimate = estimateModelRunTime(now, resolvedModel)
+            val loadedForecastDays = hourlyData.dailyForecasts.size.coerceAtMost(forecastDays)
             val snapshot = ForecastSnapshot(
                 days = hourlyData.dailyForecasts,
                 updatedAtUtcMillis = now,
                 hourlyData = hourlyData,
                 resolvedModel = resolvedModel,
-                forecastDays = forecastDays,
+                forecastDays = loadedForecastDays,
                 modelGeneratedAtMillis = modelGenEstimate,
             )
 
             // Store in DB cache
-            saveToDbCache(place.id, model, resolvedModel, forecastDays, hourlyData, now)
+            saveToDbCache(place.id, model, resolvedModel, loadedForecastDays, hourlyData, now)
 
             snapshot
         }

@@ -5,7 +5,6 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -13,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -43,7 +43,6 @@ import com.cloudbasepredictor.ui.screens.forecast.ThermicForecastChartUiModel
 import com.cloudbasepredictor.ui.screens.forecast.ThermicSlotDiagnostics
 import com.cloudbasepredictor.ui.screens.forecast.aggregatedForDisplay
 import com.cloudbasepredictor.ui.screens.forecast.visibleSegment
-import com.cloudbasepredictor.ui.screens.forecast.zoomedTopAltitudeKm
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.util.Locale
 import kotlin.math.ceil
@@ -127,6 +126,7 @@ private fun ThermicForecastGrid(
         }
     }
     var crosshairPos by remember { mutableStateOf<Offset?>(null) }
+    val latestVisibleTopAltitudeKm = rememberUpdatedState(visibleTopAltitudeKm)
 
     Canvas(
         modifier = modifier
@@ -145,16 +145,12 @@ private fun ThermicForecastGrid(
                     }
                 }
             }
-            .pointerInput(visibleTopAltitudeKm) {
-                detectTransformGestures { _, _, zoom, _ ->
-                    onVisibleTopAltitudeChange(
-                    zoomedTopAltitudeKm(
-                        currentTopAltitudeKm = visibleTopAltitudeKm,
-                        zoomChange = zoom,
-                    ),
+            .pointerInput(Unit) {
+                detectForecastZoomGestures(
+                    currentTopAltitudeKm = { latestVisibleTopAltitudeKm.value },
+                    onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
                 )
-            }
-        },
+            },
     ) {
         if (chart.timeSlots.isEmpty()) {
             return@Canvas

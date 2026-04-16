@@ -3,7 +3,6 @@ package com.cloudbasepredictor.ui.screens.forecast.views
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +11,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
-import com.cloudbasepredictor.ui.screens.forecast.zoomedTopAltitudeKm
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.util.Locale
 import kotlin.math.PI
@@ -125,17 +124,14 @@ private fun ForecastRiskGrid(
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
         }
     }
+    val latestVisibleTopAltitudeKm = rememberUpdatedState(visibleTopAltitudeKm)
 
     Canvas(
-        modifier = modifier.pointerInput(visibleTopAltitudeKm) {
-            detectTransformGestures { _, _, zoom, _ ->
-                onVisibleTopAltitudeChange(
-                    zoomedTopAltitudeKm(
-                        currentTopAltitudeKm = visibleTopAltitudeKm,
-                        zoomChange = zoom,
-                    ),
-                )
-            }
+        modifier = modifier.pointerInput(Unit) {
+            detectForecastZoomGestures(
+                currentTopAltitudeKm = { latestVisibleTopAltitudeKm.value },
+                onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
+            )
         },
     ) {
         val axisWidth = with(density) { 60.dp.toPx() }

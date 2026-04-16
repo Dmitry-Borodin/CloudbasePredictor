@@ -7,10 +7,10 @@ import org.junit.Test
 
 class ForecastUiStateTest {
     @Test
-    fun defaultState_containsPlaceholderChipsForFourteenDays() {
+    fun defaultState_containsPlaceholderChipsForInitialLoadWindow() {
         val state = ForecastUiState()
 
-        assertEquals(14, state.dayChips.size)
+        assertEquals(2, state.dayChips.size)
         assertEquals("Today", state.dayChips.first().title)
         assertEquals(0, state.selectedDayIndex)
         assertNull(state.selectedPlace)
