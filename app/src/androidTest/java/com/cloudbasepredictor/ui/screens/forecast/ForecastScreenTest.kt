@@ -9,7 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.ForecastMode
-import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.testutil.SimulatedTestData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_ALTITUDE_UNIT
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_TIME_AXIS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_SELECTED_HOUR
@@ -27,7 +27,8 @@ class ForecastScreenTest {
 
     @Test
     fun forecastScreen_rendersProvidedUiState() {
-        val uiState = PreviewData.forecastReadyUiState
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val uiState = SimulatedTestData.forecastUiState(context)
 
         composeRule.setContent {
             CloudbasePredictorTheme {
@@ -48,7 +49,7 @@ class ForecastScreenTest {
     fun forecastScreen_clickingDayChipInvokesCallbackWithCorrectIndex() {
         var selectedIndex: Int? = null
         val uiState = ForecastUiState(
-            selectedPlace = PreviewData.savedPlace,
+            selectedPlace = SimulatedTestData.brauneckPlace,
             selectedDayIndex = 0,
             dayChips = listOf(
                 ForecastDayChipUiModel(title = "Day 1", subtitle = "Now"),
@@ -78,13 +79,16 @@ class ForecastScreenTest {
     @Test
     fun forecastScreen_loadingStateShowsProgress() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val placeName = PreviewData.forecastLoadingUiState.selectedPlace?.name.orEmpty()
+        val placeName = SimulatedTestData.brauneckPlace.name
         val expectedLoadingMessage = context.getString(R.string.loading_forecast_for_place, placeName)
 
         composeRule.setContent {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = PreviewData.forecastLoadingUiState,
+                    uiState = SimulatedTestData.forecastUiState(context).copy(
+                        isLoading = true,
+                        forecastText = expectedLoadingMessage,
+                    ),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -96,10 +100,11 @@ class ForecastScreenTest {
 
     @Test
     fun forecastScreen_windModeShowsVisibleTimeAxis() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
         composeRule.setContent {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.WIND),
+                    uiState = SimulatedTestData.forecastUiState(context, mode = ForecastMode.WIND),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -112,10 +117,11 @@ class ForecastScreenTest {
 
     @Test
     fun forecastScreen_stuveModeShowsSelectedHour() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
         composeRule.setContent {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.STUVE),
+                    uiState = SimulatedTestData.forecastUiState(context, mode = ForecastMode.STUVE),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -130,10 +136,11 @@ class ForecastScreenTest {
 
     @Test
     fun forecastScreen_thermicModeShowsAltitudeUnitAndHourLabels() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
         composeRule.setContent {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.THERMIC),
+                    uiState = SimulatedTestData.forecastUiState(context, mode = ForecastMode.THERMIC),
                     onDateSelected = {},
                     onOpenMap = {},
                 )

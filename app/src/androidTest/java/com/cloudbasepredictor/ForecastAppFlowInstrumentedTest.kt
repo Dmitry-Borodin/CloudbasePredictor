@@ -23,9 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.model.SavedPlace
+import com.cloudbasepredictor.testutil.SimulatedTestData
 import com.cloudbasepredictor.ui.CloudbasePredictorApp
 import com.cloudbasepredictor.ui.navigation.CloudbaseNavGraph
-import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastScreen
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_MODE_TAB
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_VIEW
@@ -62,15 +62,16 @@ class ForecastAppFlowInstrumentedTest {
                             TestMapDestination(
                                 selectedPlace = selectedPlace,
                                 onSelectLocation = {
-                                    selectedPlace = PreviewData.savedPlace
+                                    selectedPlace = SimulatedTestData.brauneckPlace
                                 },
                                 onOpenForecast = onOpenForecast,
                             )
                         },
                         forecastDestination = { onOpenMap ->
+                            val context = composeRule.activity
                             ForecastScreen(
-                                uiState = PreviewData.forecastUiStateForMode(selectedMode).copy(
-                                    selectedPlace = selectedPlace ?: PreviewData.savedPlace,
+                                uiState = SimulatedTestData.forecastUiState(context, mode = selectedMode).copy(
+                                    selectedPlace = selectedPlace ?: SimulatedTestData.brauneckPlace,
                                 ),
                                 onDateSelected = {},
                                 onForecastModeSelected = { selectedMode = it },
@@ -85,13 +86,13 @@ class ForecastAppFlowInstrumentedTest {
 
     @Test
     fun appShell_selectLocationAndOpenForecast_showsSelectedPlace() {
-        composeRule.onNodeWithText("Select Interlaken").performClick()
-        composeRule.onNodeWithText("Interlaken").assertIsDisplayed()
+        composeRule.onNodeWithText("Select Brauneck").performClick()
+        composeRule.onNodeWithText("Brauneck Süd").assertIsDisplayed()
 
         composeRule.onNodeWithText("Open forecast").performClick()
 
         composeRule.onNodeWithTag(THERMIC_VIEW).assertIsDisplayed()
-        composeRule.onNodeWithText("Interlaken").assertIsDisplayed()
+        composeRule.onNodeWithText("Brauneck Süd").assertIsDisplayed()
     }
 
     @Test
@@ -133,7 +134,7 @@ class ForecastAppFlowInstrumentedTest {
     }
 
     private fun openForecast() {
-        composeRule.onNodeWithText("Select Interlaken").performClick()
+        composeRule.onNodeWithText("Select Brauneck").performClick()
         composeRule.onNodeWithText("Open forecast").performClick()
         composeRule.onNodeWithTag(THERMIC_VIEW).assertIsDisplayed()
     }
@@ -161,7 +162,7 @@ private fun TestMapDestination(
             Text(text = place.name)
         }
         Button(onClick = onSelectLocation) {
-            Text(text = "Select Interlaken")
+            Text(text = "Select Brauneck")
         }
         Button(
             onClick = onOpenForecast,

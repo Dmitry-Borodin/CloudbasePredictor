@@ -9,15 +9,17 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.platform.app.InstrumentationRegistry
 import com.cloudbasepredictor.model.ForecastMode
+import com.cloudbasepredictor.testutil.SimulatedTestData
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastScreen
+import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
 /**
- * Screenshot capture tests — render screens with simulated data and save PNG screenshots.
+ * Screenshot capture tests — render screens with simulated Brauneck data and save PNG screenshots.
  *
  * These tests are NOT part of the regular test suite. Run them explicitly:
  *   ./gradlew :app:connectedDebugAndroidTest \
@@ -32,12 +34,17 @@ class ScreenshotCaptureTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private fun simulatedState(mode: ForecastMode): ForecastUiState {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        return SimulatedTestData.forecastUiState(context, mode = mode)
+    }
+
     @Test
     fun captureThermicForecast() {
         captureScreen("forecast_thermic") {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.THERMIC),
+                    uiState = simulatedState(ForecastMode.THERMIC),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -50,7 +57,7 @@ class ScreenshotCaptureTest {
         captureScreen("forecast_stuve") {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.STUVE),
+                    uiState = simulatedState(ForecastMode.STUVE),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -63,7 +70,7 @@ class ScreenshotCaptureTest {
         captureScreen("forecast_wind") {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.WIND),
+                    uiState = simulatedState(ForecastMode.WIND),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -76,7 +83,7 @@ class ScreenshotCaptureTest {
         captureScreen("forecast_cloud") {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.CLOUD),
+                    uiState = simulatedState(ForecastMode.CLOUD),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -89,7 +96,9 @@ class ScreenshotCaptureTest {
         captureScreen("forecast_loading") {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = PreviewData.forecastLoadingUiState,
+                    uiState = PreviewData.forecastLoadingUiState.copy(
+                        selectedPlace = SimulatedTestData.brauneckPlace,
+                    ),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -102,7 +111,9 @@ class ScreenshotCaptureTest {
         captureScreen("forecast_error") {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = PreviewData.forecastErrorUiState,
+                    uiState = PreviewData.forecastErrorUiState.copy(
+                        selectedPlace = SimulatedTestData.brauneckPlace,
+                    ),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -117,7 +128,7 @@ class ScreenshotCaptureTest {
         captureScreen("forecast_thermic_dark") {
             CloudbasePredictorTheme(darkTheme = true) {
                 ForecastScreen(
-                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.THERMIC),
+                    uiState = simulatedState(ForecastMode.THERMIC),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -130,7 +141,7 @@ class ScreenshotCaptureTest {
         captureScreen("forecast_stuve_dark") {
             CloudbasePredictorTheme(darkTheme = true) {
                 ForecastScreen(
-                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.STUVE),
+                    uiState = simulatedState(ForecastMode.STUVE),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -143,7 +154,7 @@ class ScreenshotCaptureTest {
         captureScreen("forecast_wind_dark") {
             CloudbasePredictorTheme(darkTheme = true) {
                 ForecastScreen(
-                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.WIND),
+                    uiState = simulatedState(ForecastMode.WIND),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -156,7 +167,7 @@ class ScreenshotCaptureTest {
         captureScreen("forecast_cloud_dark") {
             CloudbasePredictorTheme(darkTheme = true) {
                 ForecastScreen(
-                    uiState = PreviewData.forecastUiStateForMode(ForecastMode.CLOUD),
+                    uiState = simulatedState(ForecastMode.CLOUD),
                     onDateSelected = {},
                     onOpenMap = {},
                 )

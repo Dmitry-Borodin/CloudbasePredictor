@@ -3,6 +3,7 @@ package com.cloudbasepredictor.data.forecast
 import android.util.Log
 import com.cloudbasepredictor.data.datasource.DataSourcePreference
 import com.cloudbasepredictor.data.datasource.DataSourceRepository
+import com.cloudbasepredictor.data.datasource.SimulatedForecastDataSource
 import com.cloudbasepredictor.data.local.CachedForecastEntity
 import com.cloudbasepredictor.data.local.DatabaseErrorManager
 import com.cloudbasepredictor.data.local.ForecastCacheDao
@@ -56,6 +57,7 @@ interface ForecastRepository {
 class InMemoryForecastRepository @Inject constructor(
     private val openMeteoRemoteDataSource: OpenMeteoRemoteDataSource,
     private val dataSourceRepository: DataSourceRepository,
+    private val simulatedForecastDataSource: SimulatedForecastDataSource,
     private val forecastCacheDao: ForecastCacheDao,
     private val databaseErrorManager: DatabaseErrorManager,
     private val json: Json,
@@ -111,38 +113,53 @@ class InMemoryForecastRepository @Inject constructor(
             }
         }
 
-        // 3. Fetch from network (or generate fake data)
-        val snapshot = if (dataSourceRepository.preference.value == DataSourcePreference.FAKE) {
-            val fakeDays = generateFakeDays(forecastDays)
-            ForecastSnapshot(
-                days = fakeDays,
-                updatedAtUtcMillis = System.currentTimeMillis(),
-                resolvedModel = model,
-                forecastDays = fakeDays.size,
-            )
-        } else {
-            val (resolvedModel, hourlyData) = openMeteoRemoteDataSource.getHourlyForecastWithFallback(
-                latitude = place.latitude,
-                longitude = place.longitude,
-                requestedModel = model,
-                forecastDays = forecastDays,
-            )
-            val now = System.currentTimeMillis()
-            val modelGenEstimate = estimateModelRunTime(now, resolvedModel)
-            val loadedForecastDays = hourlyData.dailyForecasts.size.coerceAtMost(forecastDays)
-            val snapshot = ForecastSnapshot(
-                days = hourlyData.dailyForecasts,
-                updatedAtUtcMillis = now,
-                hourlyData = hourlyData,
-                resolvedModel = resolvedModel,
-                forecastDays = loadedForecastDays,
-                modelGeneratedAtMillis = modelGenEstimate,
-            )
+        // 3. Fetch from network, assets, or generate fake data
+        val snapshot = when (dataSourceRepository.preference.value) {
+            DataSourcePreference.FAKE -> {
+                val fakeDays = generateFakeDays(forecastDays)
+                ForecastSnapshot(
+                    days = fakeDays,
+                    updatedAtUtcMillis = System.currentTimeMillis(),
+                    resolvedModel = model,
+                    forecastDays = fakeDays.size,
+                )
+            }
+            DataSourcePreference.SIMULATED -> {
+                val hourlyData = simulatedForecastDataSource.loadForecastData()
+                val now = System.currentTimeMillis()
+                ForecastSnapshot(
+                    days = hourlyData.dailyForecasts,
+                    updatedAtUtcMillis = now,
+                    hourlyData = hourlyData,
+                    resolvedModel = ForecastModel.ICON_SEAMLESS,
+                    forecastDays = hourlyData.dailyForecasts.size,
+                    modelGeneratedAtMillis = now,
+                )
+            }
+            DataSourcePreference.REAL -> {
+                val (resolvedModel, hourlyData) = openMeteoRemoteDataSource.getHourlyForecastWithFallback(
+                    latitude = place.latitude,
+                    longitude = place.longitude,
+                    requestedModel = model,
+                    forecastDays = forecastDays,
+                )
+                val now = System.currentTimeMillis()
+                val modelGenEstimate = estimateModelRunTime(now, resolvedModel)
+                val loadedForecastDays = hourlyData.dailyForecasts.size.coerceAtMost(forecastDays)
+                val snapshot = ForecastSnapshot(
+                    days = hourlyData.dailyForecasts,
+                    updatedAtUtcMillis = now,
+                    hourlyData = hourlyData,
+                    resolvedModel = resolvedModel,
+                    forecastDays = loadedForecastDays,
+                    modelGeneratedAtMillis = modelGenEstimate,
+                )
 
-            // Store in DB cache
-            saveToDbCache(place.id, model, resolvedModel, loadedForecastDays, hourlyData, now)
+                // Store in DB cache
+                saveToDbCache(place.id, model, resolvedModel, loadedForecastDays, hourlyData, now)
 
-            snapshot
+                snapshot
+            }
         }
 
         cachedForecasts.value = cachedForecasts.value + (key to snapshot)

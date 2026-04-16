@@ -6,8 +6,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 enum class DataSourcePreference {
-    FAKE,
     REAL,
+    SIMULATED,
+    FAKE,
 }
 
 interface DataSourceRepository {

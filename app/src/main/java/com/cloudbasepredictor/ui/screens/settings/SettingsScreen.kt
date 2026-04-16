@@ -119,13 +119,18 @@ fun SettingsScreen(
                     text = stringResource(R.string.settings_data_source),
                     style = MaterialTheme.typography.titleMedium,
                 )
+                val dataSourceLabels = mapOf(
+                    DataSourcePreference.REAL to "Real",
+                    DataSourcePreference.SIMULATED to "Simulated",
+                    DataSourcePreference.FAKE to "Fake",
+                )
                 var expanded by remember { mutableStateOf(false) }
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = it },
                 ) {
                     OutlinedTextField(
-                        value = dataSource.name,
+                        value = dataSourceLabels[dataSource] ?: dataSource.name,
                         onValueChange = {},
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -139,7 +144,7 @@ fun SettingsScreen(
                     ) {
                         DataSourcePreference.entries.forEach { option ->
                             DropdownMenuItem(
-                                text = { Text(text = option.name) },
+                                text = { Text(text = dataSourceLabels[option] ?: option.name) },
                                 onClick = {
                                     onDataSourceChanged(option)
                                     expanded = false

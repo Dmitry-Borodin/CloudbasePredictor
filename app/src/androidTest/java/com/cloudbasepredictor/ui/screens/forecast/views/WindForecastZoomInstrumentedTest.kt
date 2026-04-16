@@ -11,7 +11,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pinch
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cloudbasepredictor.model.ForecastMode
-import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.testutil.SimulatedTestData
 import com.cloudbasepredictor.ui.screens.forecast.DEFAULT_TOP_ALTITUDE_KM
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_VIEW
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
@@ -35,7 +35,8 @@ class WindForecastZoomInstrumentedTest {
         composeRule.setContent {
             CloudbasePredictorTheme {
                 WindForecastView(
-                    uiState = PreviewData.forecastUiStateForMode(
+                    uiState = SimulatedTestData.forecastUiState(
+                        composeRule.activity,
                         mode = ForecastMode.WIND,
                         topAltitudeKm = visibleTopAltitudeKm,
                     ),
