@@ -34,12 +34,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -103,6 +107,9 @@ fun ForecastScreen(
     modifier: Modifier = Modifier,
 ) {
     var showFavoriteDialog by rememberSaveable { mutableStateOf(false) }
+    val density = LocalDensity.current
+    var mapPanelHeightPx by remember { mutableFloatStateOf(0f) }
+    val mapPanelHeightDp = with(density) { mapPanelHeightPx.toDp() }
 
     Column(
         modifier = modifier
@@ -121,7 +128,8 @@ fun ForecastScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f)
+                .testTag(ForecastTestTags.FORECAST_CHART_AREA),
         ) {
             when {
                 uiState.isLoading -> {
@@ -143,6 +151,7 @@ fun ForecastScreen(
                         onForecastViewportTopChanged = onForecastViewportTopChanged,
                         onStuveHourChanged = onStuveHourChanged,
                         onModelSelected = onModelSelected,
+                        modifier = Modifier.padding(bottom = mapPanelHeightDp),
                     )
                 }
             }
@@ -151,7 +160,8 @@ fun ForecastScreen(
                 currentPlace = uiState.selectedPlace,
                 favoritePlaces = uiState.favoritePlaces,
                 onLocationChanged = onMapLocationChanged,
-                modifier = Modifier.fillMaxSize(),
+                onPanelHeightChanged = { mapPanelHeightPx = it },
+                modifier = Modifier.fillMaxSize().testTag(ForecastTestTags.MAP_PANEL),
             )
         }
 
@@ -233,8 +243,9 @@ private fun ForecastReadyContent(
     onForecastViewportTopChanged: (Float) -> Unit,
     onStuveHourChanged: (Int) -> Unit,
     onModelSelected: (ForecastModel) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         AnimatedContent(
             targetState = uiState.selectedForecastMode,
             transitionSpec = {

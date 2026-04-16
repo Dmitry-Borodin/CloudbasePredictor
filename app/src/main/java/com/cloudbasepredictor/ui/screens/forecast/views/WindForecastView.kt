@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_ALTITUDE_UNIT
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_TIME_AXIS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
@@ -89,6 +90,16 @@ internal fun WindForecastView(
             WindBottomAxis(
                 hours = uiState.windChart.hours,
                 modifier = Modifier.fillMaxSize(),
+            )
+            // "km" unit label aligned with the Y-axis
+            Text(
+                text = "km",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 8.dp, bottom = 8.dp)
+                    .testTag(WIND_ALTITUDE_UNIT),
             )
         }
 

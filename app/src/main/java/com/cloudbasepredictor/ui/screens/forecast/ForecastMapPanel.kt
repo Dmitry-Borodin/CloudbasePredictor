@@ -72,6 +72,7 @@ fun ForecastMapPanel(
     onLocationChanged: (latitude: Double, longitude: Double) -> Unit,
     modifier: Modifier = Modifier,
     maxFraction: Float = 1f / 3f,
+    onPanelHeightChanged: (Float) -> Unit = {},
 ) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -81,6 +82,12 @@ fun ForecastMapPanel(
     val handleHeightPx = with(density) { DRAG_HANDLE_HEIGHT_DP.dp.toPx() }
 
     val maxPanelHeightPx = parentHeightPx * maxFraction
+
+    // Report panel height changes to parent so chart can resize
+    LaunchedEffect(panelHeightPx, handleHeightPx) {
+        val totalHeight = (panelHeightPx + handleHeightPx).coerceAtLeast(handleHeightPx)
+        onPanelHeightChanged(totalHeight)
+    }
 
     val cameraState = rememberCameraState(
         firstPosition = CameraPosition(

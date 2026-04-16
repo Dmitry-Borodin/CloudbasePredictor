@@ -81,21 +81,36 @@ class ThermicChartDiagnosticsTest {
     }
 
     @Test
-    fun buildChart_cloudMarkers_atCloudBaseNotThermalTop() {
+    fun buildChart_cloudMarkers_spanFromCloudBaseToMoistTop() {
         val chart = buildThermicChartFromData(makeHourlyData(), dayIndex = 0)
         val diag = chart.slotDiagnostics.firstOrNull() ?: return
         val cloudBase = diag.cloudBaseKm ?: return
 
-        chart.cloudMarkers
+        val markers = chart.cloudMarkers
             .filter { it.startMinuteOfDayLocal == diag.startMinuteOfDayLocal }
-            .forEach { marker ->
-                assertEquals(
-                    "Cloud marker should be at cloud base",
-                    cloudBase,
-                    marker.altitudeKm,
-                    0.1f,
-                )
-            }
+        assertTrue("Should have cloud markers", markers.isNotEmpty())
+
+        val lowestMarker = markers.minOf { it.altitudeKm }
+        assertEquals(
+            "Lowest cloud marker should be at cloud base",
+            cloudBase,
+            lowestMarker,
+            0.1f,
+        )
+
+        // If moist equilibrium top exists, markers should span up to it
+        val moistTop = diag.moistEquilibriumTopKm
+        if (moistTop != null && moistTop > cloudBase + 0.1f) {
+            assertTrue(
+                "Should have multiple cloud markers spanning to moist top",
+                markers.size > 1,
+            )
+            val highestMarker = markers.maxOf { it.altitudeKm }
+            assertTrue(
+                "Highest marker ($highestMarker) should reach near moist top ($moistTop)",
+                highestMarker >= moistTop - 0.35f,
+            )
+        }
     }
 
     @Test

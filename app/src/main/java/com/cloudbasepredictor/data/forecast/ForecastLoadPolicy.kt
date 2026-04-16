@@ -1,10 +1,11 @@
 package com.cloudbasepredictor.data.forecast
 
 import kotlin.math.max
+import kotlin.math.min
 
-internal const val INITIAL_FORECAST_DAYS = 2
+internal const val INITIAL_FORECAST_DAYS = 5
 internal const val FORECAST_DAY_BATCH_SIZE = 2
-internal const val MAX_FORECAST_DAYS = 7
+internal const val MAX_FORECAST_DAYS = 14
 
 internal fun requestedForecastDaysForDayIndex(
     dayIndex: Int,
@@ -45,5 +46,5 @@ internal fun exposedForecastDayCount(
     )
 
     return max(normalizedLoadedDays, max(selectionWindow, interactiveWindow))
-        .coerceIn(initialForecastDays, maxForecastDays)
+        .coerceIn(min(initialForecastDays, maxForecastDays), maxForecastDays)
 }

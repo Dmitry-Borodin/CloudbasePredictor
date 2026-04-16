@@ -15,9 +15,14 @@ object ForecastTestTags {
     const val STUVE_TIME_SLIDER = "forecast_stuve_time_slider"
     const val STUVE_SELECTED_HOUR = "forecast_stuve_selected_hour"
     const val WIND_TIME_AXIS = "forecast_wind_time_axis"
+    const val WIND_ALTITUDE_UNIT = "forecast_wind_altitude_unit"
 
     const val HELP_BUTTON = "forecast_help_button"
 
     const val MODEL_SELECTOR_BUTTON = "forecast_model_selector_button"
     const val MODEL_OPTION_PREFIX = "forecast_model_option_"
+
+    const val FORECAST_CHART_AREA = "forecast_chart_area"
+    const val MAP_PANEL = "forecast_map_panel"
+    const val DAY_CHIP_PREFIX = "forecast_day_chip_"
 }

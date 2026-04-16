@@ -434,4 +434,45 @@ class ParcelAnalysisTest {
         val f21 = solarElevationFactor(21)
         assertEquals(0f, f21, 0.01f)
     }
+
+    // ── CAPE discrepancy analysis ──
+
+    @Test
+    fun capeDiscrepancy_documentedFactors() {
+        // This test documents why computed CAPE differs from model CAPE.
+        // The calibration factor (model/computed, clamped 0.5..1.5) compensates.
+        val result = analyzeParcel(
+            profile = standardProfile,
+            surfaceTemperatureC = 22f,
+            surfaceDewPointC = 10f,
+            surfacePressureHpa = 955f,
+            elevationKm = 0.58f,
+            heatingInput = standardHeatingInput,
+            modelCapeJKg = 300f,
+        )
+
+        assertNotNull(result)
+        result!!
+
+        // The discrepancy arises from:
+        // 1. Surface heating (+2 to +8°C) boosts parcel θ above model's T2m-based CAPE
+        // 2. Coarse profile (8 levels) vs model's fine vertical grid (~90 levels)
+        // 3. No virtual temperature correction (moisture buoyancy ignored)
+        // 4. Simplified moist adiabat (4 Newton iterations vs full integration)
+        // 5. Model likely uses mixed-layer CAPE (avg lowest 100 hPa) vs our surface-based parcel
+        //
+        // The calibrationFactor = (modelCape / computedCape).coerceIn(0.5, 1.5)
+        // ensures thermal strength stays within a reasonable envelope.
+        assertTrue(
+            "Computed CAPE (${result.computedCapeJKg}) should be positive",
+            result.computedCapeJKg > 0f,
+        )
+
+        // Surface heating shifts the parcel significantly warmer, typically resulting
+        // in computed CAPE exceeding model CAPE when radiation is strong.
+        assertTrue(
+            "Surface heating should be > 0",
+            result.surfaceHeatingC > 0f,
+        )
+    }
 }

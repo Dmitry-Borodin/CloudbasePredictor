@@ -201,13 +201,27 @@ internal fun buildThermicChartFromData(
             )
         }
 
-        // Cloud marker at cloud base if cumulus formation is expected
+        // Cloud markers from cloud base to moist equilibrium top
         val cloudBase = analysis.cloudBaseKm
+        val cloudTop = analysis.moistEquilibriumTopKm ?: cloudBase
         if (cloudBase != null && cloudBase > elevationKm + 0.3f) {
-            cloudMarkers += ThermicForecastCloudMarkerUiModel(
-                startMinuteOfDayLocal = startMinute,
-                altitudeKm = cloudBase,
-            )
+            val top = cloudTop?.coerceAtLeast(cloudBase) ?: cloudBase
+            val cloudRange = top - cloudBase
+            val stepKm = if (cloudRange > 0.01f) {
+                // Space markers ~0.3 km apart, at least 1 marker
+                (cloudRange / ((cloudRange / 0.3f).toInt().coerceAtLeast(1))).coerceAtMost(0.3f)
+            } else {
+                0.3f
+            }
+            var alt = cloudBase
+            while (alt <= top + 0.001f) {
+                cloudMarkers += ThermicForecastCloudMarkerUiModel(
+                    startMinuteOfDayLocal = startMinute,
+                    altitudeKm = alt,
+                )
+                alt += stepKm
+                if (stepKm < 0.01f) break
+            }
         }
 
         diagnostics += ThermicSlotDiagnostics(
@@ -330,15 +344,15 @@ internal fun buildWindChartFromData(
         null
     }
 
-    // Compute altitude bands: each data level gets ±200m or half distance to neighbor
+    // Compute altitude bands: each data level extends halfway to its neighbors
     val sortedAlts = altitudeSet.toList()
     val altitudeBands = sortedAlts.mapIndexed { idx, alt ->
         val lowerDist = if (idx > 0) (alt - sortedAlts[idx - 1]) / 2f else 0.2f
         val upperDist = if (idx < sortedAlts.lastIndex) (sortedAlts[idx + 1] - alt) / 2f else 0.2f
         WindAltitudeBand(
             centerKm = alt,
-            bottomKm = alt - lowerDist.coerceAtMost(0.2f),
-            topKm = alt + upperDist.coerceAtMost(0.2f),
+            bottomKm = alt - lowerDist,
+            topKm = alt + upperDist,
         )
     }
 
