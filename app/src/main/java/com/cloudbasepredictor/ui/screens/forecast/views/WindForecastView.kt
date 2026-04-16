@@ -42,6 +42,7 @@ import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.WindForecastCellUiModel
 import com.cloudbasepredictor.ui.screens.forecast.WindForecastChartUiModel
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.util.Locale
@@ -109,14 +110,6 @@ private fun WindChartCanvas(
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
         }
     }
-    val hourLabelPaint = remember(density, axisLabelColor) {
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = axisLabelColor.toArgb()
-            textSize = with(density) { 12.sp.toPx() }
-            textAlign = Paint.Align.CENTER
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-        }
-    }
     val unitLabelPaint = remember(density, axisLabelColor) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = axisLabelColor.toArgb()
@@ -172,7 +165,7 @@ private fun WindChartCanvas(
         )
 
         val axisWidth = with(density) { 60.dp.toPx() }
-        val bottomAxisHeight = with(density) { 38.dp.toPx() }
+        val bottomAxisHeight = with(density) { 24.dp.toPx() }
         val arrowSizePx = with(density) { 48.dp.toPx() }
 
         val plotLeft = axisWidth
@@ -223,12 +216,19 @@ private fun WindChartCanvas(
         val altCluster = max(1, ceil(arrowSizePx * 1.1f / bandHeightPx).toInt())
         val hourCluster = max(1, ceil(arrowSizePx * 1.1f / columnWidth).toInt())
 
+        // Build a fast cell lookup: (hour, altitudeKm) → cell
+        val cellLookup = HashMap<Long, WindForecastCellUiModel>(chart.cells.size)
+        chart.cells.forEach { c ->
+            val key = c.hour.toLong().shl(32) or c.altitudeKm.toBits().toLong()
+            cellLookup.putIfAbsent(key, c)
+        }
+
         // ── Wind speed background using band boundaries ──────────
         chart.hours.forEachIndexed { hourIndex, hour ->
             val x = plotLeft + hourIndex * columnWidth
             visibleBands.forEach { band ->
-                val cell = chart.cells.find { it.hour == hour && it.altitudeKm == band.centerKm }
-                    ?: return@forEach
+                val key = hour.toLong().shl(32) or band.centerKm.toBits().toLong()
+                val cell = cellLookup[key] ?: return@forEach
                 val topY = altitudeToY(
                     band.topKm.coerceAtMost(effectiveTopAltitudeKm),
                     minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
@@ -359,7 +359,8 @@ private fun WindChartCanvas(
                     altIdx, (altIdx + altCluster).coerceAtMost(visibleAltitudes.size),
                 )
                 val clusterCells = clusterAlts.mapNotNull { a ->
-                    chart.cells.find { it.hour == hour && it.altitudeKm == a }
+                    val k = hour.toLong().shl(32) or a.toBits().toLong()
+                    cellLookup[k]
                 }
                 if (clusterCells.isEmpty()) return@clusteredAlt
 
@@ -410,16 +411,40 @@ private fun WindChartCanvas(
                 unitLabelPaint,
             )
 
-            chart.hours.forEachIndexed { index, hour ->
-                if ((hour - chart.hours.first()) % 3 != 0) return@forEachIndexed
-                val labelCenterX = plotLeft + index * columnWidth + columnWidth / 2f
+            // Wind speed color legend at bottom
+            val legendSteps = listOf(0f, 5f, 10f, 15f, 20f, 30f, 40f, 50f, 60f)
+            val legendY = plotBottom + 4.dp.toPx()
+            val legendHeight = bottomAxisHeight - 6.dp.toPx()
+            val legendItemWidth = (plotWidth) / legendSteps.size
+            val legendLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = axisLabelPaint.color
+                textSize = with(density) { 9.sp.toPx() }
+                textAlign = Paint.Align.CENTER
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
+            }
+            legendSteps.forEachIndexed { index, speedKmh ->
+                val lx = plotLeft + index * legendItemWidth
+                val swatchW = legendItemWidth * 0.6f
+                val swatchH = legendHeight * 0.45f
+                drawRoundRect(
+                    color = windSpeedColor(speedKmh).copy(alpha = 0.7f),
+                    topLeft = Offset(lx + (legendItemWidth - swatchW) / 2f, legendY),
+                    size = Size(swatchW, swatchH),
+                    cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
+                )
                 canvas.nativeCanvas.drawText(
-                    String.format(Locale.US, "%02d", hour),
-                    labelCenterX,
-                    plotBottom + hourLabelPaint.textSize + 14.dp.toPx(),
-                    hourLabelPaint,
+                    "${speedKmh.toInt()}",
+                    lx + legendItemWidth / 2f,
+                    legendY + swatchH + legendLabelPaint.textSize + 1.dp.toPx(),
+                    legendLabelPaint,
                 )
             }
+            canvas.nativeCanvas.drawText(
+                "km/h",
+                plotLeft - 20.dp.toPx(),
+                legendY + legendHeight / 2f + legendLabelPaint.textSize * 0.35f,
+                legendLabelPaint,
+            )
 
             // Speed labels at center of each clustered cell
             clusteredHours.forEach { hour ->
@@ -432,7 +457,8 @@ private fun WindChartCanvas(
                         altIdx, (altIdx + altCluster).coerceAtMost(visibleAltitudes.size),
                     )
                     val clusterCells = clusterAlts.mapNotNull { a ->
-                        chart.cells.find { it.hour == hour && it.altitudeKm == a }
+                        val k = hour.toLong().shl(32) or a.toBits().toLong()
+                        cellLookup[k]
                     }
                     if (clusterCells.isEmpty()) return@clusteredAltLabel
 
@@ -669,9 +695,9 @@ private fun windSpeedColor(speedKmh: Float): Color {
     return lerp(lowerStop.second, upperStop.second, fraction)
 }
 
-/** Background color for wind cells — same scale as windSpeedColor but with low alpha. */
+/** Background color for wind cells — same scale as windSpeedColor but with moderate alpha. */
 private fun windSpeedBgColor(speedKmh: Float): Color {
-    return windSpeedColor(speedKmh).copy(alpha = 0.25f)
+    return windSpeedColor(speedKmh).copy(alpha = 0.55f)
 }
 
 private fun altitudeToY(

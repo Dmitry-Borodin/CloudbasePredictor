@@ -305,7 +305,10 @@ class ForecastViewModel @Inject constructor(
     }
 
     fun updateForecastLocation(latitude: Double, longitude: Double) {
-        val newPlace = SavedPlace.fromCoordinates(latitude, longitude)
+        val matchingFavorite = uiState.value.favoritePlaces.find { fav ->
+            fav.isNearby(latitude, longitude)
+        }
+        val newPlace = matchingFavorite ?: SavedPlace.fromCoordinates(latitude, longitude)
         viewModelScope.launch {
             placeRepository.saveAndSelectPlace(newPlace)
         }

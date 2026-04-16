@@ -300,7 +300,7 @@ private fun ForecastReadyContent(
             uiState = uiState,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(start = 8.dp, top = 8.dp),
+                .padding(start = 40.dp, top = 8.dp),
         )
 
         ModelSelectorOverlay(

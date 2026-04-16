@@ -63,7 +63,10 @@ class MapViewModel @Inject constructor(
         latitude: Double,
         longitude: Double,
     ) {
-        selectedPlaceDraft.value = SavedPlace.fromCoordinates(
+        val matchingFavorite = uiState.value.favoritePlaces.find { fav ->
+            fav.isNearby(latitude, longitude)
+        }
+        selectedPlaceDraft.value = matchingFavorite ?: SavedPlace.fromCoordinates(
             latitude = latitude,
             longitude = longitude,
         )

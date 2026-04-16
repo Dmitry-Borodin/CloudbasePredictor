@@ -108,6 +108,18 @@ fun ForecastMapPanel(
         ),
     )
 
+    // Re-center camera when currentPlace changes
+    LaunchedEffect(currentPlace?.latitude, currentPlace?.longitude) {
+        if (currentPlace != null) {
+            cameraState.animateTo(
+                CameraPosition(
+                    target = Position(longitude = currentPlace.longitude, latitude = currentPlace.latitude),
+                    zoom = MAP_INITIAL_ZOOM,
+                ),
+            )
+        }
+    }
+
     var lastUpdateTimeMs by remember { mutableLongStateOf(0L) }
     var isRateLimited by remember { mutableStateOf(false) }
 

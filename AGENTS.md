@@ -10,10 +10,10 @@ Keep preview sample data for UI models in a dedicated preview data layer (for ex
 Manual test commands (agent and user):
 
 Unit tests (JVM, no device needed):
-- `./gradlew :app:testDebugUnitTest`
+- `./gradlew :app:testDebugUnitTest --rerun`
 
 Instrumentation tests (require running emulator/device):
-- `./gradlew :app:connectedInstrumentationTest`
+- `./gradlew :app:connectedInstrumentationTest --rerun`
 
 Compile-check instrumentation tests without running:
 - `./gradlew :app:compileDebugAndroidTestKotlin`

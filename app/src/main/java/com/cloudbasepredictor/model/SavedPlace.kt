@@ -10,7 +10,20 @@ data class SavedPlace(
     val defaultModel: String,
     val isFavorite: Boolean = false,
 ) {
+    /**
+     * Returns true if the given coordinates are within ~200 m of this place.
+     * Uses a fast equi-rectangular approximation suitable for short distances.
+     */
+    fun isNearby(lat: Double, lon: Double, thresholdMeters: Double = 200.0): Boolean {
+        val dLat = Math.toRadians(latitude - lat)
+        val dLon = Math.toRadians(longitude - lon) * kotlin.math.cos(Math.toRadians((latitude + lat) / 2.0))
+        val distMeters = kotlin.math.sqrt(dLat * dLat + dLon * dLon) * EARTH_RADIUS_M
+        return distMeters <= thresholdMeters
+    }
+
     companion object {
+        private const val EARTH_RADIUS_M = 6_371_000.0
+
         fun fromCoordinates(
             latitude: Double,
             longitude: Double,
