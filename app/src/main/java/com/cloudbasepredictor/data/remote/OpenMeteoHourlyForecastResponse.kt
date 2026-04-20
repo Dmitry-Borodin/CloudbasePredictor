@@ -109,6 +109,18 @@ data class OpenMeteoHourlyResponse(
     val temperature550hPa: List<Double?>? = null,
     @SerialName("temperature_500hPa")
     val temperature500hPa: List<Double?>? = null,
+    @SerialName("temperature_450hPa")
+    val temperature450hPa: List<Double?>? = null,
+    @SerialName("temperature_400hPa")
+    val temperature400hPa: List<Double?>? = null,
+    @SerialName("temperature_350hPa")
+    val temperature350hPa: List<Double?>? = null,
+    @SerialName("temperature_300hPa")
+    val temperature300hPa: List<Double?>? = null,
+    @SerialName("temperature_250hPa")
+    val temperature250hPa: List<Double?>? = null,
+    @SerialName("temperature_200hPa")
+    val temperature200hPa: List<Double?>? = null,
 
     // --- Dewpoint at pressure levels (°C) ---
     @SerialName("dew_point_1000hPa")
@@ -139,6 +151,18 @@ data class OpenMeteoHourlyResponse(
     val dewPoint550hPa: List<Double?>? = null,
     @SerialName("dew_point_500hPa")
     val dewPoint500hPa: List<Double?>? = null,
+    @SerialName("dew_point_450hPa")
+    val dewPoint450hPa: List<Double?>? = null,
+    @SerialName("dew_point_400hPa")
+    val dewPoint400hPa: List<Double?>? = null,
+    @SerialName("dew_point_350hPa")
+    val dewPoint350hPa: List<Double?>? = null,
+    @SerialName("dew_point_300hPa")
+    val dewPoint300hPa: List<Double?>? = null,
+    @SerialName("dew_point_250hPa")
+    val dewPoint250hPa: List<Double?>? = null,
+    @SerialName("dew_point_200hPa")
+    val dewPoint200hPa: List<Double?>? = null,
 
     // --- Wind speed at pressure levels (km/h) ---
     @SerialName("wind_speed_1000hPa")
@@ -169,6 +193,18 @@ data class OpenMeteoHourlyResponse(
     val windSpeed550hPa: List<Double?>? = null,
     @SerialName("wind_speed_500hPa")
     val windSpeed500hPa: List<Double?>? = null,
+    @SerialName("wind_speed_450hPa")
+    val windSpeed450hPa: List<Double?>? = null,
+    @SerialName("wind_speed_400hPa")
+    val windSpeed400hPa: List<Double?>? = null,
+    @SerialName("wind_speed_350hPa")
+    val windSpeed350hPa: List<Double?>? = null,
+    @SerialName("wind_speed_300hPa")
+    val windSpeed300hPa: List<Double?>? = null,
+    @SerialName("wind_speed_250hPa")
+    val windSpeed250hPa: List<Double?>? = null,
+    @SerialName("wind_speed_200hPa")
+    val windSpeed200hPa: List<Double?>? = null,
 
     // --- Wind direction at pressure levels (°) ---
     @SerialName("wind_direction_1000hPa")
@@ -199,6 +235,18 @@ data class OpenMeteoHourlyResponse(
     val windDirection550hPa: List<Double?>? = null,
     @SerialName("wind_direction_500hPa")
     val windDirection500hPa: List<Double?>? = null,
+    @SerialName("wind_direction_450hPa")
+    val windDirection450hPa: List<Double?>? = null,
+    @SerialName("wind_direction_400hPa")
+    val windDirection400hPa: List<Double?>? = null,
+    @SerialName("wind_direction_350hPa")
+    val windDirection350hPa: List<Double?>? = null,
+    @SerialName("wind_direction_300hPa")
+    val windDirection300hPa: List<Double?>? = null,
+    @SerialName("wind_direction_250hPa")
+    val windDirection250hPa: List<Double?>? = null,
+    @SerialName("wind_direction_200hPa")
+    val windDirection200hPa: List<Double?>? = null,
 
     // --- Geopotential height at pressure levels (m ASL) ---
     @SerialName("geopotential_height_1000hPa")
@@ -229,6 +277,18 @@ data class OpenMeteoHourlyResponse(
     val geopotentialHeight550hPa: List<Double?>? = null,
     @SerialName("geopotential_height_500hPa")
     val geopotentialHeight500hPa: List<Double?>? = null,
+    @SerialName("geopotential_height_450hPa")
+    val geopotentialHeight450hPa: List<Double?>? = null,
+    @SerialName("geopotential_height_400hPa")
+    val geopotentialHeight400hPa: List<Double?>? = null,
+    @SerialName("geopotential_height_350hPa")
+    val geopotentialHeight350hPa: List<Double?>? = null,
+    @SerialName("geopotential_height_300hPa")
+    val geopotentialHeight300hPa: List<Double?>? = null,
+    @SerialName("geopotential_height_250hPa")
+    val geopotentialHeight250hPa: List<Double?>? = null,
+    @SerialName("geopotential_height_200hPa")
+    val geopotentialHeight200hPa: List<Double?>? = null,
 ) {
     /**
      * Helper to collect all pressure-level temperature lists alongside their pressure (hPa).
@@ -249,6 +309,11 @@ data class OpenMeteoHourlyResponse(
         temperature600hPa?.let { 600 to it },
         temperature550hPa?.let { 550 to it },
         temperature500hPa?.let { 500 to it },
+        temperature450hPa?.let { 450 to it },
+        temperature400hPa?.let { 400 to it },
+        temperature350hPa?.let { 350 to it },
+        temperature300hPa?.let { 300 to it },
+        temperature250hPa?.let { 250 to it },
     )
 
     fun dewPointsByPressure(): List<Pair<Int, List<Double?>>> = listOfNotNull(
@@ -266,6 +331,11 @@ data class OpenMeteoHourlyResponse(
         dewPoint600hPa?.let { 600 to it },
         dewPoint550hPa?.let { 550 to it },
         dewPoint500hPa?.let { 500 to it },
+        dewPoint450hPa?.let { 450 to it },
+        dewPoint400hPa?.let { 400 to it },
+        dewPoint350hPa?.let { 350 to it },
+        dewPoint300hPa?.let { 300 to it },
+        dewPoint250hPa?.let { 250 to it },
     )
 
     fun windSpeedsByPressure(): List<Pair<Int, List<Double?>>> = listOfNotNull(
@@ -283,6 +353,11 @@ data class OpenMeteoHourlyResponse(
         windSpeed600hPa?.let { 600 to it },
         windSpeed550hPa?.let { 550 to it },
         windSpeed500hPa?.let { 500 to it },
+        windSpeed450hPa?.let { 450 to it },
+        windSpeed400hPa?.let { 400 to it },
+        windSpeed350hPa?.let { 350 to it },
+        windSpeed300hPa?.let { 300 to it },
+        windSpeed250hPa?.let { 250 to it },
     )
 
     fun windDirectionsByPressure(): List<Pair<Int, List<Double?>>> = listOfNotNull(
@@ -300,6 +375,11 @@ data class OpenMeteoHourlyResponse(
         windDirection600hPa?.let { 600 to it },
         windDirection550hPa?.let { 550 to it },
         windDirection500hPa?.let { 500 to it },
+        windDirection450hPa?.let { 450 to it },
+        windDirection400hPa?.let { 400 to it },
+        windDirection350hPa?.let { 350 to it },
+        windDirection300hPa?.let { 300 to it },
+        windDirection250hPa?.let { 250 to it },
     )
 
     fun geopotentialHeightsByPressure(): List<Pair<Int, List<Double?>>> = listOfNotNull(
@@ -317,5 +397,10 @@ data class OpenMeteoHourlyResponse(
         geopotentialHeight600hPa?.let { 600 to it },
         geopotentialHeight550hPa?.let { 550 to it },
         geopotentialHeight500hPa?.let { 500 to it },
+        geopotentialHeight450hPa?.let { 450 to it },
+        geopotentialHeight400hPa?.let { 400 to it },
+        geopotentialHeight350hPa?.let { 350 to it },
+        geopotentialHeight300hPa?.let { 300 to it },
+        geopotentialHeight250hPa?.let { 250 to it },
     )
 }

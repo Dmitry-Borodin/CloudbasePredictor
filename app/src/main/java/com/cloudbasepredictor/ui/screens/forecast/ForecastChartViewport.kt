@@ -54,5 +54,5 @@ internal fun sanitizeTopAltitudeKm(
 
 internal const val DEFAULT_TOP_ALTITUDE_KM = 4.5f
 internal const val MIN_TOP_ALTITUDE_KM = 1.5f
-internal const val MAX_TOP_ALTITUDE_KM = 7f
+internal const val MAX_TOP_ALTITUDE_KM = 12.5f
 private const val ZOOM_AMPLIFICATION_FACTOR = 2.5f

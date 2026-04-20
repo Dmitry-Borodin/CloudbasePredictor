@@ -34,8 +34,9 @@ interface OpenMeteoApi {
 /**
  * Surface + pressure-level variables requested for chart construction.
  *
- * Pressure levels: 1000, 975, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500 hPa.
- * Extra levels (975, 875, 750, 650, 550) added for granularity below 4 km.
+ * Pressure levels: 1000, 975, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600,
+ * 550, 500, 450, 400, 350, 300, 250 hPa.
+ * Extra levels improve Skew-T continuity and allow a Windy-like full sounding range.
  */
 private const val HOURLY_VARIABLES =
     "temperature_2m,dew_point_2m," +
@@ -47,15 +48,20 @@ private const val HOURLY_VARIABLES =
     "temperature_1000hPa,temperature_975hPa,temperature_950hPa,temperature_925hPa,temperature_900hPa," +
     "temperature_875hPa,temperature_850hPa,temperature_800hPa,temperature_750hPa," +
     "temperature_700hPa,temperature_650hPa,temperature_600hPa,temperature_550hPa,temperature_500hPa," +
+    "temperature_450hPa,temperature_400hPa,temperature_350hPa,temperature_300hPa,temperature_250hPa," +
     "dew_point_1000hPa,dew_point_975hPa,dew_point_950hPa,dew_point_925hPa,dew_point_900hPa," +
     "dew_point_875hPa,dew_point_850hPa,dew_point_800hPa,dew_point_750hPa," +
     "dew_point_700hPa,dew_point_650hPa,dew_point_600hPa,dew_point_550hPa,dew_point_500hPa," +
+    "dew_point_450hPa,dew_point_400hPa,dew_point_350hPa,dew_point_300hPa,dew_point_250hPa," +
     "wind_speed_1000hPa,wind_speed_975hPa,wind_speed_950hPa,wind_speed_925hPa,wind_speed_900hPa," +
     "wind_speed_875hPa,wind_speed_850hPa,wind_speed_800hPa,wind_speed_750hPa," +
     "wind_speed_700hPa,wind_speed_650hPa,wind_speed_600hPa,wind_speed_550hPa,wind_speed_500hPa," +
+    "wind_speed_450hPa,wind_speed_400hPa,wind_speed_350hPa,wind_speed_300hPa,wind_speed_250hPa," +
     "wind_direction_1000hPa,wind_direction_975hPa,wind_direction_950hPa,wind_direction_925hPa,wind_direction_900hPa," +
     "wind_direction_875hPa,wind_direction_850hPa,wind_direction_800hPa,wind_direction_750hPa," +
     "wind_direction_700hPa,wind_direction_650hPa,wind_direction_600hPa,wind_direction_550hPa,wind_direction_500hPa," +
+    "wind_direction_450hPa,wind_direction_400hPa,wind_direction_350hPa,wind_direction_300hPa,wind_direction_250hPa," +
     "geopotential_height_1000hPa,geopotential_height_975hPa,geopotential_height_950hPa,geopotential_height_925hPa,geopotential_height_900hPa," +
     "geopotential_height_875hPa,geopotential_height_850hPa,geopotential_height_800hPa,geopotential_height_750hPa," +
-    "geopotential_height_700hPa,geopotential_height_650hPa,geopotential_height_600hPa,geopotential_height_550hPa,geopotential_height_500hPa"
+    "geopotential_height_700hPa,geopotential_height_650hPa,geopotential_height_600hPa,geopotential_height_550hPa,geopotential_height_500hPa," +
+    "geopotential_height_450hPa,geopotential_height_400hPa,geopotential_height_350hPa,geopotential_height_300hPa,geopotential_height_250hPa"

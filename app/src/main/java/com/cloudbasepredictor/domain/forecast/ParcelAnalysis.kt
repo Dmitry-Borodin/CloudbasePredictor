@@ -18,8 +18,14 @@ data class ParcelAnalysisResult(
     val dryThermalTopKm: Float,
     /** Lifting Condensation Level: where surface parcel reaches saturation on dry adiabat, km ASL. */
     val lclKm: Float,
+    /** Lifting Condensation Level pressure, hPa. */
+    val lclPressureHpa: Float,
     /** Convective Condensation Level: where surface mixing ratio meets env. temperature, km ASL. */
     val cclKm: Float,
+    /** Convective Condensation Level pressure, hPa. */
+    val cclPressureHpa: Float,
+    /** Convective temperature at the surface required to reach the CCL, °C. */
+    val tconC: Float?,
     /**
      * Cloud base altitude for cumulus formation, km ASL.
      * Equals max(LCL, CCL) only if the parcel can actually reach it (dry top >= cloud base).
@@ -162,11 +168,16 @@ fun analyzeParcel(
     // ── Find CCL: where surface mixing ratio meets environmental temperature ──
     val cclResult = findCcl(surfaceMixingRatio, aboveSurface, elevationKm)
 
+    val tconC = interpolateTemperatureCAtPressure(aboveSurface, cclResult.pressureHpa)?.let { envTempAtCcl ->
+        val thetaAtCcl = potentialTemperatureK(envTempAtCcl, cclResult.pressureHpa)
+        dryAdiabatTempC(thetaAtCcl, surfacePressureHpa)
+    }
+
     // ── Find dry thermal top: where dry adiabat parcel T < environment T ──
     val dryTopKm = findDryThermalTop(parcelThetaK, aboveSurface, elevationKm)
 
     // ── Cloud base determination ──
-    val rawCloudBaseKm = maxOf(lclResult.heightKm, cclResult)
+    val rawCloudBaseKm = maxOf(lclResult.heightKm, cclResult.heightKm)
     val cloudBaseKm = if (dryTopKm >= rawCloudBaseKm - 0.05f) rawCloudBaseKm else null
 
     // ── Moist ascent above LCL / cloud base ──
@@ -195,7 +206,10 @@ fun analyzeParcel(
     return ParcelAnalysisResult(
         dryThermalTopKm = dryTopKm,
         lclKm = lclResult.heightKm,
-        cclKm = cclResult,
+        lclPressureHpa = lclResult.pressureHpa,
+        cclKm = cclResult.heightKm,
+        cclPressureHpa = cclResult.pressureHpa,
+        tconC = tconC,
         cloudBaseKm = cloudBaseKm,
         moistEquilibriumTopKm = moistEquilibriumTopKm,
         computedCapeJKg = capeCin.first,
@@ -297,16 +311,68 @@ fun satVaporPressureHpa(temperatureC: Float): Float {
     return 6.112f * exp(17.67f * temperatureC / (temperatureC + 243.5f))
 }
 
+/** Relative humidity as fraction 0..1 from temperature and dew point. */
+fun relativeHumidityFraction(temperatureC: Float, dewPointC: Float): Float {
+    val saturationAtTemp = satVaporPressureHpa(temperatureC)
+    val saturationAtDewPoint = satVaporPressureHpa(dewPointC)
+    return (saturationAtDewPoint / saturationAtTemp).coerceIn(0f, 1f)
+}
+
+/** Temperature (°C) of a mixing-ratio line at a given pressure. */
+fun mixingRatioTemperatureC(mixingRatioGKg: Float, pressureHpa: Float): Float {
+    val vaporPressure = mixingRatioGKg * pressureHpa / (622f + mixingRatioGKg)
+    val lnRatio = ln(vaporPressure / 6.112f)
+    return (243.5f * lnRatio) / (17.67f - lnRatio)
+}
+
 /** Estimate surface pressure (hPa) from elevation (m) using ISA barometric formula. */
 fun estimateSurfacePressure(elevationM: Double): Float {
     return (1013.25 * (1.0 - 0.0065 * elevationM / 288.15).pow(5.2561)).toFloat()
+}
+
+/** Linear interpolation of environmental temperature by pressure. */
+fun interpolateTemperatureCAtPressure(
+    profile: List<ProfileLevel>,
+    pressureHpa: Float,
+): Float? {
+    val sorted = profile.sortedByDescending { it.pressureHpa }
+    if (sorted.isEmpty()) return null
+    sorted.firstOrNull { it.pressureHpa == pressureHpa }?.let { return it.temperatureC }
+    for (i in 0 until sorted.size - 1) {
+        val lower = sorted[i]
+        val upper = sorted[i + 1]
+        if (pressureHpa <= lower.pressureHpa && pressureHpa >= upper.pressureHpa) {
+            val fraction = (lower.pressureHpa - pressureHpa) / (lower.pressureHpa - upper.pressureHpa)
+            return lower.temperatureC + fraction * (upper.temperatureC - lower.temperatureC)
+        }
+    }
+    return null
+}
+
+/** Linear interpolation of environmental height by pressure. */
+fun interpolateHeightKmAtPressure(
+    profile: List<ProfileLevel>,
+    pressureHpa: Float,
+): Float? {
+    val sorted = profile.sortedByDescending { it.pressureHpa }
+    if (sorted.isEmpty()) return null
+    sorted.firstOrNull { it.pressureHpa == pressureHpa }?.let { return it.heightKm }
+    for (i in 0 until sorted.size - 1) {
+        val lower = sorted[i]
+        val upper = sorted[i + 1]
+        if (pressureHpa <= lower.pressureHpa && pressureHpa >= upper.pressureHpa) {
+            val fraction = (lower.pressureHpa - pressureHpa) / (lower.pressureHpa - upper.pressureHpa)
+            return lower.heightKm + fraction * (upper.heightKm - lower.heightKm)
+        }
+    }
+    return null
 }
 
 // ────────────────────────────────────────────────────────────────────
 // Internal analysis steps
 // ────────────────────────────────────────────────────────────────────
 
-private data class LclResult(val pressureHpa: Float, val heightKm: Float)
+private data class PressureHeightResult(val pressureHpa: Float, val heightKm: Float)
 
 /**
  * Finds the Lifting Condensation Level by ascending the dry adiabat until
@@ -318,7 +384,7 @@ private fun findLcl(
     surfacePressureHpa: Float,
     profile: List<ProfileLevel>,
     elevationKm: Float,
-): LclResult {
+): PressureHeightResult {
     var prevLevel: ProfileLevel? = null
     for (level in profile) {
         val dryTemp = dryAdiabatTempC(parcelThetaK, level.pressureHpa)
@@ -333,15 +399,15 @@ private fun findLcl(
                 } else 0.5f
                 val interpHeight = prevLevel.heightKm + frac * (level.heightKm - prevLevel.heightKm)
                 val interpPressure = prevLevel.pressureHpa + frac * (level.pressureHpa - prevLevel.pressureHpa)
-                return LclResult(interpPressure, interpHeight.coerceAtLeast(elevationKm))
+                return PressureHeightResult(interpPressure, interpHeight.coerceAtLeast(elevationKm))
             }
-            return LclResult(level.pressureHpa, level.heightKm.coerceAtLeast(elevationKm))
+            return PressureHeightResult(level.pressureHpa, level.heightKm.coerceAtLeast(elevationKm))
         }
         prevLevel = level
     }
     // LCL above entire profile — use top level
     val top = profile.last()
-    return LclResult(top.pressureHpa, top.heightKm)
+    return PressureHeightResult(top.pressureHpa, top.heightKm)
 }
 
 /**
@@ -352,7 +418,7 @@ private fun findCcl(
     surfaceMixingRatio: Float,
     profile: List<ProfileLevel>,
     elevationKm: Float,
-): Float {
+): PressureHeightResult {
     var prevLevel: ProfileLevel? = null
     for (level in profile) {
         val envSatMr = satMixingRatioGKg(level.temperatureC, level.pressureHpa)
@@ -362,14 +428,24 @@ private fun findCcl(
                 val frac = if ((prevEnvSatMr - envSatMr) > 0.001f) {
                     (prevEnvSatMr - surfaceMixingRatio) / (prevEnvSatMr - envSatMr)
                 } else 0.5f
-                return (prevLevel.heightKm + frac * (level.heightKm - prevLevel.heightKm))
-                    .coerceAtLeast(elevationKm)
+                return PressureHeightResult(
+                    pressureHpa = prevLevel.pressureHpa + frac * (level.pressureHpa - prevLevel.pressureHpa),
+                    heightKm = (prevLevel.heightKm + frac * (level.heightKm - prevLevel.heightKm))
+                        .coerceAtLeast(elevationKm),
+                )
             }
-            return level.heightKm.coerceAtLeast(elevationKm)
+            return PressureHeightResult(
+                pressureHpa = level.pressureHpa,
+                heightKm = level.heightKm.coerceAtLeast(elevationKm),
+            )
         }
         prevLevel = level
     }
-    return profile.lastOrNull()?.heightKm ?: elevationKm
+    val top = profile.lastOrNull()
+    return PressureHeightResult(
+        pressureHpa = top?.pressureHpa ?: 0f,
+        heightKm = top?.heightKm ?: elevationKm,
+    )
 }
 
 /**

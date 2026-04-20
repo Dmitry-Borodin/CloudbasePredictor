@@ -74,6 +74,21 @@ class ParcelAnalysisTest {
     }
 
     @Test
+    fun relativeHumidityFraction_isOneAtSaturation() {
+        val humidity = relativeHumidityFraction(12f, 12f)
+        assertEquals(1f, humidity, 0.001f)
+    }
+
+    @Test
+    fun mixingRatioTemperature_roundTripsSaturationMixingRatio() {
+        val originalTemperature = 7f
+        val pressure = 850f
+        val mixingRatio = satMixingRatioGKg(originalTemperature, pressure)
+        val reconstructedTemperature = mixingRatioTemperatureC(mixingRatio, pressure)
+        assertEquals(originalTemperature, reconstructedTemperature, 0.3f)
+    }
+
+    @Test
     fun moistAdiabat_warmerThanDryAboveLcl() {
         val theta = potentialTemperatureK(20f, 1000f)
         val dryTemp = dryAdiabatTempC(theta, 600f)
@@ -198,6 +213,9 @@ class ParcelAnalysisTest {
         assertTrue("Dry top should be above elevation", result.dryThermalTopKm > 0.58f)
         assertTrue("LCL should be above elevation", result.lclKm > 0.58f)
         assertTrue("CCL should be above elevation", result.cclKm > 0.58f)
+        assertTrue("LCL pressure should be below the surface", result.lclPressureHpa < 955f)
+        assertTrue("CCL pressure should be below the surface", result.cclPressureHpa < 955f)
+        assertNotNull("TCON should be available for the standard profile", result.tconC)
     }
 
     @Test

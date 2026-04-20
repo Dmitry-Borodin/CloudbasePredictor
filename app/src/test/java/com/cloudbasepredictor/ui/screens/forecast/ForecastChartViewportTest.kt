@@ -6,13 +6,13 @@ import org.junit.Test
 
 class ForecastChartViewportTest {
     @Test
-    fun zoomedTopAltitudeKm_clampsZoomOutAtSevenKilometers() {
+    fun zoomedTopAltitudeKm_clampsZoomOutAtConfiguredMaxAltitude() {
         val zoomedOutTop = zoomedTopAltitudeKm(
-            currentTopAltitudeKm = 6.8f,
+            currentTopAltitudeKm = 12.2f,
             zoomChange = 0.6f,
         )
 
-        assertEquals(7f, zoomedOutTop)
+        assertEquals(MAX_TOP_ALTITUDE_KM, zoomedOutTop, 0.001f)
     }
 
     @Test

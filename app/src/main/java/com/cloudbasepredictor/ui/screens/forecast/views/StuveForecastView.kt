@@ -1,9 +1,15 @@
 package com.cloudbasepredictor.ui.screens.forecast.views
 
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
-import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroidSize
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,8 +23,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -27,8 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Canvas as ComposeGraphicsCanvas
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -37,39 +45,50 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.ui.screens.forecast.DEFAULT_TOP_ALTITUDE_KM
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_SELECTED_HOUR
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_CHART_CANVAS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_TIME_SLIDER
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.MAX_TOP_ALTITUDE_KM
 import com.cloudbasepredictor.ui.screens.forecast.STUVE_DRY_ADIABAT_THETAS_K
 import com.cloudbasepredictor.ui.screens.forecast.STUVE_MIXING_RATIO_VALUES_GKG
 import com.cloudbasepredictor.ui.screens.forecast.STUVE_MOIST_ADIABAT_THETAS_K
-import com.cloudbasepredictor.ui.screens.forecast.STUVE_PRESSURE_LEVELS
 import com.cloudbasepredictor.ui.screens.forecast.StuveForecastChartUiModel
 import com.cloudbasepredictor.ui.screens.forecast.StuveProfilePoint
-import com.cloudbasepredictor.ui.screens.forecast.dryAdiabatTemperatureC
-import com.cloudbasepredictor.ui.screens.forecast.mixingRatioTemperatureC
-import com.cloudbasepredictor.ui.screens.forecast.moistAdiabatTemperatureC
+import com.cloudbasepredictor.ui.screens.forecast.interpolateProfileHeightMeters
+import com.cloudbasepredictor.ui.screens.forecast.interpolateProfileTemperature
 import com.cloudbasepredictor.ui.screens.forecast.pressureToApproxHeightMeters
+import com.cloudbasepredictor.ui.screens.forecast.zoomedTopAltitudeKm
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
+import com.cloudbasepredictor.domain.forecast.dryAdiabatTempC
+import com.cloudbasepredictor.domain.forecast.mixingRatioTemperatureC
+import com.cloudbasepredictor.domain.forecast.moistAdiabatTempC
+import com.cloudbasepredictor.domain.forecast.potentialTemperatureK
+import com.cloudbasepredictor.domain.forecast.satMixingRatioGKg
 import java.util.Locale
 import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sin
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Public Composable
-// ──────────────────────────────────────────────────────────────────────────────
 
 @Composable
 internal fun StuveForecastView(
@@ -79,6 +98,46 @@ internal fun StuveForecastView(
     onStuveHourChanged: (Int) -> Unit = {},
 ) {
     val stuveChart = uiState.stuveChart
+    val chartSessionKey = Triple(
+        uiState.selectedPlace?.id,
+        uiState.selectedDayIndex,
+        uiState.resolvedModel ?: uiState.selectedModel,
+    )
+    val autoFitTopAltitudeKm = remember(stuveChart.temperatureProfile, stuveChart.windBarbs) {
+        recommendedStuveTopAltitudeKm(stuveChart)
+    }
+    val initialRequestedTopAltitudeKm = remember(chartSessionKey) {
+        uiState.chartViewport.visibleTopAltitudeKm
+    }
+    var effectiveTopAltitudeKm by remember(chartSessionKey) {
+        mutableFloatStateOf(
+            maxOf(
+                uiState.chartViewport.visibleTopAltitudeKm,
+                autoFitTopAltitudeKm,
+            ),
+        )
+    }
+
+    LaunchedEffect(chartSessionKey, autoFitTopAltitudeKm) {
+        val fittedTopAltitudeKm = maxOf(
+            uiState.chartViewport.visibleTopAltitudeKm,
+            autoFitTopAltitudeKm,
+        )
+        effectiveTopAltitudeKm = fittedTopAltitudeKm
+        if (abs(uiState.chartViewport.visibleTopAltitudeKm - fittedTopAltitudeKm) > 0.01f) {
+            onVisibleTopAltitudeChange(fittedTopAltitudeKm)
+        }
+    }
+
+    LaunchedEffect(uiState.chartViewport.visibleTopAltitudeKm, chartSessionKey, autoFitTopAltitudeKm) {
+        val requestedTopAltitudeKm = uiState.chartViewport.visibleTopAltitudeKm
+        val isInitialUnderZoomedRequest =
+            abs(requestedTopAltitudeKm - initialRequestedTopAltitudeKm) <= 0.01f &&
+                requestedTopAltitudeKm < autoFitTopAltitudeKm - 0.01f
+        if (!isInitialUnderZoomedRequest && abs(requestedTopAltitudeKm - effectiveTopAltitudeKm) > 0.01f) {
+            effectiveTopAltitudeKm = requestedTopAltitudeKm
+        }
+    }
 
     Column(
         modifier = modifier
@@ -93,8 +152,11 @@ internal fun StuveForecastView(
         ) {
             SkewTDiagramCanvas(
                 chart = stuveChart,
-                visibleTopAltitudeKm = uiState.chartViewport.visibleTopAltitudeKm,
-                onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
+                visibleTopAltitudeKm = effectiveTopAltitudeKm,
+                onVisibleTopAltitudeChange = { topAltitudeKm ->
+                    effectiveTopAltitudeKm = topAltitudeKm
+                    onVisibleTopAltitudeChange(topAltitudeKm)
+                },
                 modifier = Modifier.fillMaxSize(),
             )
 
@@ -171,9 +233,25 @@ private fun StuveTimeSlider(
     }
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Canvas
-// ──────────────────────────────────────────────────────────────────────────────
+private data class SkewTCursorState(
+    val y: Float,
+    val isPinned: Boolean = false,
+)
+
+private data class CursorReadout(
+    val pressureHpa: Float,
+    val altitudeMeters: Int,
+    val temperatureC: Float?,
+    val dewpointC: Float?,
+    val parcelTemperatureC: Float?,
+    val guideDryThetaK: Float?,
+    val guideMoistThetaWK: Float?,
+    val guideMixingRatioGKg: Float?,
+    val parcelSurfaceTemperatureC: Float?,
+    val criticalSurfaceDewpointC: Float?,
+    val windSpeedKmh: Float?,
+    val windDirectionDeg: Float?,
+)
 
 @Composable
 private fun SkewTDiagramCanvas(
@@ -192,6 +270,7 @@ private fun SkewTDiagramCanvas(
         fraction = 0.02f,
     )
     val outlineColor = MaterialTheme.colorScheme.outlineVariant
+    val latestVisibleTopAltitudeKm = rememberUpdatedState(visibleTopAltitudeKm)
 
     val axisLabelPaint = remember(density, axisLabelColor) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -219,21 +298,37 @@ private fun SkewTDiagramCanvas(
     }
     val mixingRatioLabelPaint = remember(density) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color(0xFF5588CC).toArgb()
+            color = Color(0xFF5C88B4).toArgb()
             textSize = with(density) { 8.sp.toPx() }
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
             textAlign = Paint.Align.CENTER
         }
     }
-    val latestVisibleTopAltitudeKm = rememberUpdatedState(visibleTopAltitudeKm)
+    var cursorState by remember(
+        chart.selectedHour,
+        chart.surfacePressureHpa,
+        chart.temperatureProfile,
+        chart.dewpointProfile,
+    ) {
+        mutableStateOf<SkewTCursorState?>(null)
+    }
 
     Canvas(
         modifier = modifier
             .clipToBounds()
-            .pointerInput(Unit) {
-                detectForecastZoomGestures(
+            .testTag(STUVE_CHART_CANVAS)
+            .semantics {
+                stateDescription = when {
+                    cursorState?.isPinned == true -> "pinned"
+                    cursorState != null -> "tracking"
+                    else -> "idle"
+                }
+            }
+            .pointerInput(chart.selectedHour, chart.surfacePressureHpa) {
+                detectSkewTGestures(
                     currentTopAltitudeKm = { latestVisibleTopAltitudeKm.value },
                     onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
+                    onCursorStateChanged = { cursorState = it },
                 )
             },
     ) {
@@ -242,17 +337,21 @@ private fun SkewTDiagramCanvas(
             size = size,
         )
 
-        // Chart bottom matches the surface pressure (+ 20 hPa margin)
         val chartBottomPressure = (chart.surfacePressureHpa + 20f)
             .coerceAtMost(SKEWT_BOTTOM_PRESSURE)
-
         val topPressure = altitudeKmToApproxPressureHpa(visibleTopAltitudeKm)
             .coerceIn(SKEWT_MIN_TOP_PRESSURE, chartBottomPressure - 50f)
 
+        val tempAxisRange = buildVisibleTemperatureAxisRange(
+            chart = chart,
+            topPressure = topPressure,
+            bottomPressure = chartBottomPressure,
+        )
+
         val leftAxisWidth = with(density) { 40.dp.toPx() }
-        val rightAltitudeWidth = with(density) { 40.dp.toPx() }
-        val rightWindWidth = with(density) { 56.dp.toPx() }
-        val bottomAxisHeight = with(density) { 28.dp.toPx() }
+        val rightAltitudeWidth = with(density) { 42.dp.toPx() }
+        val rightWindWidth = with(density) { 58.dp.toPx() }
+        val bottomAxisHeight = with(density) { 34.dp.toPx() }
         val topPadding = with(density) { 16.dp.toPx() }
 
         val plotLeft = leftAxisWidth
@@ -264,157 +363,219 @@ private fun SkewTDiagramCanvas(
 
         if (plotWidth <= 0f || plotHeight <= 0f) return@Canvas
 
-        // Skew factor: pixels per log-pressure unit, scaled so isotherms tilt ~45°
         val skewFactor = plotWidth * SKEWT_SKEW_RATIO
 
-        // Helper closures that capture the current plot geometry
-        fun pToY(p: Float) = pressureToY(p, plotTop, plotBottom, topPressure, chartBottomPressure)
-        fun tpToX(t: Float, p: Float) = skewTToX(
-            t, p, TEMP_MIN, TEMP_MAX, plotLeft, plotRight, topPressure, skewFactor,
+        fun pressureToY(pressureHpa: Float) = pressureToY(
+            pressureHpa = pressureHpa,
+            plotTop = plotTop,
+            plotBottom = plotBottom,
+            topPressure = topPressure,
+            bottomPressure = chartBottomPressure,
+        )
+        fun temperatureToX(temperatureC: Float, pressureHpa: Float) = skewTToX(
+            temperatureC = temperatureC,
+            pressureHpa = pressureHpa,
+            tempMin = tempAxisRange.minC,
+            tempMax = tempAxisRange.maxC,
+            plotLeft = plotLeft,
+            plotRight = plotRight,
+            skewFactor = skewFactor,
+            topPressure = topPressure,
+            bottomPressure = chartBottomPressure,
+        )
+        fun yToPressure(y: Float) = yToPressure(
+            y = y,
+            plotTop = plotTop,
+            plotBottom = plotBottom,
+            topPressure = topPressure,
+            bottomPressure = chartBottomPressure,
         )
 
-        // ── Background ──────────────────────────────────────────────────
+        val pressureLabels = selectPressureLabels(
+            topPressure = topPressure,
+            plotHeight = plotHeight,
+        )
+
         drawRect(
             color = gridBackgroundColor,
             topLeft = Offset(plotLeft, plotTop),
             size = Size(plotWidth, plotHeight),
         )
 
-        // All reference lines are clipped to the plot area
+        drawMoistureCueStrip(
+            chart = chart,
+            plotTop = plotTop,
+            plotBottom = plotBottom,
+            plotRight = plotRight,
+            pressureToY = ::pressureToY,
+            density = density,
+        )
+
         clipRect(plotLeft, plotTop, plotRight, plotBottom) {
-
-            // ── Isotherms (skewed 45° lines) ────────────────────────────
-            var t = TEMP_MIN
-            while (t <= TEMP_MAX) {
-                val alpha = if (t.toInt() % 20 == 0) 0.35f else 0.15f
-                val pBottom = chartBottomPressure
-                val pTop = topPressure
+            var isothermTemp = floorToStep(tempAxisRange.minC, TEMP_STEP)
+            while (isothermTemp <= tempAxisRange.maxC + 0.01f) {
+                val alpha = if (isothermTemp.toInt() % 20 == 0) 0.35f else 0.15f
                 drawLine(
                     color = outlineColor.copy(alpha = alpha),
-                    start = Offset(tpToX(t, pBottom), pToY(pBottom)),
-                    end = Offset(tpToX(t, pTop), pToY(pTop)),
+                    start = Offset(temperatureToX(isothermTemp, chartBottomPressure), pressureToY(chartBottomPressure)),
+                    end = Offset(temperatureToX(isothermTemp, topPressure), pressureToY(topPressure)),
                     strokeWidth = 1.dp.toPx(),
                 )
-                t += TEMP_STEP
+                isothermTemp += TEMP_STEP
             }
 
-            // ── Isobars (horizontal) ────────────────────────────────────
-            val pressureLabels = ISOBAR_LABELS.filter { it >= topPressure }
-            pressureLabels.forEach { p ->
-                val y = pToY(p)
-                val alpha = if (p.toInt() % 200 == 0) 0.4f else 0.2f
+            pressureLabels.forEach { pressure ->
+                val alpha = if (pressure.toInt() % 200 == 0) 0.4f else 0.2f
                 drawLine(
                     color = outlineColor.copy(alpha = alpha),
-                    start = Offset(plotLeft, y),
-                    end = Offset(plotRight, y),
+                    start = Offset(plotLeft, pressureToY(pressure)),
+                    end = Offset(plotRight, pressureToY(pressure)),
                     strokeWidth = 1.dp.toPx(),
                 )
             }
 
-            // ── Dry adiabats (green curved lines) ───────────────────────
             STUVE_DRY_ADIABAT_THETAS_K.forEach { theta ->
                 drawAdiabat(
-                    pressures = STUVE_PRESSURE_LEVELS.filter { it in topPressure..chartBottomPressure },
-                    computeTemp = { p -> dryAdiabatTemperatureC(theta, p) },
-                    mapXY = { temp, p -> Offset(tpToX(temp, p), pToY(p)) },
-                    plotLeft = plotLeft, plotRight = plotRight,
-                    plotTop = plotTop, plotBottom = plotBottom,
-                    color = Color(0xFF44AA44).copy(alpha = 0.35f),
+                    pressures = STUVE_DRY_REFERENCE_PRESSURES.filter { it in topPressure..chartBottomPressure },
+                    computeTemp = { pressure -> dryAdiabatTempC(theta, pressure) },
+                    mapXY = { temperature, pressure -> Offset(temperatureToX(temperature, pressure), pressureToY(pressure)) },
+                    plotLeft = plotLeft,
+                    plotRight = plotRight,
+                    plotTop = plotTop,
+                    plotBottom = plotBottom,
+                    color = Color(0xFF4E9B64).copy(alpha = 0.32f),
                     strokeWidth = 1.dp.toPx(),
                 )
             }
 
-            // ── Moist adiabats (dashed teal curves) ─────────────────────
-            val moistPressures = buildList {
-                var p = chartBottomPressure; while (p >= topPressure) { add(p); p -= 25f }
-            }
-            STUVE_MOIST_ADIABAT_THETAS_K.forEach { thetaW ->
+            val moistPressures = buildReferencePressures(chartBottomPressure, topPressure, stepHpa = 25f)
+            STUVE_MOIST_ADIABAT_THETAS_K.forEach { theta ->
                 drawAdiabat(
                     pressures = moistPressures,
-                    computeTemp = { p -> moistAdiabatTemperatureC(thetaW, p) },
-                    mapXY = { temp, p -> Offset(tpToX(temp, p), pToY(p)) },
-                    plotLeft = plotLeft, plotRight = plotRight,
-                    plotTop = plotTop, plotBottom = plotBottom,
-                    color = Color(0xFF00AACC).copy(alpha = 0.3f),
+                    computeTemp = { pressure -> moistAdiabatTempC(theta, pressure) },
+                    mapXY = { temperature, pressure -> Offset(temperatureToX(temperature, pressure), pressureToY(pressure)) },
+                    plotLeft = plotLeft,
+                    plotRight = plotRight,
+                    plotTop = plotTop,
+                    plotBottom = plotBottom,
+                    color = Color(0xFF2F8BAA).copy(alpha = 0.28f),
                     strokeWidth = 1.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(
-                        floatArrayOf(6.dp.toPx(), 4.dp.toPx()),
-                    ),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())),
                 )
             }
 
-            // ── Mixing ratio lines (dotted blue) ────────────────────────
-            val mixPressures = buildList {
-                var p = chartBottomPressure; while (p >= topPressure) { add(p); p -= 50f }
-            }
-            STUVE_MIXING_RATIO_VALUES_GKG.forEach { w ->
+            val mixingRatioPressures = buildReferencePressures(chartBottomPressure, topPressure, stepHpa = 50f)
+            STUVE_MIXING_RATIO_VALUES_GKG.forEach { mixingRatio ->
                 drawAdiabat(
-                    pressures = mixPressures,
-                    computeTemp = { p -> mixingRatioTemperatureC(w, p) },
-                    mapXY = { temp, p -> Offset(tpToX(temp, p), pToY(p)) },
-                    plotLeft = plotLeft, plotRight = plotRight,
-                    plotTop = plotTop, plotBottom = plotBottom,
-                    color = Color(0xFF5588CC).copy(alpha = 0.3f),
+                    pressures = mixingRatioPressures,
+                    computeTemp = { pressure -> mixingRatioTemperatureC(mixingRatio, pressure) },
+                    mapXY = { temperature, pressure -> Offset(temperatureToX(temperature, pressure), pressureToY(pressure)) },
+                    plotLeft = plotLeft,
+                    plotRight = plotRight,
+                    plotTop = plotTop,
+                    plotBottom = plotBottom,
+                    color = Color(0xFF6E93C0).copy(alpha = 0.24f),
                     strokeWidth = 1.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(
-                        floatArrayOf(3.dp.toPx(), 4.dp.toPx()),
-                    ),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 4.dp.toPx())),
                 )
             }
 
-            // ── Temperature sounding (red) ──────────────────────────────
             drawSkewTProfile(
                 points = chart.temperatureProfile,
-                mapXY = { temp, p -> Offset(tpToX(temp, p), pToY(p)) },
-                plotLeft = plotLeft, plotRight = plotRight,
-                plotTop = plotTop, plotBottom = plotBottom,
-                color = Color(0xFFDD2222),
-                strokeWidth = 2.5f.dp.toPx(),
+                mapXY = { temperature, pressure -> Offset(temperatureToX(temperature, pressure), pressureToY(pressure)) },
+                plotLeft = plotLeft,
+                plotRight = plotRight,
+                plotTop = plotTop,
+                plotBottom = plotBottom,
+                color = Color(0xFFD83A3A),
+                strokeWidth = 2.6f.dp.toPx(),
                 drawDataDots = true,
-                dataDotRadius = 2.5f.dp.toPx(),
+                dataDotRadius = 2.6f.dp.toPx(),
             )
 
-            // ── Dewpoint sounding (blue) ────────────────────────────────
             drawSkewTProfile(
                 points = chart.dewpointProfile,
-                mapXY = { temp, p -> Offset(tpToX(temp, p), pToY(p)) },
-                plotLeft = plotLeft, plotRight = plotRight,
-                plotTop = plotTop, plotBottom = plotBottom,
-                color = Color(0xFF2255CC),
-                strokeWidth = 2f.dp.toPx(),
+                mapXY = { temperature, pressure -> Offset(temperatureToX(temperature, pressure), pressureToY(pressure)) },
+                plotLeft = plotLeft,
+                plotRight = plotRight,
+                plotTop = plotTop,
+                plotBottom = plotBottom,
+                color = Color(0xFF2E6FB5),
+                strokeWidth = 2.1f.dp.toPx(),
                 drawDataDots = true,
-                dataDotRadius = 2f.dp.toPx(),
+                dataDotRadius = 2.2f.dp.toPx(),
             )
 
-            // ── Parcel ascent path (dashed) ──────────────────────────────
             drawSkewTProfile(
                 points = chart.parcelAscentPath,
-                mapXY = { temp, p -> Offset(tpToX(temp, p), pToY(p)) },
-                plotLeft = plotLeft, plotRight = plotRight,
-                plotTop = plotTop, plotBottom = plotBottom,
-                color = onSurfaceColor.copy(alpha = 0.55f),
+                mapXY = { temperature, pressure -> Offset(temperatureToX(temperature, pressure), pressureToY(pressure)) },
+                plotLeft = plotLeft,
+                plotRight = plotRight,
+                plotTop = plotTop,
+                plotBottom = plotBottom,
+                color = onSurfaceColor.copy(alpha = 0.58f),
                 strokeWidth = 2f.dp.toPx(),
-                pathEffect = PathEffect.dashPathEffect(
-                    floatArrayOf(8.dp.toPx(), 6.dp.toPx()),
-                ),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 5.dp.toPx())),
             )
 
-            // ── LCL marker ──────────────────────────────────────────────
-            chart.lclPressureHpa?.let { lcl ->
-                val lclY = pToY(lcl)
+            chart.lclPressureHpa?.let { pressure ->
+                val y = pressureToY(pressure)
                 drawLine(
                     color = onSurfaceColor.copy(alpha = 0.35f),
-                    start = Offset(plotLeft, lclY),
-                    end = Offset(plotRight, lclY),
-                    strokeWidth = 1.5f.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(
-                        floatArrayOf(4.dp.toPx(), 6.dp.toPx()),
-                    ),
+                    start = Offset(plotLeft, y),
+                    end = Offset(plotRight, y),
+                    strokeWidth = 1.4f.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 5.dp.toPx())),
                 )
+            }
+
+            chart.cclPressureHpa?.let { pressure ->
+                val y = pressureToY(pressure)
+                drawLine(
+                    color = Color(0xFFB36A27).copy(alpha = 0.5f),
+                    start = Offset(plotLeft, y),
+                    end = Offset(plotRight, y),
+                    strokeWidth = 1.5f.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 4.dp.toPx())),
+                )
+            }
+
+            val lclPressure = chart.lclPressureHpa
+            val cclPressure = chart.cclPressureHpa
+            if (lclPressure != null && cclPressure != null) {
+                val topBandPressure = minOf(lclPressure, cclPressure)
+                val bottomBandPressure = maxOf(lclPressure, cclPressure)
+                val topBandY = pressureToY(topBandPressure).coerceIn(plotTop, plotBottom)
+                val bottomBandY = pressureToY(bottomBandPressure).coerceIn(plotTop, plotBottom)
+                if (bottomBandY > topBandY + 1f) {
+                    drawRect(
+                        color = Color(0xFFE9B267).copy(alpha = 0.10f),
+                        topLeft = Offset(plotLeft, topBandY),
+                        size = Size(plotWidth, bottomBandY - topBandY),
+                    )
+                }
+            }
+
+            val activeCursor = cursorState
+            if (activeCursor != null) {
+                val readout = buildCursorReadout(chart, yToPressure(activeCursor.y))
+                val cursorY = pressureToY(readout.pressureHpa)
+                if (cursorY in plotTop..plotBottom) {
+                    drawCursorOverlay(
+                        readout = readout,
+                        cursorY = cursorY,
+                        topPressure = topPressure,
+                        bottomPressure = chartBottomPressure,
+                        plotLeft = plotLeft,
+                        plotRight = plotRight,
+                        onSurfaceColor = onSurfaceColor,
+                        temperatureToX = ::temperatureToX,
+                        pressureToY = ::pressureToY,
+                    )
+                }
             }
         }
 
-        // ── Plot outline ─────────────────────────────────────────────────
         drawRect(
             color = outlineColor.copy(alpha = 0.5f),
             topLeft = Offset(plotLeft, plotTop),
@@ -422,9 +583,8 @@ private fun SkewTDiagramCanvas(
             style = Stroke(width = 1.dp.toPx()),
         )
 
-        // ── Wind barbs (right edge) ─────────────────────────────────────
         chart.windBarbs.forEach { barb ->
-            val y = pToY(barb.pressureHpa)
+            val y = pressureToY(barb.pressureHpa)
             if (y in plotTop..plotBottom) {
                 drawWindBarb(
                     centerX = plotRight + rightAltitudeWidth + rightWindWidth / 2f,
@@ -437,15 +597,12 @@ private fun SkewTDiagramCanvas(
             }
         }
 
-        // ── Axis labels ──────────────────────────────────────────────────
         drawIntoCanvas { canvas ->
-            // Pressure labels (left)
-            val pressureLabels = ISOBAR_LABELS.filter { it >= topPressure }
-            pressureLabels.forEach { p ->
-                val y = pToY(p)
+            pressureLabels.forEach { pressure ->
+                val y = pressureToY(pressure)
                 if (y in plotTop..plotBottom) {
                     canvas.nativeCanvas.drawText(
-                        "${p.toInt()}",
+                        "${pressure.toInt()}",
                         leftAxisWidth - 4.dp.toPx(),
                         y + axisLabelPaint.textSize * 0.35f,
                         axisLabelPaint,
@@ -453,31 +610,26 @@ private fun SkewTDiagramCanvas(
                 }
             }
 
-            // Temperature labels (bottom) — placed at the bottom isobar intersection
-            var tempLabel = TEMP_MIN
-            while (tempLabel <= TEMP_MAX) {
-                if (tempLabel.toInt() % 10 == 0) {
-                    val x = tpToX(tempLabel, chartBottomPressure)
-                    if (x in plotLeft..plotRight) {
-                        canvas.nativeCanvas.drawText(
-                            "${tempLabel.toInt()}°",
-                            x,
-                            plotBottom + tempLabelPaint.textSize + 6.dp.toPx(),
-                            tempLabelPaint,
-                        )
-                    }
-                }
-                tempLabel += TEMP_STEP
-            }
-
-            // Mixing ratio labels (top of plot)
-            STUVE_MIXING_RATIO_VALUES_GKG.forEach { w ->
-                val tempAtTop = mixingRatioTemperatureC(w, topPressure)
-                val x = tpToX(tempAtTop, topPressure)
+            val temperatureAxisBaseline = plotBottom + tempLabelPaint.textSize +
+                with(density) { 6.dp.toPx() }
+            buildTemperatureAxisLabels(tempAxisRange).forEach { tempLabel ->
+                val x = temperatureToX(tempLabel, chartBottomPressure)
                 if (x in plotLeft..plotRight) {
                     canvas.nativeCanvas.drawText(
-                        if (w < 1f) String.format(Locale.US, "%.1f", w)
-                        else "${w.toInt()}",
+                        "${tempLabel.toInt()}°",
+                        x,
+                        temperatureAxisBaseline,
+                        tempLabelPaint,
+                    )
+                }
+            }
+
+            STUVE_MIXING_RATIO_VALUES_GKG.forEach { mixingRatio ->
+                val x = temperatureToX(mixingRatioTemperatureC(mixingRatio, topPressure), topPressure)
+                if (x in plotLeft..plotRight) {
+                    canvas.nativeCanvas.drawText(
+                        if (mixingRatio < 1f) String.format(Locale.US, "%.1f", mixingRatio)
+                        else "${mixingRatio.toInt()}",
                         x,
                         plotTop - 2.dp.toPx(),
                         mixingRatioLabelPaint,
@@ -485,27 +637,31 @@ private fun SkewTDiagramCanvas(
                 }
             }
 
-            // LCL label
-            chart.lclPressureHpa?.let { lcl ->
-                val lclY = pToY(lcl)
-                if (lclY in plotTop..plotBottom) {
-                    val lclLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = axisLabelColor.toArgb()
-                        textSize = with(density) { 9.sp.toPx() }
-                        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-                    }
-                    canvas.nativeCanvas.drawText(
-                        "LCL",
-                        plotLeft + 4.dp.toPx(),
-                        lclY - 3.dp.toPx(),
-                        lclLabelPaint,
-                    )
-                }
+            chart.lclPressureHpa?.let { pressure ->
+                drawMarkerLabel(
+                    canvas = canvas,
+                    text = "LCL",
+                    y = pressureToY(pressure),
+                    x = plotLeft + 4.dp.toPx(),
+                    color = axisLabelColor,
+                    density = density,
+                    yOffsetPx = -with(density) { 6.dp.toPx() },
+                )
+            }
+            chart.cclPressureHpa?.let { pressure ->
+                drawMarkerLabel(
+                    canvas = canvas,
+                    text = "CCL",
+                    y = pressureToY(pressure),
+                    x = plotLeft + 4.dp.toPx(),
+                    color = Color(0xFFB36A27),
+                    density = density,
+                    yOffsetPx = with(density) { 12.dp.toPx() },
+                )
             }
 
-            // Wind speed labels
             chart.windBarbs.forEach { barb ->
-                val y = pToY(barb.pressureHpa)
+                val y = pressureToY(barb.pressureHpa)
                 if (y in plotTop..plotBottom) {
                     val windLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = axisLabelColor.toArgb()
@@ -522,21 +678,41 @@ private fun SkewTDiagramCanvas(
                 }
             }
 
-            // Altitude labels (right side, metres)
-            pressureLabels.forEach { p ->
-                val y = pToY(p)
+            pressureLabels.forEach { pressure ->
+                val y = pressureToY(pressure)
                 if (y in plotTop..plotBottom) {
-                    val heightM = pressureToApproxHeightMeters(p)
-                    val label = if (heightM >= 1000) {
-                        String.format(Locale.US, "%.1fk", heightM / 1000f)
-                    } else {
-                        "${heightM}m"
-                    }
+                    val heightMeters = interpolateProfileHeightMeters(chart.temperatureProfile, pressure)
+                        ?: pressureToApproxHeightMeters(pressure).toFloat()
                     canvas.nativeCanvas.drawText(
-                        label,
+                        formatAxisHeight(heightMeters),
                         plotRight + 4.dp.toPx(),
                         y + altitudeLabelPaint.textSize * 0.35f,
                         altitudeLabelPaint,
+                    )
+                }
+            }
+
+            cursorState?.let { activeCursor ->
+                val readout = buildCursorReadout(chart, yToPressure(activeCursor.y))
+                val cursorY = pressureToY(readout.pressureHpa)
+                if (cursorY in plotTop..plotBottom) {
+                    drawCursorInlineLabels(
+                        canvas = canvas,
+                        readout = readout,
+                        cursorY = cursorY,
+                        plotLeft = plotLeft,
+                        plotRight = plotRight,
+                        plotTop = plotTop,
+                        plotBottom = plotBottom,
+                        bottomPressure = chartBottomPressure,
+                        rightWindCenterX = plotRight + rightAltitudeWidth + rightWindWidth / 2f,
+                        axisLabelPaint = axisLabelPaint,
+                        altitudeLabelPaint = altitudeLabelPaint,
+                        temperatureAxisBaseline = temperatureAxisBaseline,
+                        temperatureAxisRange = tempAxisRange,
+                        temperatureAxisLabelPaint = tempLabelPaint,
+                        density = density,
+                        temperatureToX = ::temperatureToX,
                     )
                 }
             }
@@ -544,30 +720,613 @@ private fun SkewTDiagramCanvas(
     }
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Coordinate mapping — Skew-T log-P
-// ──────────────────────────────────────────────────────────────────────────────
+private fun DrawScope.drawMoistureCueStrip(
+    chart: StuveForecastChartUiModel,
+    plotTop: Float,
+    plotBottom: Float,
+    plotRight: Float,
+    pressureToY: (Float) -> Float,
+    density: androidx.compose.ui.unit.Density,
+) {
+    if (chart.moistureBands.isEmpty()) return
 
-private const val SKEWT_MIN_TOP_PRESSURE = 200f
+    val stripWidth = with(density) { 9.dp.toPx() }
+    val stripLeft = plotRight + 2.dp.toPx()
+
+    chart.moistureBands.forEach { band ->
+        val bandTopY = pressureToY(band.topPressureHpa).coerceIn(plotTop, plotBottom)
+        val bandBottomY = pressureToY(band.bottomPressureHpa).coerceIn(plotTop, plotBottom)
+        if (bandBottomY <= bandTopY) return@forEach
+
+        val intensity = ((band.relativeHumidityFraction - 0.55f) / 0.45f).coerceIn(0f, 1f)
+        if (intensity <= 0f) return@forEach
+
+        drawRect(
+            color = lerp(
+                start = Color(0xFFD7EAF4),
+                stop = Color(0xFF4E7C9A),
+                fraction = intensity,
+            ).copy(alpha = 0.16f + intensity * 0.42f),
+            topLeft = Offset(stripLeft, bandTopY),
+            size = Size(stripWidth, bandBottomY - bandTopY),
+        )
+    }
+}
+
+private fun DrawScope.drawCursorOverlay(
+    readout: CursorReadout,
+    cursorY: Float,
+    topPressure: Float,
+    bottomPressure: Float,
+    plotLeft: Float,
+    plotRight: Float,
+    onSurfaceColor: Color,
+    temperatureToX: (Float, Float) -> Float,
+    pressureToY: (Float) -> Float,
+) {
+    drawLine(
+        color = onSurfaceColor.copy(alpha = 0.58f),
+        start = Offset(plotLeft, cursorY),
+        end = Offset(plotRight, cursorY),
+        strokeWidth = 1.dp.toPx(),
+        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
+    )
+
+    readout.temperatureC?.let { temperature ->
+        drawLine(
+            color = Color(0xFFD83A3A).copy(alpha = 0.45f),
+            start = Offset(temperatureToX(temperature, bottomPressure), pressureToY(bottomPressure)),
+            end = Offset(temperatureToX(temperature, topPressure), pressureToY(topPressure)),
+            strokeWidth = 1.2f.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())),
+        )
+    }
+
+    readout.guideDryThetaK?.let { thetaK ->
+        drawAdiabat(
+            pressures = buildReferencePressures(bottomPressure, readout.pressureHpa, stepHpa = 25f) +
+                listOf(readout.pressureHpa),
+            computeTemp = { pressure -> dryAdiabatTempC(thetaK, pressure) },
+            mapXY = { temperature, pressure ->
+                Offset(temperatureToX(temperature, pressure), pressureToY(pressure))
+            },
+            plotLeft = plotLeft,
+            plotRight = plotRight,
+            plotTop = pressureToY(topPressure),
+            plotBottom = pressureToY(bottomPressure),
+            color = Color(0xFF59A36A).copy(alpha = 0.72f),
+            strokeWidth = 1.6f.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 5.dp.toPx())),
+        )
+    }
+
+    readout.guideMoistThetaWK?.let { thetaWK ->
+        drawAdiabat(
+            pressures = (listOf(readout.pressureHpa) + buildReferencePressures(readout.pressureHpa, topPressure, stepHpa = 25f))
+                .distinct()
+                .sortedDescending(),
+            computeTemp = { pressure -> moistAdiabatTempC(thetaWK, pressure) },
+            mapXY = { temperature, pressure ->
+                Offset(temperatureToX(temperature, pressure), pressureToY(pressure))
+            },
+            plotLeft = plotLeft,
+            plotRight = plotRight,
+            plotTop = pressureToY(topPressure),
+            plotBottom = pressureToY(bottomPressure),
+            color = Color(0xFF59A36A).copy(alpha = 0.86f),
+            strokeWidth = 1.8f.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 5.dp.toPx())),
+        )
+    }
+
+    readout.guideMixingRatioGKg?.let { mixingRatio ->
+        drawAdiabat(
+            pressures = buildReferencePressures(bottomPressure, topPressure, stepHpa = 25f),
+            computeTemp = { pressure -> mixingRatioTemperatureC(mixingRatio, pressure) },
+            mapXY = { temperature, pressure ->
+                Offset(temperatureToX(temperature, pressure), pressureToY(pressure))
+            },
+            plotLeft = plotLeft,
+            plotRight = plotRight,
+            plotTop = pressureToY(topPressure),
+            plotBottom = pressureToY(bottomPressure),
+            color = onSurfaceColor.copy(alpha = 0.55f),
+            strokeWidth = 1.5f.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 4.dp.toPx())),
+        )
+    }
+
+    readout.temperatureC?.let { temperature ->
+        drawCircle(
+            color = Color(0xFFD83A3A),
+            radius = 4.dp.toPx(),
+            center = Offset(temperatureToX(temperature, readout.pressureHpa), cursorY),
+        )
+    }
+    readout.dewpointC?.let { dewpoint ->
+        drawCircle(
+            color = Color(0xFF2E6FB5),
+            radius = 3.6f.dp.toPx(),
+            center = Offset(temperatureToX(dewpoint, readout.pressureHpa), cursorY),
+        )
+    }
+    readout.parcelTemperatureC?.let { parcelTemperature ->
+        val parcelX = temperatureToX(parcelTemperature, readout.pressureHpa)
+        drawCircle(
+            color = onSurfaceColor.copy(alpha = 0.65f),
+            radius = 3.2f.dp.toPx(),
+            center = Offset(parcelX, cursorY),
+            style = Stroke(width = 1.6f.dp.toPx()),
+        )
+
+        readout.temperatureC?.let { ambientTemperature ->
+            drawLine(
+                color = Color(0xFFE2A85F).copy(alpha = 0.55f),
+                start = Offset(temperatureToX(ambientTemperature, readout.pressureHpa), cursorY),
+                end = Offset(parcelX, cursorY),
+                strokeWidth = 1.8f.dp.toPx(),
+            )
+        }
+    }
+}
+
+private fun drawMarkerLabel(
+    canvas: ComposeGraphicsCanvas,
+    text: String,
+    y: Float,
+    x: Float,
+    color: Color,
+    density: androidx.compose.ui.unit.Density,
+    yOffsetPx: Float = 0f,
+) {
+    if (!y.isFinite()) return
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color.toArgb()
+        textSize = with(density) { 9.sp.toPx() }
+        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+    }
+    canvas.nativeCanvas.drawText(
+        text,
+        x,
+        y - with(density) { 3.dp.toPx() } + yOffsetPx,
+        labelPaint,
+    )
+}
+
+private fun drawCursorInlineLabels(
+    canvas: ComposeGraphicsCanvas,
+    readout: CursorReadout,
+    cursorY: Float,
+    plotLeft: Float,
+    plotRight: Float,
+    plotTop: Float,
+    plotBottom: Float,
+    bottomPressure: Float,
+    rightWindCenterX: Float,
+    axisLabelPaint: Paint,
+    altitudeLabelPaint: Paint,
+    temperatureAxisBaseline: Float,
+    temperatureAxisRange: TempAxisRange,
+    temperatureAxisLabelPaint: Paint,
+    density: androidx.compose.ui.unit.Density,
+    temperatureToX: (Float, Float) -> Float,
+) {
+    drawBadgeLabel(
+        canvas = canvas,
+        lines = listOf(
+            formatReadoutHeight(readout.altitudeMeters),
+            "${readout.pressureHpa.roundToInt()} hPa",
+        ),
+        centerX = plotLeft - with(density) { 10.dp.toPx() },
+        centerY = cursorY,
+        density = density,
+        textPaint = Paint(axisLabelPaint).apply {
+            color = Color(0xFF2B2B2B).toArgb()
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        },
+        backgroundColor = Color(0xFFF3F3F3),
+        minWidth = with(density) { 46.dp.toPx() },
+    )
+
+    drawBadgeLabel(
+        canvas = canvas,
+        lines = listOf(formatAxisHeight(readout.altitudeMeters.toFloat())),
+        centerX = plotRight + with(density) { 18.dp.toPx() },
+        centerY = cursorY,
+        density = density,
+        textPaint = Paint(altitudeLabelPaint).apply {
+            color = Color(0xFF2B2B2B).toArgb()
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        },
+        backgroundColor = Color(0xFFF3F3F3).copy(alpha = 0.92f),
+        minWidth = with(density) { 34.dp.toPx() },
+    )
+
+    val pointLabelPaint = fun(color: Color): Paint {
+        return Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color.toArgb()
+            textSize = with(density) { 9.sp.toPx() }
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        }
+    }
+
+    readout.temperatureC?.let { temperature ->
+        val pointX = temperatureToX(temperature, readout.pressureHpa)
+        drawPointValue(
+            canvas = canvas,
+            text = String.format(Locale.US, "T %.1f°", temperature),
+            x = pointX + with(density) { 6.dp.toPx() },
+            y = cursorY - with(density) { 6.dp.toPx() },
+            paint = pointLabelPaint(Color(0xFFD83A3A)),
+            maxX = plotRight - with(density) { 4.dp.toPx() },
+            minX = plotLeft + with(density) { 4.dp.toPx() },
+        )
+    }
+
+    readout.dewpointC?.let { dewpoint ->
+        val pointX = temperatureToX(dewpoint, readout.pressureHpa)
+        drawPointValue(
+            canvas = canvas,
+            text = String.format(Locale.US, "Td %.1f°", dewpoint),
+            x = pointX - with(density) { 6.dp.toPx() },
+            y = cursorY + with(density) { 16.dp.toPx() },
+            paint = pointLabelPaint(Color(0xFF2E6FB5)).apply {
+                textAlign = Paint.Align.RIGHT
+            },
+            maxX = plotRight - with(density) { 4.dp.toPx() },
+            minX = plotLeft + with(density) { 4.dp.toPx() },
+        )
+    }
+
+    readout.parcelTemperatureC?.let { parcelTemperature ->
+        val pointX = temperatureToX(parcelTemperature, readout.pressureHpa)
+        drawPointValue(
+            canvas = canvas,
+            text = String.format(Locale.US, "Parcel %.1f°", parcelTemperature),
+            x = pointX + with(density) { 6.dp.toPx() },
+            y = cursorY + with(density) { 28.dp.toPx() },
+            paint = pointLabelPaint(Color(0xFF59A36A)),
+            maxX = plotRight - with(density) { 4.dp.toPx() },
+            minX = plotLeft + with(density) { 4.dp.toPx() },
+        )
+    }
+
+    val bottomLabels = buildList {
+        add(
+            BottomAxisLabel(
+                text = "${temperatureAxisRange.minC.roundToInt()}°",
+                preferredX = plotLeft + temperatureAxisLabelPaint.measureText("${temperatureAxisRange.minC.roundToInt()}°") / 2f,
+                paint = Paint(temperatureAxisLabelPaint).apply { textAlign = Paint.Align.CENTER },
+            ),
+        )
+        add(
+            BottomAxisLabel(
+                text = "${temperatureAxisRange.maxC.roundToInt()}°",
+                preferredX = plotRight - temperatureAxisLabelPaint.measureText("${temperatureAxisRange.maxC.roundToInt()}°") / 2f,
+                paint = Paint(temperatureAxisLabelPaint).apply { textAlign = Paint.Align.CENTER },
+            ),
+        )
+
+        readout.parcelSurfaceTemperatureC?.let { parcelSurfaceTemperature ->
+            val bottomTemp = readout.guideDryThetaK?.let { dryAdiabatTempC(it, bottomPressure) } ?: return@let
+            add(
+                BottomAxisLabel(
+                    text = String.format(Locale.US, "Parcel %.0f°", parcelSurfaceTemperature),
+                    preferredX = temperatureToX(bottomTemp, bottomPressure),
+                    paint = pointLabelPaint(Color(0xFF59A36A)).apply { textAlign = Paint.Align.CENTER },
+                ),
+            )
+        }
+
+        readout.criticalSurfaceDewpointC?.let { criticalSurfaceDewpoint ->
+            val bottomTemp = readout.guideMixingRatioGKg?.let {
+                mixingRatioTemperatureC(it, bottomPressure)
+            } ?: return@let
+            add(
+                BottomAxisLabel(
+                    text = String.format(Locale.US, "Crit Td %.0f°", criticalSurfaceDewpoint),
+                    preferredX = temperatureToX(bottomTemp, bottomPressure),
+                    paint = pointLabelPaint(Color(0xFFB7BCC7)).apply { textAlign = Paint.Align.CENTER },
+                ),
+            )
+        }
+    }
+
+    drawBottomAxisLabels(
+        canvas = canvas,
+        labels = bottomLabels,
+        y = temperatureAxisBaseline,
+        plotLeft = plotLeft,
+        plotRight = plotRight,
+        minimumGapPx = with(density) { 10.dp.toPx() },
+    )
+
+    if (readout.windSpeedKmh != null && readout.windDirectionDeg != null) {
+        drawBadgeLabel(
+            canvas = canvas,
+            lines = listOf(
+                String.format(Locale.US, "%.0f km/h %03.0f°", readout.windSpeedKmh, readout.windDirectionDeg),
+            ),
+            centerX = rightWindCenterX,
+            centerY = (cursorY - with(density) { 10.dp.toPx() })
+                .coerceAtLeast(plotTop + with(density) { 10.dp.toPx() }),
+            density = density,
+            textPaint = pointLabelPaint(Color(0xFF2B2B2B)).apply {
+                textAlign = Paint.Align.CENTER
+            },
+            backgroundColor = Color(0xFFF3F3F3),
+            minWidth = with(density) { 74.dp.toPx() },
+        )
+    }
+}
+
+private fun drawBadgeLabel(
+    canvas: ComposeGraphicsCanvas,
+    lines: List<String>,
+    centerX: Float,
+    centerY: Float,
+    density: androidx.compose.ui.unit.Density,
+    textPaint: Paint,
+    backgroundColor: Color,
+    minWidth: Float = 0f,
+) {
+    if (lines.isEmpty()) return
+
+    val paddingHorizontal = with(density) { 6.dp.toPx() }
+    val paddingVertical = with(density) { 4.dp.toPx() }
+    val lineSpacing = with(density) { 2.dp.toPx() }
+    val lineHeight = textPaint.textSize
+    val maxTextWidth = lines.maxOf { textPaint.measureText(it) }
+    val boxWidth = maxOf(minWidth, maxTextWidth + paddingHorizontal * 2f)
+    val boxHeight = (lineHeight * lines.size) + lineSpacing * (lines.size - 1) + paddingVertical * 2f
+    val rect = RectF(
+        centerX - boxWidth / 2f,
+        centerY - boxHeight / 2f,
+        centerX + boxWidth / 2f,
+        centerY + boxHeight / 2f,
+    )
+
+    val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = backgroundColor.toArgb()
+    }
+    canvas.nativeCanvas.drawRoundRect(
+        rect,
+        with(density) { 4.dp.toPx() },
+        with(density) { 4.dp.toPx() },
+        backgroundPaint,
+    )
+
+    val firstBaseline = rect.top + paddingVertical + lineHeight * 0.8f
+    lines.forEachIndexed { index, line ->
+        canvas.nativeCanvas.drawText(
+            line,
+            centerX,
+            firstBaseline + index * (lineHeight + lineSpacing),
+            textPaint,
+        )
+    }
+}
+
+private fun drawPointValue(
+    canvas: ComposeGraphicsCanvas,
+    text: String,
+    x: Float,
+    y: Float,
+    paint: Paint,
+    maxX: Float,
+    minX: Float,
+) {
+    val measuredWidth = paint.measureText(text)
+    val drawX = when (paint.textAlign) {
+        Paint.Align.RIGHT -> x.coerceAtMost(maxX).coerceAtLeast(minX + measuredWidth)
+        Paint.Align.CENTER -> x.coerceIn(minX + measuredWidth / 2f, maxX - measuredWidth / 2f)
+        else -> x.coerceAtLeast(minX).coerceAtMost(maxX - measuredWidth)
+    }
+    canvas.nativeCanvas.drawText(text, drawX, y, paint)
+}
+
+private data class BottomAxisLabel(
+    val text: String,
+    val preferredX: Float,
+    val paint: Paint,
+)
+
+private fun drawBottomAxisLabels(
+    canvas: ComposeGraphicsCanvas,
+    labels: List<BottomAxisLabel>,
+    y: Float,
+    plotLeft: Float,
+    plotRight: Float,
+    minimumGapPx: Float,
+) {
+    if (labels.isEmpty()) return
+
+    val layout = labels
+        .map { label -> label to label.paint.measureText(label.text) }
+        .sortedBy { it.first.preferredX }
+        .map { (label, width) ->
+            PositionedBottomAxisLabel(
+                label = label,
+                width = width,
+                centerX = label.preferredX.coerceIn(plotLeft + width / 2f, plotRight - width / 2f),
+            )
+        }
+        .toMutableList()
+
+    for (index in 1 until layout.size) {
+        val previous = layout[index - 1]
+        val current = layout[index]
+        val minimumCenterX = previous.centerX + previous.width / 2f + minimumGapPx + current.width / 2f
+        if (current.centerX < minimumCenterX) {
+            current.centerX = minimumCenterX
+        }
+    }
+
+    for (index in layout.lastIndex - 1 downTo 0) {
+        val next = layout[index + 1]
+        val current = layout[index]
+        val maximumCenterX = next.centerX - next.width / 2f - minimumGapPx - current.width / 2f
+        if (current.centerX > maximumCenterX) {
+            current.centerX = maximumCenterX
+        }
+    }
+
+    layout.forEach { positioned ->
+        val clampedX = positioned.centerX.coerceIn(
+            plotLeft + positioned.width / 2f,
+            plotRight - positioned.width / 2f,
+        )
+        canvas.nativeCanvas.drawText(
+            positioned.label.text,
+            clampedX,
+            y,
+            positioned.label.paint,
+        )
+    }
+}
+
+private data class PositionedBottomAxisLabel(
+    val label: BottomAxisLabel,
+    val width: Float,
+    var centerX: Float,
+)
+
+private fun buildCursorReadout(
+    chart: StuveForecastChartUiModel,
+    pressureHpa: Float,
+): CursorReadout {
+    val clampedPressure = pressureHpa.coerceIn(
+        chart.temperatureProfile.lastOrNull()?.pressureHpa ?: pressureHpa,
+        chart.surfacePressureHpa,
+    )
+    val altitudeMeters = (
+        interpolateProfileHeightMeters(chart.temperatureProfile, clampedPressure)
+            ?: pressureToApproxHeightMeters(clampedPressure).toFloat()
+        ).roundToInt()
+    val nearestWind = chart.windBarbs.minByOrNull { abs(it.pressureHpa - clampedPressure) }
+        ?.takeIf { abs(it.pressureHpa - clampedPressure) <= 60f }
+
+    return CursorReadout(
+        pressureHpa = clampedPressure,
+        altitudeMeters = altitudeMeters,
+        temperatureC = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure),
+        dewpointC = interpolateProfileTemperature(chart.dewpointProfile, clampedPressure),
+        parcelTemperatureC = interpolateProfileTemperature(chart.parcelAscentPath, clampedPressure),
+        guideDryThetaK = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure)?.let { temperature ->
+            potentialTemperatureK(temperature, clampedPressure)
+        },
+        guideMoistThetaWK = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure)?.let { temperature ->
+            estimateMoistAdiabatThetaWK(temperature, clampedPressure)
+        },
+        guideMixingRatioGKg = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure)?.let { temperature ->
+            satMixingRatioGKg(temperature, clampedPressure)
+        },
+        parcelSurfaceTemperatureC = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure)?.let { temperature ->
+            dryAdiabatTempC(
+                potentialTemperatureK(temperature, clampedPressure),
+                chart.surfacePressureHpa,
+            )
+        },
+        criticalSurfaceDewpointC = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure)?.let { temperature ->
+            mixingRatioTemperatureC(
+                satMixingRatioGKg(temperature, clampedPressure),
+                chart.surfacePressureHpa,
+            )
+        },
+        windSpeedKmh = nearestWind?.speedKmh,
+        windDirectionDeg = nearestWind?.directionDeg,
+    )
+}
+
+private suspend fun PointerInputScope.detectSkewTGestures(
+    currentTopAltitudeKm: () -> Float,
+    onVisibleTopAltitudeChange: (Float) -> Unit,
+    onCursorStateChanged: (SkewTCursorState?) -> Unit,
+) {
+    awaitEachGesture {
+        var cumulativeZoom = 1f
+        var isZooming = false
+        var gestureTopAltitudeKm = currentTopAltitudeKm()
+        var hasDragged = false
+
+        val down = awaitFirstDown(requireUnconsumed = false)
+        val startY = down.position.y
+        var latestY = startY
+        onCursorStateChanged(SkewTCursorState(y = latestY, isPinned = false))
+
+        do {
+            val event = awaitPointerEvent()
+            val canceled = event.changes.any { it.isConsumed }
+            if (!canceled) {
+                val pressedPointers = event.changes.count { it.pressed }
+                if (pressedPointers >= 2) {
+                    if (!isZooming) {
+                        isZooming = true
+                        onCursorStateChanged(null)
+                    }
+
+                    val zoomChange = event.calculateZoom()
+                    cumulativeZoom *= zoomChange
+                    val zoomMotion = abs(1 - cumulativeZoom) * event.calculateCentroidSize(useCurrent = false)
+                    if (zoomMotion > viewConfiguration.touchSlop && zoomChange != 1f) {
+                        gestureTopAltitudeKm = zoomedTopAltitudeKm(
+                            currentTopAltitudeKm = gestureTopAltitudeKm,
+                            zoomChange = zoomChange,
+                        )
+                        onVisibleTopAltitudeChange(gestureTopAltitudeKm)
+                        event.changes.forEach { change ->
+                            if (change.positionChanged()) {
+                                change.consume()
+                            }
+                        }
+                    }
+                } else {
+                    event.changes.firstOrNull { it.pressed }?.let { change ->
+                        latestY = change.position.y
+                        if (abs(latestY - startY) > viewConfiguration.touchSlop) {
+                            hasDragged = true
+                        }
+                        onCursorStateChanged(SkewTCursorState(y = latestY, isPinned = false))
+                    }
+                }
+            }
+        } while (event.changes.any { it.pressed })
+
+        if (isZooming || hasDragged) {
+            onCursorStateChanged(null)
+        } else {
+            onCursorStateChanged(SkewTCursorState(y = latestY, isPinned = true))
+        }
+    }
+}
+
+private const val SKEWT_MIN_TOP_PRESSURE = 250f
 private const val SKEWT_BOTTOM_PRESSURE = 1050f
-private const val SKEWT_KAPPA = 0.286f
 private const val TEMP_MIN = -30f
 private const val TEMP_MAX = 40f
 private const val TEMP_STEP = 10f
-
-/**
- * Controls how much isotherms are skewed. 1.0 means a full plot-width of skew
- * between bottom and top of the diagram, giving roughly 45° lines when the
- * temperature range equals the skewed shift range.
- */
-private const val SKEWT_SKEW_RATIO = 0.85f
+private const val SKEWT_SKEW_RATIO = 0.45f
+private const val STUVE_AUTO_FIT_MARGIN_KM = 0.35f
+private const val TEMP_AXIS_FOCUS_TOP_PRESSURE_HPA = 650f
+private const val TEMP_AXIS_LEFT_PADDING_C = 6f
+private const val TEMP_AXIS_RIGHT_PADDING_C = 10f
+private const val TEMP_AXIS_MIN_SPAN_C = 34f
+private const val TEMP_AXIS_MAX_SPAN_C = 48f
+private const val TEMP_AXIS_MAX_DEWPOINT_EXTENSION_C = 14f
 
 private val ISOBAR_LABELS = listOf(
     1000f, 950f, 900f, 850f, 800f, 750f, 700f, 650f,
-    600f, 550f, 500f, 450f, 400f, 350f, 300f, 250f, 200f,
+    600f, 550f, 500f, 450f, 400f, 350f, 300f, 250f,
 )
 
-/** Y-axis: log-P scale, bottom = [bottomPressure], top = [topPressure]. */
+private val STUVE_DRY_REFERENCE_PRESSURES = listOf(
+    1050f, 1000f, 975f, 950f, 925f, 900f, 875f, 850f, 825f, 800f, 775f, 750f, 725f, 700f,
+    675f, 650f, 625f, 600f, 575f, 550f, 525f, 500f, 475f, 450f, 425f, 400f, 375f, 350f,
+    325f, 300f, 275f, 250f,
+)
+
 private fun pressureToY(
     pressureHpa: Float,
     plotTop: Float,
@@ -575,25 +1334,27 @@ private fun pressureToY(
     topPressure: Float,
     bottomPressure: Float = SKEWT_BOTTOM_PRESSURE,
 ): Float {
-    val logP = ln(pressureHpa)
+    val logPressure = ln(pressureHpa)
     val logBottom = ln(bottomPressure)
     val logTop = ln(topPressure)
-    // logBottom → plotBottom, logTop → plotTop
-    val frac = (logP - logTop) / (logBottom - logTop)
-    return plotTop + frac * (plotBottom - plotTop)
+    val fraction = (logPressure - logTop) / (logBottom - logTop)
+    return plotTop + fraction * (plotBottom - plotTop)
 }
 
-/**
- * X-axis: Skew-T mapping.
- *
- * At the bottom isobar the temperature axis is placed normally (tempMin→plotLeft,
- * tempMax→plotRight). As pressure decreases (higher altitude), isotherms shift
- * to the right by [skewFactor] × normalised log-pressure distance, producing the
- * characteristic 45° tilt.
- *
- * The skew is always computed against the FULL pressure range (200–1050 hPa) so
- * the isotherm angle stays constant regardless of the current zoom level.
- */
+private fun yToPressure(
+    y: Float,
+    plotTop: Float,
+    plotBottom: Float,
+    topPressure: Float,
+    bottomPressure: Float = SKEWT_BOTTOM_PRESSURE,
+): Float {
+    val logBottom = ln(bottomPressure)
+    val logTop = ln(topPressure)
+    val fraction = ((y - plotTop) / (plotBottom - plotTop)).coerceIn(0f, 1f)
+    val logPressure = logTop + fraction * (logBottom - logTop)
+    return kotlin.math.exp(logPressure)
+}
+
 private fun skewTToX(
     temperatureC: Float,
     pressureHpa: Float,
@@ -601,34 +1362,54 @@ private fun skewTToX(
     tempMax: Float,
     plotLeft: Float,
     plotRight: Float,
-    @Suppress("UNUSED_PARAMETER") topPressure: Float,
     skewFactor: Float,
+    topPressure: Float,
+    bottomPressure: Float,
 ): Float {
     val plotWidth = plotRight - plotLeft
-    val tNorm = (temperatureC - tempMin) / (tempMax - tempMin)
-    // Skew offset: 0 at bottom (1050 hPa), increases toward top
-    // Uses full range so skew angle is zoom-independent
-    val logP = ln(pressureHpa)
-    val logBottom = ln(SKEWT_BOTTOM_PRESSURE)
-    val logTop = ln(SKEWT_MIN_TOP_PRESSURE)
-    val heightFrac = ((logBottom - logP) / (logBottom - logTop)).coerceIn(0f, 1f)
-    val skewOffset = heightFrac * skewFactor
-    return plotLeft + tNorm * plotWidth + skewOffset
+    val normalizedTemperature = (temperatureC - tempMin) / (tempMax - tempMin)
+    val logPressure = ln(pressureHpa)
+    val logBottom = ln(bottomPressure)
+    val logTop = ln(topPressure)
+    val heightFraction = ((logBottom - logPressure) / (logBottom - logTop)).coerceIn(0f, 1f)
+    return plotLeft + normalizedTemperature * plotWidth + heightFraction * skewFactor
 }
 
-/** Convert altitude in km to an approximate pressure in hPa. */
 private fun altitudeKmToApproxPressureHpa(altitudeKm: Float): Float {
-    val hMeters = (altitudeKm * 1000f).coerceAtLeast(0f)
-    return (1013.25f * (1f - 0.0000225577f * hMeters).pow(5.25588f))
+    val heightMeters = (altitudeKm * 1000f).coerceAtLeast(0f)
+    return 1013.25f * (1f - 0.0000225577f * heightMeters).pow(5.25588f)
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Drawing helpers
-// ──────────────────────────────────────────────────────────────────────────────
+private fun buildReferencePressures(
+    bottomPressure: Float,
+    topPressure: Float,
+    stepHpa: Float,
+): List<Float> {
+    return buildList {
+        var pressure = bottomPressure
+        while (pressure >= topPressure) {
+            add(pressure)
+            pressure -= stepHpa
+        }
+    }
+}
 
-/**
- * Generic curve drawer for dry adiabats, moist adiabats, and mixing ratio lines.
- */
+private fun selectPressureLabels(
+    topPressure: Float,
+    plotHeight: Float,
+): List<Float> {
+    val visibleLabels = ISOBAR_LABELS.filter { it >= topPressure }
+    return if (visibleLabels.isEmpty()) {
+        emptyList()
+    } else if (plotHeight / visibleLabels.size >= 28f) {
+        visibleLabels
+    } else {
+        visibleLabels.filter { pressure ->
+            pressure.toInt() % 100 == 0 || pressure in listOf(950f, 850f, 700f, 500f, 300f, 250f)
+        }
+    }
+}
+
 private fun DrawScope.drawAdiabat(
     pressures: List<Float>,
     computeTemp: (Float) -> Float,
@@ -641,25 +1422,23 @@ private fun DrawScope.drawAdiabat(
     strokeWidth: Float,
     pathEffect: PathEffect? = null,
 ) {
-    val points = pressures.map { p ->
-        val temp = computeTemp(p)
-        mapXY(temp, p)
-    }.filter { it.x in (plotLeft - 20f)..(plotRight + 20f) && it.y in plotTop..plotBottom }
+    val points = pressures.map { pressure ->
+        mapXY(computeTemp(pressure), pressure)
+    }.filter { point ->
+        point.x in (plotLeft - 24f)..(plotRight + 24f) && point.y in plotTop..plotBottom
+    }
 
-    for (i in 0 until points.size - 1) {
+    for (index in 0 until points.size - 1) {
         drawLine(
             color = color,
-            start = points[i],
-            end = points[i + 1],
+            start = points[index],
+            end = points[index + 1],
             strokeWidth = strokeWidth,
             pathEffect = pathEffect,
         )
     }
 }
 
-/**
- * Draw a temperature or dewpoint sounding profile with optional data dots.
- */
 private fun DrawScope.drawSkewTProfile(
     points: List<StuveProfilePoint>,
     mapXY: (Float, Float) -> Offset,
@@ -673,28 +1452,26 @@ private fun DrawScope.drawSkewTProfile(
     drawDataDots: Boolean = false,
     dataDotRadius: Float = 0f,
 ) {
-    val offsets = points.map { pt -> mapXY(pt.temperatureC, pt.pressureHpa) }
+    val offsets = points.map { point -> mapXY(point.temperatureC, point.pressureHpa) }
 
-    val effect = pathEffect
-
-    for (i in 0 until offsets.size - 1) {
-        val start = offsets[i]
-        val end = offsets[i + 1]
+    for (index in 0 until offsets.size - 1) {
+        val start = offsets[index]
+        val end = offsets[index + 1]
         if (start.y in plotTop..plotBottom || end.y in plotTop..plotBottom) {
             drawLine(
                 color = color,
                 start = start,
                 end = end,
                 strokeWidth = strokeWidth,
-                pathEffect = effect,
+                pathEffect = pathEffect,
             )
         }
     }
 
     if (drawDataDots && dataDotRadius > 0f) {
-        points.forEachIndexed { i, pt ->
-            if (pt.isRealData) {
-                val offset = offsets[i]
+        points.forEachIndexed { index, point ->
+            if (point.isRealData) {
+                val offset = offsets[index]
                 if (offset.x in plotLeft..plotRight && offset.y in plotTop..plotBottom) {
                     drawCircle(
                         color = color,
@@ -730,14 +1507,14 @@ private fun DrawScope.drawWindBarb(
         strokeWidth = 1.5f,
     )
 
-    val arrowLen = halfSize * 0.4f
+    val arrowLength = halfSize * 0.4f
     val arrowAngle = PI.toFloat() / 6f
     drawLine(
         color = color,
         start = Offset(tipX, tipY),
         end = Offset(
-            tipX - cos(angleRad - arrowAngle) * arrowLen,
-            tipY - sin(angleRad - arrowAngle) * arrowLen,
+            tipX - cos(angleRad - arrowAngle) * arrowLength,
+            tipY - sin(angleRad - arrowAngle) * arrowLength,
         ),
         strokeWidth = 1.5f,
     )
@@ -745,16 +1522,160 @@ private fun DrawScope.drawWindBarb(
         color = color,
         start = Offset(tipX, tipY),
         end = Offset(
-            tipX - cos(angleRad + arrowAngle) * arrowLen,
-            tipY - sin(angleRad + arrowAngle) * arrowLen,
+            tipX - cos(angleRad + arrowAngle) * arrowLength,
+            tipY - sin(angleRad + arrowAngle) * arrowLength,
         ),
         strokeWidth = 1.5f,
     )
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Previews
-// ──────────────────────────────────────────────────────────────────────────────
+private fun formatHeightSummary(heightMeters: Float): String {
+    return if (heightMeters >= 1000f) {
+        String.format(Locale.US, "%.1f km", heightMeters / 1000f)
+    } else {
+        "${heightMeters.roundToInt()} m"
+    }
+}
+
+private fun formatAxisHeight(heightMeters: Float): String {
+    return if (heightMeters >= 1000f) {
+        String.format(Locale.US, "%.1fk", heightMeters / 1000f)
+    } else {
+        "${heightMeters.roundToInt()}m"
+    }
+}
+
+private fun formatReadoutHeight(heightMeters: Int): String {
+    return if (heightMeters >= 1000) {
+        String.format(Locale.US, "%.1f km", heightMeters / 1000f)
+    } else {
+        "${heightMeters} m"
+    }
+}
+
+private fun recommendedStuveTopAltitudeKm(chart: StuveForecastChartUiModel): Float {
+    val topHeightMeters = chart.temperatureProfile.lastOrNull()?.heightMeters
+        ?: chart.dewpointProfile.lastOrNull()?.heightMeters
+        ?: chart.windBarbs.minByOrNull { it.pressureHpa }?.let { windBarb ->
+            pressureToApproxHeightMeters(windBarb.pressureHpa).toFloat()
+        }
+        ?: pressureToApproxHeightMeters(
+            chart.temperatureProfile.lastOrNull()?.pressureHpa ?: SKEWT_MIN_TOP_PRESSURE,
+        ).toFloat()
+
+    return ((topHeightMeters / 1000f) + STUVE_AUTO_FIT_MARGIN_KM)
+        .coerceIn(DEFAULT_TOP_ALTITUDE_KM, MAX_TOP_ALTITUDE_KM)
+}
+
+internal data class TempAxisRange(
+    val minC: Float,
+    val maxC: Float,
+)
+
+internal fun buildVisibleTemperatureAxisRange(
+    chart: StuveForecastChartUiModel,
+    topPressure: Float,
+    bottomPressure: Float,
+): TempAxisRange {
+    val visibleTemperatures = collectProfileTemperatures(
+        profile = chart.temperatureProfile,
+        topPressure = topPressure,
+        bottomPressure = bottomPressure,
+    )
+    val visibleDewpoints = collectProfileTemperatures(
+        profile = chart.dewpointProfile,
+        topPressure = topPressure,
+        bottomPressure = bottomPressure,
+    )
+
+    if (visibleTemperatures.isEmpty() && visibleDewpoints.isEmpty()) {
+        return TempAxisRange(TEMP_MIN, TEMP_MAX)
+    }
+
+    val focusTopPressure = maxOf(topPressure, TEMP_AXIS_FOCUS_TOP_PRESSURE_HPA)
+    val focusedTemperatures = collectProfileTemperatures(
+        profile = chart.temperatureProfile,
+        topPressure = focusTopPressure,
+        bottomPressure = bottomPressure,
+    )
+    val focusedDewpoints = collectProfileTemperatures(
+        profile = chart.dewpointProfile,
+        topPressure = focusTopPressure,
+        bottomPressure = bottomPressure,
+    )
+    val temperatureReference = (focusedTemperatures.ifEmpty { visibleTemperatures }).maxOrNull()
+        ?: visibleTemperatures.maxOrNull()
+        ?: TEMP_MAX
+    val lowerReferenceTemperatures = focusedTemperatures.ifEmpty { visibleTemperatures }
+    val lowerReferenceDewpoints = focusedDewpoints.ifEmpty { visibleDewpoints }
+    val temperatureMin = lowerReferenceTemperatures.minOrNull() ?: temperatureReference
+    val boundedDewpointMin = lowerReferenceDewpoints.minOrNull()
+        ?.coerceAtLeast(temperatureMin - TEMP_AXIS_MAX_DEWPOINT_EXTENSION_C)
+        ?: temperatureMin
+    val heatedSurfaceMax = maxOf(
+        chart.temperatureProfile.firstOrNull()?.temperatureC ?: temperatureReference,
+        chart.parcelAscentPath.firstOrNull()?.temperatureC ?: temperatureReference,
+        chart.tconC ?: temperatureReference,
+        temperatureReference,
+    )
+
+    val rawMin = minOf(temperatureMin, boundedDewpointMin) - TEMP_AXIS_LEFT_PADDING_C
+    val rawMax = heatedSurfaceMax + TEMP_AXIS_RIGHT_PADDING_C
+    val span = (rawMax - rawMin).coerceIn(TEMP_AXIS_MIN_SPAN_C, TEMP_AXIS_MAX_SPAN_C)
+    val center = (rawMin + rawMax) / 2f
+    return TempAxisRange(
+        minC = floorToStep(center - span / 2f, TEMP_STEP),
+        maxC = ceilToStep(center + span / 2f, TEMP_STEP),
+    )
+}
+
+private fun collectProfileTemperatures(
+    profile: List<StuveProfilePoint>,
+    topPressure: Float,
+    bottomPressure: Float,
+): List<Float> = buildList {
+    profile
+        .filter { it.pressureHpa in topPressure..bottomPressure }
+        .forEach { point -> add(point.temperatureC) }
+    interpolateProfileTemperature(profile, topPressure)?.let(::add)
+    interpolateProfileTemperature(profile, bottomPressure)?.let(::add)
+}
+
+private fun buildTemperatureAxisLabels(range: TempAxisRange): List<Float> {
+    val labels = mutableListOf<Float>()
+    var value = ceilToStep(range.minC, TEMP_STEP)
+    while (value <= range.maxC + 0.01f) {
+        labels += value
+        value += TEMP_STEP
+    }
+    return labels.ifEmpty { listOf(range.minC, range.maxC) }
+}
+
+private fun floorToStep(value: Float, step: Float): Float =
+    floor(value / step) * step
+
+private fun ceilToStep(value: Float, step: Float): Float =
+    ceil(value / step) * step
+
+private fun estimateMoistAdiabatThetaWK(
+    temperatureC: Float,
+    pressureHpa: Float,
+): Float {
+    var bestTheta = potentialTemperatureK(temperatureC, pressureHpa)
+    var bestDelta = Float.MAX_VALUE
+
+    var theta = 220f
+    while (theta <= 380f) {
+        val delta = abs(moistAdiabatTempC(theta, pressureHpa) - temperatureC)
+        if (delta < bestDelta) {
+            bestDelta = delta
+            bestTheta = theta
+        }
+        theta += 0.5f
+    }
+
+    return bestTheta
+}
 
 @Preview(name = "Skew-T Default", showBackground = true, widthDp = 420, heightDp = 720)
 @Composable

@@ -12,6 +12,7 @@ object ForecastTestTags {
     const val CLOUD_VIEW = "forecast_view_cloud"
     const val THERMIC_TIME_AXIS = "forecast_thermic_time_axis"
     const val THERMIC_ALTITUDE_UNIT = "forecast_thermic_altitude_unit"
+    const val STUVE_CHART_CANVAS = "forecast_stuve_chart_canvas"
     const val STUVE_TIME_SLIDER = "forecast_stuve_time_slider"
     const val STUVE_SELECTED_HOUR = "forecast_stuve_selected_hour"
     const val WIND_TIME_AXIS = "forecast_wind_time_axis"

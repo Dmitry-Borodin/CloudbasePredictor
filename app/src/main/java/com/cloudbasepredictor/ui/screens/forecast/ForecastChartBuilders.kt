@@ -6,7 +6,7 @@ import com.cloudbasepredictor.domain.forecast.ProfileLevel
 import com.cloudbasepredictor.domain.forecast.SurfaceHeatingInput
 import com.cloudbasepredictor.domain.forecast.analyzeParcel
 import com.cloudbasepredictor.domain.forecast.estimateSurfacePressure
-import kotlin.math.pow
+import com.cloudbasepredictor.domain.forecast.satMixingRatioGKg
 
 /**
  * Builds chart UI models from real [HourlyForecastData] returned by the backend.
@@ -32,74 +32,123 @@ internal fun buildStuveChartFromData(
         ?: return buildPlaceholderStuveChart(hour, dayIndex)
 
     val pressureLevels = hourPoint.pressureLevels.sortedByDescending { it.pressureHpa }
+    val surfacePressure = hourPoint.surfacePressureHpa?.toFloat()
+        ?: estimateSurfacePressure(hourlyData.elevation ?: 0.0)
+    val surfaceHeightMeters = hourlyData.elevation?.toFloat()
+        ?: pressureToApproxHeightMeters(surfacePressure).toFloat()
+    val surfaceTemperatureC = hourPoint.temperature2mC?.toFloat()
+        ?: return buildPlaceholderStuveChart(hour, dayIndex)
+    val surfaceDewPointC = hourPoint.dewPoint2mC?.toFloat()
+        ?: return buildPlaceholderStuveChart(hour, dayIndex)
 
-    // Estimate surface pressure from station elevation (ISA)
-    val surfacePressure = estimateSurfacePressureHpa(hourlyData.elevation ?: 0.0)
-
-    // Build temperature profile: surface 2 m point + pressure levels above surface
     val temperatureProfile = buildList {
-        hourPoint.temperature2mC?.let { t2m ->
-            add(StuveProfilePoint(surfacePressure, t2m.toFloat(), isRealData = true))
-        }
+        add(
+            StuveProfilePoint(
+                pressureHpa = surfacePressure,
+                temperatureC = surfaceTemperatureC,
+                heightMeters = surfaceHeightMeters,
+                isRealData = true,
+            ),
+        )
         pressureLevels
             .filter { it.pressureHpa.toFloat() < surfacePressure }
             .forEach { pl ->
-                add(StuveProfilePoint(pl.pressureHpa.toFloat(), pl.temperatureC.toFloat(), isRealData = true))
+                add(
+                    StuveProfilePoint(
+                        pressureHpa = pl.pressureHpa.toFloat(),
+                        temperatureC = pl.temperatureC.toFloat(),
+                        heightMeters = pl.geopotentialHeightM?.toFloat()
+                            ?: pressureToApproxHeightMeters(pl.pressureHpa.toFloat()).toFloat(),
+                        isRealData = true,
+                    ),
+                )
             }
     }
 
     if (temperatureProfile.isEmpty()) return buildPlaceholderStuveChart(hour, dayIndex)
 
-    // Dewpoint profile: surface 2 m point + pressure levels above surface
     val dewpointProfile = buildList {
-        hourPoint.dewPoint2mC?.let { dew ->
-            add(StuveProfilePoint(surfacePressure, dew.toFloat(), isRealData = true))
-        }
+        add(
+            StuveProfilePoint(
+                pressureHpa = surfacePressure,
+                temperatureC = surfaceDewPointC,
+                heightMeters = surfaceHeightMeters,
+                isRealData = true,
+            ),
+        )
         pressureLevels
             .filter { it.pressureHpa.toFloat() < surfacePressure }
             .forEach { pl ->
                 pl.dewPointC?.let { dew ->
-                    add(StuveProfilePoint(pl.pressureHpa.toFloat(), dew.toFloat(), isRealData = true))
+                    add(
+                        StuveProfilePoint(
+                            pressureHpa = pl.pressureHpa.toFloat(),
+                            temperatureC = dew.toFloat(),
+                            heightMeters = pl.geopotentialHeightM?.toFloat()
+                                ?: pressureToApproxHeightMeters(pl.pressureHpa.toFloat()).toFloat(),
+                            isRealData = true,
+                        ),
+                    )
                 }
             }
     }
 
-    // Parcel ascent from surface — lifted PARCEL_SURFACE_HEATING_C above current T₂ₘ
-    val surfaceEnvTemp = hourPoint.temperature2mC?.toFloat()
-        ?: temperatureProfile.firstOrNull()?.temperatureC
-        ?: return buildPlaceholderStuveChart(hour, dayIndex)
-    val surfaceTemp = surfaceEnvTemp + PARCEL_SURFACE_HEATING_C
-    val surfaceDew = hourPoint.dewPoint2mC?.toFloat()
-        ?: dewpointProfile.firstOrNull()?.temperatureC
-        ?: (surfaceTemp - 8f)
-    val kappa = 0.286f
-    val surfaceThetaK = (surfaceTemp + 273.15f) * (1000f / surfacePressure).pow(kappa)
-    val surfaceMixingRatio = saturationMixingRatioGKg(surfaceDew, surfacePressure)
-
-    // Parcel pressures: start exactly at surface, then standard levels above
-    val parcelPressures = buildList {
-        add(surfacePressure)
-        addAll(STUVE_PRESSURE_LEVELS.filter { it < surfacePressure })
+    val profileLevels = buildList {
+        add(
+            ProfileLevel(
+                pressureHpa = surfacePressure,
+                temperatureC = surfaceTemperatureC,
+                dewPointC = surfaceDewPointC,
+                heightKm = surfaceHeightMeters / 1000f,
+            ),
+        )
+        addAll(
+            pressureLevels
+                .filter { it.pressureHpa.toFloat() < surfacePressure }
+                .map { pressureLevel ->
+                    ProfileLevel(
+                        pressureHpa = pressureLevel.pressureHpa.toFloat(),
+                        temperatureC = pressureLevel.temperatureC.toFloat(),
+                        dewPointC = pressureLevel.dewPointC?.toFloat(),
+                        heightKm = (
+                            pressureLevel.geopotentialHeightM?.toFloat()
+                                ?: pressureToApproxHeightMeters(pressureLevel.pressureHpa.toFloat()).toFloat()
+                            ) / 1000f,
+                    )
+                },
+        )
     }
 
-    var reachedLcl = false
-    var lclPressure: Float? = null
-    val parcelPath = parcelPressures.map { p ->
-        if (!reachedLcl) {
-            val dryTemp = dryAdiabatTemperatureC(surfaceThetaK, p)
-            val satMr = saturationMixingRatioGKg(dryTemp, p)
-            if (satMr <= surfaceMixingRatio) {
-                reachedLcl = true
-                lclPressure = p
-                StuveProfilePoint(p, dryTemp)
-            } else {
-                StuveProfilePoint(p, dryTemp)
-            }
-        } else {
-            val moistTemp = moistAdiabatTemperatureC(surfaceThetaK, p)
-            StuveProfilePoint(p, moistTemp)
-        }
-    }
+    val heatingInput = SurfaceHeatingInput(
+        hourOfDay = hourPoint.hour,
+        shortwaveRadiationWm2 = hourPoint.shortwaveRadiationWm2?.toFloat(),
+        cloudCoverLowPercent = hourPoint.cloudCoverLowPercent?.toFloat(),
+        cloudCoverMidPercent = hourPoint.cloudCoverMidPercent?.toFloat(),
+        cloudCoverHighPercent = hourPoint.cloudCoverHighPercent?.toFloat(),
+        precipitationMm = hourPoint.precipitationMm?.toFloat(),
+        isDay = hourPoint.isDay?.let { it > 0.5 },
+    )
+    val analysis = analyzeParcel(
+        profile = profileLevels,
+        surfaceTemperatureC = surfaceTemperatureC,
+        surfaceDewPointC = surfaceDewPointC,
+        surfacePressureHpa = surfacePressure,
+        elevationKm = surfaceHeightMeters / 1000f,
+        heatingInput = heatingInput,
+        modelCapeJKg = hourPoint.capeJKg?.toFloat(),
+    ) ?: return buildPlaceholderStuveChart(hour, dayIndex)
+
+    val parcelPath = buildParcelAscentPath(
+        pressures = buildRenderableParcelPressures(
+            surfacePressureHpa = surfacePressure,
+            profilePressures = profileLevels.map { it.pressureHpa },
+        ),
+        profile = profileLevels,
+        surfaceTemperatureC = surfaceTemperatureC,
+        surfaceDewPointC = surfaceDewPointC,
+        surfacePressureHpa = surfacePressure,
+        surfaceHeatingC = analysis.surfaceHeatingC,
+    )
 
     val windBarbs = pressureLevels.mapNotNull { pl ->
         val speed = pl.windSpeedKmh ?: return@mapNotNull null
@@ -117,7 +166,10 @@ internal fun buildStuveChartFromData(
         dewpointProfile = dewpointProfile,
         parcelAscentPath = parcelPath,
         windBarbs = windBarbs,
-        lclPressureHpa = lclPressure,
+        lclPressureHpa = analysis.lclPressureHpa,
+        cclPressureHpa = analysis.cclPressureHpa,
+        tconC = analysis.tconC,
+        moistureBands = buildMoistureBands(temperatureProfile, dewpointProfile),
         selectedHour = hour,
         surfacePressureHpa = surfacePressure,
     )
@@ -327,15 +379,16 @@ internal fun buildWindChartFromData(
     }
 
     // CCL (Convective Condensation Level) — where surface mixing ratio meets env. temp, ASL
-    val surfacePressure = estimateSurfacePressureHpa(elevation)
     val cclMarkers = daytimePoints.mapNotNull { hp ->
+        val surfacePressure = hp.surfacePressureHpa?.toFloat()
+            ?: estimateSurfacePressure(elevation)
         val surfDew = hp.dewPoint2mC?.toFloat() ?: return@mapNotNull null
-        val surfMr = saturationMixingRatioGKg(surfDew, surfacePressure)
+        val surfMr = satMixingRatioGKg(surfDew, surfacePressure)
         val pls = hp.pressureLevels
             .filter { it.pressureHpa.toFloat() < surfacePressure }
             .sortedByDescending { it.pressureHpa }
         for (pl in pls) {
-            val satMr = saturationMixingRatioGKg(pl.temperatureC.toFloat(), pl.pressureHpa.toFloat())
+            val satMr = satMixingRatioGKg(pl.temperatureC.toFloat(), pl.pressureHpa.toFloat())
             if (satMr <= surfMr) {
                 val heightAsl = (pl.geopotentialHeightM ?: continue).toFloat() / 1000f
                 if (heightAsl > elevationKm) {

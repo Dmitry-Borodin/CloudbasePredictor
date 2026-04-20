@@ -3,15 +3,23 @@ package com.cloudbasepredictor.screenshot
 import android.graphics.Bitmap
 import android.os.Environment
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.platform.app.InstrumentationRegistry
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.testutil.SimulatedTestData
 import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.ui.screens.forecast.DEFAULT_TOP_ALTITUDE_KM
 import com.cloudbasepredictor.ui.screens.forecast.ForecastScreen
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_CHART_CANVAS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import org.junit.Rule
@@ -54,15 +62,55 @@ class ScreenshotCaptureTest {
 
     @Test
     fun captureStuveForecast() {
-        captureScreen("forecast_stuve") {
+        val baseState = simulatedState(ForecastMode.STUVE)
+        var visibleTopAltitudeKm by mutableFloatStateOf(DEFAULT_TOP_ALTITUDE_KM)
+
+        composeRule.setContent {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = simulatedState(ForecastMode.STUVE),
+                    uiState = baseState.copy(
+                        chartViewport = baseState.chartViewport.copy(
+                            visibleTopAltitudeKm = visibleTopAltitudeKm,
+                        ),
+                    ),
                     onDateSelected = {},
+                    onForecastViewportTopChanged = { visibleTopAltitudeKm = it },
                     onOpenMap = {},
                 )
             }
         }
+        composeRule.waitForIdle()
+        composeRule.waitForIdle()
+        captureCurrentContent("forecast_stuve")
+    }
+
+    @Test
+    fun captureStuveForecastSelectedLevel() {
+        val baseState = simulatedState(ForecastMode.STUVE)
+        var visibleTopAltitudeKm by mutableFloatStateOf(DEFAULT_TOP_ALTITUDE_KM)
+
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = baseState.copy(
+                        chartViewport = baseState.chartViewport.copy(
+                            visibleTopAltitudeKm = visibleTopAltitudeKm,
+                        ),
+                    ),
+                    onDateSelected = {},
+                    onForecastViewportTopChanged = { visibleTopAltitudeKm = it },
+                    onOpenMap = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(STUVE_CHART_CANVAS).performTouchInput {
+            click(center)
+        }
+        composeRule.waitForIdle()
+
+        captureCurrentContent("forecast_stuve_selected")
     }
 
     @Test
@@ -236,7 +284,12 @@ class ScreenshotCaptureTest {
     private fun captureScreen(name: String, content: @Composable () -> Unit) {
         composeRule.setContent(content)
         composeRule.waitForIdle()
+        captureCurrentContent(name)
+    }
 
+    private fun captureCurrentContent(name: String) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
         val bitmap = composeRule.onRoot().captureToImage()
             .let { imageBitmap ->
                 val androidBitmap = Bitmap.createBitmap(
@@ -254,7 +307,7 @@ class ScreenshotCaptureTest {
             }
 
         val dir = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+            requireNotNull(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)),
             "CloudbaseScreenshots",
         )
         dir.mkdirs()
@@ -262,5 +315,17 @@ class ScreenshotCaptureTest {
         file.outputStream().use { out ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
         }
+
+        val sharedDir = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+            "CloudbaseScreenshots",
+        )
+        val sharedFile = File(sharedDir, "$name.png")
+        instrumentation.uiAutomation
+            .executeShellCommand("mkdir -p ${sharedDir.absolutePath}")
+            .close()
+        instrumentation.uiAutomation
+            .executeShellCommand("cp ${file.absolutePath} ${sharedFile.absolutePath}")
+            .close()
     }
 }
