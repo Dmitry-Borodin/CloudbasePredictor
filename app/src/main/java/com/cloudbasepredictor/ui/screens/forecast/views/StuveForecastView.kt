@@ -50,8 +50,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import com.cloudbasepredictor.domain.forecast.ProfileLevel
+import com.cloudbasepredictor.ui.screens.forecast.StuveActiveThetaKKey
+import com.cloudbasepredictor.ui.screens.forecast.buildParcelAscentPath
+import com.cloudbasepredictor.ui.screens.forecast.buildRenderableParcelPressures
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -235,6 +241,7 @@ private fun StuveTimeSlider(
 
 private data class SkewTCursorState(
     val y: Float,
+    val x: Float,
     val isPinned: Boolean = false,
 )
 
@@ -313,22 +320,142 @@ private fun SkewTDiagramCanvas(
         mutableStateOf<SkewTCursorState?>(null)
     }
 
+    // Heating-handle state: tracks how many °C the user has shifted the parcel start
+    // temperature away from the forecast default via the bottom drag handle.
+    // Reset whenever the selected hour or surface pressure changes (new sounding).
+    var heatingDeltaC by remember(chart.selectedHour, chart.surfacePressureHpa) {
+        mutableFloatStateOf(0f)
+    }
+
+    // Canvas pixel dimensions — updated by onSizeChanged, used to compute layout outside the
+    // Canvas draw block for gesture detection and semantics.
+    var canvasWidth by remember { mutableFloatStateOf(0f) }
+    var canvasHeight by remember { mutableFloatStateOf(0f) }
+
+    // Layout constants that mirror the computation inside the Canvas draw block.
+    val leftAxisWidthPx = with(density) { 40.dp.toPx() }
+    val rightAltitudeWidthPx = with(density) { 42.dp.toPx() }
+    val rightWindWidthPx = with(density) { 58.dp.toPx() }
+    val bottomAxisHeightPx = with(density) { 34.dp.toPx() }
+    val topPaddingPx = with(density) { 16.dp.toPx() }
+
+    // Derived layout (may be zero on first composition before onSizeChanged fires).
+    val outerPlotLeft = leftAxisWidthPx
+    val outerPlotRight = (canvasWidth - rightAltitudeWidthPx - rightWindWidthPx).coerceAtLeast(0f)
+    val outerPlotWidth = (outerPlotRight - outerPlotLeft).coerceAtLeast(0f)
+    val outerPlotBottom = (canvasHeight - bottomAxisHeightPx).coerceAtLeast(0f)
+
+    val outerChartBottomPressure = (chart.surfacePressureHpa + 20f).coerceAtMost(SKEWT_BOTTOM_PRESSURE)
+    val outerTopPressure = altitudeKmToApproxPressureHpa(visibleTopAltitudeKm)
+        .coerceIn(SKEWT_MIN_TOP_PRESSURE, outerChartBottomPressure - 50f)
+    val outerTempAxisRange = remember(chart, outerTopPressure, outerChartBottomPressure) {
+        buildVisibleTemperatureAxisRange(chart, outerTopPressure, outerChartBottomPressure)
+    }
+    val outerSkewFactor = outerPlotWidth * SKEWT_SKEW_RATIO
+
+    // Default parcel start temperature (first point of the pre-built ascent path).
+    val defaultParcelStartTempC = remember(chart.parcelAscentPath, chart.temperatureProfile) {
+        chart.parcelAscentPath.firstOrNull()?.temperatureC
+            ?: chart.temperatureProfile.firstOrNull()?.temperatureC
+            ?: 15f
+    }
+
+    // Memoised profile levels and parcel pressures used for live parcel recomputation.
+    val profileLevels = remember(chart.temperatureProfile, chart.dewpointProfile) {
+        buildMinimalProfileLevels(chart)
+    }
+    val parcelPressures = remember(chart.surfacePressureHpa, chart.pressureLevels) {
+        buildRenderableParcelPressures(chart.surfacePressureHpa, chart.pressureLevels)
+    }
+
+    // Anchor temperature for the active cursor, computed from its X position.
+    // Null when no cursor is active or the canvas has not been sized yet.
+    val anchorTemperatureC: Float? = remember(cursorState, outerPlotWidth, outerTempAxisRange) {
+        val cursor = cursorState ?: return@remember null
+        if (outerPlotWidth <= 0f) return@remember null
+        val pressure = yToPressure(
+            cursor.y, topPaddingPx, outerPlotBottom, outerTopPressure, outerChartBottomPressure,
+        ).coerceIn(outerTopPressure, outerChartBottomPressure)
+        xToSkewTTemperature(
+            x = cursor.x,
+            pressureHpa = pressure,
+            tempMin = outerTempAxisRange.minC,
+            tempMax = outerTempAxisRange.maxC,
+            plotLeft = outerPlotLeft,
+            plotRight = outerPlotRight,
+            skewFactor = outerSkewFactor,
+            topPressure = outerTopPressure,
+            bottomPressure = outerChartBottomPressure,
+        )
+    }
+
+    // Active parcel guide theta K exposed through semantics so that tests can verify
+    // that different tap positions produce different parcel guides.
+    val activeGuideThetaK: Float? = remember(anchorTemperatureC, cursorState, heatingDeltaC) {
+        when {
+            anchorTemperatureC != null && cursorState != null -> {
+                val pressure = yToPressure(
+                    cursorState!!.y, topPaddingPx, outerPlotBottom, outerTopPressure, outerChartBottomPressure,
+                ).coerceIn(outerTopPressure, outerChartBottomPressure)
+                potentialTemperatureK(anchorTemperatureC, pressure)
+            }
+            heatingDeltaC != 0f ->
+                potentialTemperatureK(defaultParcelStartTempC + heatingDeltaC, chart.surfacePressureHpa)
+            else -> null
+        }
+    }
+
+    // Updated lambdas for gesture callbacks — always capture the latest state.
+    val latestIsInHeatingZone = rememberUpdatedState { x: Float, y: Float ->
+        if (outerPlotWidth <= 0f) return@rememberUpdatedState false
+        val handleX = skewTToX(
+            temperatureC = defaultParcelStartTempC + heatingDeltaC,
+            pressureHpa = outerChartBottomPressure,
+            tempMin = outerTempAxisRange.minC,
+            tempMax = outerTempAxisRange.maxC,
+            plotLeft = outerPlotLeft,
+            plotRight = outerPlotRight,
+            skewFactor = outerSkewFactor,
+            topPressure = outerTopPressure,
+            bottomPressure = outerChartBottomPressure,
+        ).coerceIn(outerPlotLeft, outerPlotRight)
+        val handleY = outerPlotBottom
+        val touchRadiusPx = with(density) { 28.dp.toPx() }
+        val dx = x - handleX
+        val dy = y - handleY
+        kotlin.math.sqrt(dx * dx + dy * dy) < touchRadiusPx
+    }
+    val latestOnHeatingDragDelta = rememberUpdatedState { deltaX: Float ->
+        if (outerPlotWidth > 0f) {
+            val tempSpan = outerTempAxisRange.maxC - outerTempAxisRange.minC
+            heatingDeltaC = (heatingDeltaC + deltaX / outerPlotWidth * tempSpan)
+                .coerceIn(-20f, 20f)
+        }
+    }
+
     Canvas(
         modifier = modifier
             .clipToBounds()
             .testTag(STUVE_CHART_CANVAS)
+            .onSizeChanged { size ->
+                canvasWidth = size.width.toFloat()
+                canvasHeight = size.height.toFloat()
+            }
             .semantics {
                 stateDescription = when {
                     cursorState?.isPinned == true -> "pinned"
                     cursorState != null -> "tracking"
                     else -> "idle"
                 }
+                activeGuideThetaK?.let { set(StuveActiveThetaKKey, it) }
             }
             .pointerInput(chart.selectedHour, chart.surfacePressureHpa) {
                 detectSkewTGestures(
                     currentTopAltitudeKm = { latestVisibleTopAltitudeKm.value },
                     onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
                     onCursorStateChanged = { cursorState = it },
+                    isInHeatingZone = { x, y -> latestIsInHeatingZone.value(x, y) },
+                    onHeatingHandleDragDelta = { deltaX -> latestOnHeatingDragDelta.value(deltaX) },
                 )
             },
     ) {
@@ -395,6 +522,24 @@ private fun SkewTDiagramCanvas(
             topPressure = topPressure,
             plotHeight = plotHeight,
         )
+
+        // Resolve anchor temperature from cursor X position once, at Canvas block scope,
+        // so it can be used both inside clipRect (overlay drawing) and inside drawIntoCanvas
+        // (inline label drawing) without re-computing it twice.
+        val drawAnchorTemperatureC: Float? = cursorState?.let { cursor ->
+            val pressure = yToPressure(cursor.y).coerceIn(topPressure, chartBottomPressure)
+            xToSkewTTemperature(
+                x = cursor.x,
+                pressureHpa = pressure,
+                tempMin = tempAxisRange.minC,
+                tempMax = tempAxisRange.maxC,
+                plotLeft = plotLeft,
+                plotRight = plotRight,
+                skewFactor = skewFactor,
+                topPressure = topPressure,
+                bottomPressure = chartBottomPressure,
+            )
+        }
 
         drawRect(
             color = gridBackgroundColor,
@@ -518,6 +663,47 @@ private fun SkewTDiagramCanvas(
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 5.dp.toPx())),
             )
 
+            // ── Interactive parcel overlay ──────────────────────────────────────
+            val interactiveParcelPath: List<StuveProfilePoint>? = when {
+                drawAnchorTemperatureC != null && cursorState != null -> {
+                    val anchorPressure = yToPressure(cursorState!!.y)
+                        .coerceIn(topPressure, chartBottomPressure)
+                    buildInteractiveParcelFromPoint(
+                        anchorTemperatureC = drawAnchorTemperatureC,
+                        anchorPressureHpa = anchorPressure,
+                        chart = chart,
+                        profileLevels = profileLevels,
+                        parcelPressures = parcelPressures,
+                    )
+                }
+                heatingDeltaC != 0f ->
+                    buildInteractiveParcelFromSurface(
+                        parcelStartTempC = defaultParcelStartTempC + heatingDeltaC,
+                        chart = chart,
+                        profileLevels = profileLevels,
+                        parcelPressures = parcelPressures,
+                    )
+                else -> null
+            }
+
+            interactiveParcelPath?.let { path ->
+                drawSkewTProfile(
+                    points = path,
+                    mapXY = { temperature, pressure ->
+                        Offset(temperatureToX(temperature, pressure), pressureToY(pressure))
+                    },
+                    plotLeft = plotLeft,
+                    plotRight = plotRight,
+                    plotTop = plotTop,
+                    plotBottom = plotBottom,
+                    color = Color(0xFF59A36A).copy(alpha = 0.88f),
+                    strokeWidth = 2.4f.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(
+                        floatArrayOf(10.dp.toPx(), 5.dp.toPx()),
+                    ),
+                )
+            }
+
             chart.lclPressureHpa?.let { pressure ->
                 val y = pressureToY(pressure)
                 drawLine(
@@ -558,7 +744,11 @@ private fun SkewTDiagramCanvas(
 
             val activeCursor = cursorState
             if (activeCursor != null) {
-                val readout = buildCursorReadout(chart, yToPressure(activeCursor.y))
+                val readout = buildCursorReadout(
+                    chart = chart,
+                    pressureHpa = yToPressure(activeCursor.y),
+                    anchorTemperatureC = drawAnchorTemperatureC,
+                )
                 val cursorY = pressureToY(readout.pressureHpa)
                 if (cursorY in plotTop..plotBottom) {
                     drawCursorOverlay(
@@ -581,6 +771,41 @@ private fun SkewTDiagramCanvas(
             topLeft = Offset(plotLeft, plotTop),
             size = Size(plotWidth, plotHeight),
             style = Stroke(width = 1.dp.toPx()),
+        )
+
+        // ── Heating handle: drawn at plotBottom, outside the clipped area ──────
+        val activeParcelStartTempC = defaultParcelStartTempC + heatingDeltaC
+        val handleX = skewTToX(
+            temperatureC = activeParcelStartTempC,
+            pressureHpa = chartBottomPressure,
+            tempMin = tempAxisRange.minC,
+            tempMax = tempAxisRange.maxC,
+            plotLeft = plotLeft,
+            plotRight = plotRight,
+            skewFactor = skewFactor,
+            topPressure = topPressure,
+            bottomPressure = chartBottomPressure,
+        ).coerceIn(plotLeft, plotRight)
+        val handleColor = Color(0xFF59A36A)
+        // Vertical stem from bottom of plot area down to the handle circle.
+        drawLine(
+            color = handleColor.copy(alpha = 0.75f),
+            start = Offset(handleX, plotBottom),
+            end = Offset(handleX, plotBottom + with(density) { 8.dp.toPx() }),
+            strokeWidth = 2.dp.toPx(),
+        )
+        // Handle circle — tap / drag target.
+        drawCircle(
+            color = handleColor,
+            radius = with(density) { 6.dp.toPx() },
+            center = Offset(handleX, plotBottom + with(density) { 8.dp.toPx() }),
+        )
+        // Small tick on the plot bottom edge to show the handle position.
+        drawLine(
+            color = handleColor,
+            start = Offset(handleX, plotBottom - with(density) { 4.dp.toPx() }),
+            end = Offset(handleX, plotBottom),
+            strokeWidth = 2.dp.toPx(),
         )
 
         chart.windBarbs.forEach { barb ->
@@ -693,7 +918,11 @@ private fun SkewTDiagramCanvas(
             }
 
             cursorState?.let { activeCursor ->
-                val readout = buildCursorReadout(chart, yToPressure(activeCursor.y))
+                val readout = buildCursorReadout(
+                    chart = chart,
+                    pressureHpa = yToPressure(activeCursor.y),
+                    anchorTemperatureC = drawAnchorTemperatureC,
+                )
                 val cursorY = pressureToY(readout.pressureHpa)
                 if (cursorY in plotTop..plotBottom) {
                     drawCursorInlineLabels(
@@ -1196,6 +1425,7 @@ private data class PositionedBottomAxisLabel(
 private fun buildCursorReadout(
     chart: StuveForecastChartUiModel,
     pressureHpa: Float,
+    anchorTemperatureC: Float? = null,
 ): CursorReadout {
     val clampedPressure = pressureHpa.coerceIn(
         chart.temperatureProfile.lastOrNull()?.pressureHpa ?: pressureHpa,
@@ -1208,28 +1438,34 @@ private fun buildCursorReadout(
     val nearestWind = chart.windBarbs.minByOrNull { abs(it.pressureHpa - clampedPressure) }
         ?.takeIf { abs(it.pressureHpa - clampedPressure) <= 60f }
 
+    val envTemperatureC = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure)
+    // The guide (adiabat lines, parcel surface temperature) is derived from the tapped temperature
+    // when the user selects a specific chart X position; otherwise fall back to the environmental
+    // temperature at this level (backward-compatible behaviour).
+    val guideTemperatureC = anchorTemperatureC ?: envTemperatureC
+
     return CursorReadout(
         pressureHpa = clampedPressure,
         altitudeMeters = altitudeMeters,
-        temperatureC = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure),
+        temperatureC = envTemperatureC,
         dewpointC = interpolateProfileTemperature(chart.dewpointProfile, clampedPressure),
         parcelTemperatureC = interpolateProfileTemperature(chart.parcelAscentPath, clampedPressure),
-        guideDryThetaK = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure)?.let { temperature ->
+        guideDryThetaK = guideTemperatureC?.let { temperature ->
             potentialTemperatureK(temperature, clampedPressure)
         },
-        guideMoistThetaWK = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure)?.let { temperature ->
+        guideMoistThetaWK = guideTemperatureC?.let { temperature ->
             estimateMoistAdiabatThetaWK(temperature, clampedPressure)
         },
-        guideMixingRatioGKg = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure)?.let { temperature ->
+        guideMixingRatioGKg = guideTemperatureC?.let { temperature ->
             satMixingRatioGKg(temperature, clampedPressure)
         },
-        parcelSurfaceTemperatureC = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure)?.let { temperature ->
+        parcelSurfaceTemperatureC = guideTemperatureC?.let { temperature ->
             dryAdiabatTempC(
                 potentialTemperatureK(temperature, clampedPressure),
                 chart.surfacePressureHpa,
             )
         },
-        criticalSurfaceDewpointC = interpolateProfileTemperature(chart.temperatureProfile, clampedPressure)?.let { temperature ->
+        criticalSurfaceDewpointC = guideTemperatureC?.let { temperature ->
             mixingRatioTemperatureC(
                 satMixingRatioGKg(temperature, clampedPressure),
                 chart.surfacePressureHpa,
@@ -1244,60 +1480,85 @@ private suspend fun PointerInputScope.detectSkewTGestures(
     currentTopAltitudeKm: () -> Float,
     onVisibleTopAltitudeChange: (Float) -> Unit,
     onCursorStateChanged: (SkewTCursorState?) -> Unit,
+    isInHeatingZone: (x: Float, y: Float) -> Boolean,
+    onHeatingHandleDragDelta: (deltaX: Float) -> Unit,
 ) {
     awaitEachGesture {
-        var cumulativeZoom = 1f
-        var isZooming = false
-        var gestureTopAltitudeKm = currentTopAltitudeKm()
-        var hasDragged = false
-
         val down = awaitFirstDown(requireUnconsumed = false)
-        val startY = down.position.y
-        var latestY = startY
-        onCursorStateChanged(SkewTCursorState(y = latestY, isPinned = false))
 
-        do {
-            val event = awaitPointerEvent()
-            val canceled = event.changes.any { it.isConsumed }
-            if (!canceled) {
-                val pressedPointers = event.changes.count { it.pressed }
-                if (pressedPointers >= 2) {
-                    if (!isZooming) {
-                        isZooming = true
-                        onCursorStateChanged(null)
-                    }
-
-                    val zoomChange = event.calculateZoom()
-                    cumulativeZoom *= zoomChange
-                    val zoomMotion = abs(1 - cumulativeZoom) * event.calculateCentroidSize(useCurrent = false)
-                    if (zoomMotion > viewConfiguration.touchSlop && zoomChange != 1f) {
-                        gestureTopAltitudeKm = zoomedTopAltitudeKm(
-                            currentTopAltitudeKm = gestureTopAltitudeKm,
-                            zoomChange = zoomChange,
-                        )
-                        onVisibleTopAltitudeChange(gestureTopAltitudeKm)
-                        event.changes.forEach { change ->
-                            if (change.positionChanged()) {
-                                change.consume()
-                            }
-                        }
-                    }
-                } else {
+        if (isInHeatingZone(down.position.x, down.position.y)) {
+            // ── Heating-handle drag: updates parcel start temperature ──
+            var prevX = down.position.x
+            do {
+                val event = awaitPointerEvent()
+                val canceled = event.changes.any { it.isConsumed }
+                if (!canceled && event.changes.count { it.pressed } == 1) {
                     event.changes.firstOrNull { it.pressed }?.let { change ->
-                        latestY = change.position.y
-                        if (abs(latestY - startY) > viewConfiguration.touchSlop) {
-                            hasDragged = true
-                        }
-                        onCursorStateChanged(SkewTCursorState(y = latestY, isPinned = false))
+                        onHeatingHandleDragDelta(change.position.x - prevX)
+                        prevX = change.position.x
+                        change.consume()
                     }
                 }
-            }
-        } while (event.changes.any { it.pressed })
-
-        if (isZooming || hasDragged) {
-            onCursorStateChanged(null)
+            } while (event.changes.any { it.pressed })
         } else {
-            onCursorStateChanged(SkewTCursorState(y = latestY, isPinned = true))
+            // ── Normal cursor / pinch-zoom gesture ──
+            var cumulativeZoom = 1f
+            var isZooming = false
+            var gestureTopAltitudeKm = currentTopAltitudeKm()
+            var hasDragged = false
+
+            val startY = down.position.y
+            val startX = down.position.x
+            var latestY = startY
+            var latestX = startX
+            onCursorStateChanged(SkewTCursorState(y = latestY, x = latestX, isPinned = false))
+
+            do {
+                val event = awaitPointerEvent()
+                val canceled = event.changes.any { it.isConsumed }
+                if (!canceled) {
+                    val pressedPointers = event.changes.count { it.pressed }
+                    if (pressedPointers >= 2) {
+                        if (!isZooming) {
+                            isZooming = true
+                            onCursorStateChanged(null)
+                        }
+
+                        val zoomChange = event.calculateZoom()
+                        cumulativeZoom *= zoomChange
+                        val zoomMotion = abs(1 - cumulativeZoom) * event.calculateCentroidSize(useCurrent = false)
+                        if (zoomMotion > viewConfiguration.touchSlop && zoomChange != 1f) {
+                            gestureTopAltitudeKm = zoomedTopAltitudeKm(
+                                currentTopAltitudeKm = gestureTopAltitudeKm,
+                                zoomChange = zoomChange,
+                            )
+                            onVisibleTopAltitudeChange(gestureTopAltitudeKm)
+                            event.changes.forEach { change ->
+                                if (change.positionChanged()) {
+                                    change.consume()
+                                }
+                            }
+                        }
+                    } else {
+                        event.changes.firstOrNull { it.pressed }?.let { change ->
+                            latestY = change.position.y
+                            latestX = change.position.x
+                            if (abs(latestY - startY) > viewConfiguration.touchSlop ||
+                                abs(latestX - startX) > viewConfiguration.touchSlop
+                            ) {
+                                hasDragged = true
+                            }
+                            onCursorStateChanged(SkewTCursorState(y = latestY, x = latestX, isPinned = false))
+                        }
+                    }
+                }
+            } while (event.changes.any { it.pressed })
+
+            if (isZooming || hasDragged) {
+                onCursorStateChanged(null)
+            } else {
+                onCursorStateChanged(SkewTCursorState(y = latestY, x = latestX, isPinned = true))
+            }
         }
     }
 }
@@ -1373,6 +1634,32 @@ private fun skewTToX(
     val logTop = ln(topPressure)
     val heightFraction = ((logBottom - logPressure) / (logBottom - logTop)).coerceIn(0f, 1f)
     return plotLeft + normalizedTemperature * plotWidth + heightFraction * skewFactor
+}
+
+/**
+ * Inverse of [skewTToX]: converts a canvas X pixel coordinate at a given pressure level back
+ * to the temperature in degrees Celsius. The skew factor cancels out because the slope of the
+ * temperature mapping is constant across all pressure levels.
+ */
+private fun xToSkewTTemperature(
+    x: Float,
+    pressureHpa: Float,
+    tempMin: Float,
+    tempMax: Float,
+    plotLeft: Float,
+    plotRight: Float,
+    skewFactor: Float,
+    topPressure: Float,
+    bottomPressure: Float,
+): Float {
+    val plotWidth = plotRight - plotLeft
+    if (plotWidth <= 0f) return tempMin
+    val logPressure = ln(pressureHpa)
+    val logBottom = ln(bottomPressure)
+    val logTop = ln(topPressure)
+    val heightFraction = ((logBottom - logPressure) / (logBottom - logTop)).coerceIn(0f, 1f)
+    val normalizedTemperature = (x - plotLeft - heightFraction * skewFactor) / plotWidth
+    return normalizedTemperature * (tempMax - tempMin) + tempMin
 }
 
 private fun altitudeKmToApproxPressureHpa(altitudeKm: Float): Float {
@@ -1675,6 +1962,70 @@ private fun estimateMoistAdiabatThetaWK(
     }
 
     return bestTheta
+}
+
+/**
+ * Constructs a minimal list of [ProfileLevel] objects from the chart's temperature and
+ * dewpoint profiles. Used as input to [buildParcelAscentPath] for live parcel recomputation.
+ */
+private fun buildMinimalProfileLevels(
+    chart: StuveForecastChartUiModel,
+): List<ProfileLevel> = chart.temperatureProfile.map { point ->
+    ProfileLevel(
+        pressureHpa = point.pressureHpa,
+        temperatureC = point.temperatureC,
+        dewPointC = interpolateProfileTemperature(chart.dewpointProfile, point.pressureHpa),
+        heightKm = (point.heightMeters ?: pressureToApproxHeightMeters(point.pressureHpa).toFloat()) / 1000f,
+    )
+}
+
+/**
+ * Builds a live parcel ascent path anchored to a specific chart point selected by the user.
+ * The dry adiabat through ([anchorTemperatureC], [anchorPressureHpa]) is traced back to the
+ * surface to find the corresponding parcel start temperature; from there the standard
+ * dry-then-moist adiabatic ascent is computed.
+ */
+private fun buildInteractiveParcelFromPoint(
+    anchorTemperatureC: Float,
+    anchorPressureHpa: Float,
+    chart: StuveForecastChartUiModel,
+    profileLevels: List<ProfileLevel>,
+    parcelPressures: List<Float>,
+): List<StuveProfilePoint> {
+    val thetaK = potentialTemperatureK(anchorTemperatureC, anchorPressureHpa)
+    val parcelSurfaceTempC = dryAdiabatTempC(thetaK, chart.surfacePressureHpa)
+    val surfaceDewPointC = chart.dewpointProfile.firstOrNull()?.temperatureC
+        ?: (parcelSurfaceTempC - 8f)
+    return buildParcelAscentPath(
+        pressures = parcelPressures,
+        profile = profileLevels,
+        surfaceTemperatureC = parcelSurfaceTempC,
+        surfaceDewPointC = surfaceDewPointC,
+        surfacePressureHpa = chart.surfacePressureHpa,
+        surfaceHeatingC = 0f,
+    )
+}
+
+/**
+ * Builds a live parcel ascent path starting at [parcelStartTempC] at the surface pressure.
+ * Used when the bottom heating handle is dragged.
+ */
+private fun buildInteractiveParcelFromSurface(
+    parcelStartTempC: Float,
+    chart: StuveForecastChartUiModel,
+    profileLevels: List<ProfileLevel>,
+    parcelPressures: List<Float>,
+): List<StuveProfilePoint> {
+    val surfaceDewPointC = chart.dewpointProfile.firstOrNull()?.temperatureC
+        ?: (parcelStartTempC - 8f)
+    return buildParcelAscentPath(
+        pressures = parcelPressures,
+        profile = profileLevels,
+        surfaceTemperatureC = parcelStartTempC,
+        surfaceDewPointC = surfaceDewPointC,
+        surfacePressureHpa = chart.surfacePressureHpa,
+        surfaceHeatingC = 0f,
+    )
 }
 
 @Preview(name = "Skew-T Default", showBackground = true, widthDp = 420, heightDp = 720)

@@ -1,5 +1,14 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+
+/**
+ * Semantics key carrying the active parcel dry-adiabat potential temperature (K) when the chart
+ * has an active cursor or heating-handle interaction. Used by instrumented tests to verify that
+ * tap X position and bottom-handle drag produce distinct parcel guides.
+ */
+val StuveActiveThetaKKey = SemanticsPropertyKey<Float>("StuveActiveThetaK")
+
 object ForecastTestTags {
     const val THERMIC_MODE_TAB = "forecast_mode_tab_thermic"
     const val STUVE_MODE_TAB = "forecast_mode_tab_stuve"
