@@ -9,6 +9,8 @@ Keep preview sample data for UI models in a dedicated preview data layer (for ex
 
 Manual test commands (agent and user):
 
+Regular verification groups:
+
 Unit tests (JVM, no device needed):
 - `./gradlew :app:testDebugUnitTest --rerun`
 
@@ -18,8 +20,16 @@ Instrumentation tests (require running emulator/device):
 Compile-check instrumentation tests without running:
 - `./gradlew :app:compileDebugAndroidTestKotlin`
 
+Recommended regular order:
+- unit tests
+- `compileDebugAndroidTestKotlin` when Android test sources changed or need a compile-only check
+- instrumentation tests
+
+Manual / non-regular groups:
+
 E2E tests (require running emulator/device AND real network to Open-Meteo backend):
 - `./gradlew :app:connectedE2eTest`
+- Do not run as part of regular verification. Use when explicitly requested or when real backend coverage is required.
 
 Screenshot capture (require running emulator/device, uses simulated data):
 - Capture all screens:
@@ -30,3 +40,4 @@ Screenshot capture (require running emulator/device, uses simulated data):
   `adb pull /sdcard/Pictures/CloudbaseScreenshots/ app/screenshots/`
 - Screenshots are saved to `app/screenshots/` which is gitignored.
 - After pulling, the agent can view screenshots via the `view_image` tool to iterate on UI changes.
+- Do not run as part of regular verification. Use for visual/UI checks when explicitly requested or when screenshots are needed to validate rendering.
