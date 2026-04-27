@@ -6,7 +6,7 @@ import com.cloudbasepredictor.domain.forecast.analyzeParcel
 import com.cloudbasepredictor.domain.forecast.dryAdiabatTempC
 import com.cloudbasepredictor.domain.forecast.estimateSurfaceHeating
 import com.cloudbasepredictor.domain.forecast.interpolateHeightKmAtPressure
-import com.cloudbasepredictor.domain.forecast.moistAdiabatTempC
+import com.cloudbasepredictor.domain.forecast.moistAdiabatTempFromPointC
 import com.cloudbasepredictor.domain.forecast.potentialTemperatureK
 import com.cloudbasepredictor.domain.forecast.relativeHumidityFraction
 import com.cloudbasepredictor.domain.forecast.satMixingRatioGKg
@@ -266,6 +266,8 @@ internal fun buildParcelAscentPath(
     val surfaceMixingRatio = satMixingRatioGKg(surfaceDewPointC, surfacePressureHpa)
 
     var reachedLcl = false
+    var lclTemperatureC: Float? = null
+    var lclPressureHpa: Float? = null
 
     return pressures.map { pressure ->
         val heightMeters = interpolateHeightKmAtPressure(profile, pressure)?.times(1000f)
@@ -275,10 +277,16 @@ internal fun buildParcelAscentPath(
             val satMixingRatio = satMixingRatioGKg(dryTemp, pressure)
             if (satMixingRatio <= surfaceMixingRatio) {
                 reachedLcl = true
+                lclTemperatureC = dryTemp
+                lclPressureHpa = pressure
             }
             dryTemp
         } else {
-            moistAdiabatTempC(parcelThetaK, pressure)
+            moistAdiabatTempFromPointC(
+                startTemperatureC = lclTemperatureC ?: dryAdiabatTempC(parcelThetaK, pressure),
+                startPressureHpa = lclPressureHpa ?: pressure,
+                targetPressureHpa = pressure,
+            )
         }
         StuveProfilePoint(
             pressureHpa = pressure,

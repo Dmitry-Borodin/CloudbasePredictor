@@ -1,5 +1,6 @@
 package com.cloudbasepredictor.domain.forecast
 
+import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.max
@@ -96,6 +97,12 @@ private const val G = 9.81f
 /** Specific gas constant for dry air, J/(kg·K). */
 private const val RD = 287f
 
+/** Specific heat of dry air at constant pressure, J/(kg·K). */
+private const val CPD = 1004f
+
+/** Ratio of gas constants Rd/Rv used in mixing-ratio formulas. */
+private const val EPSILON = 0.622f
+
 /** Minimum parcel buoyancy (°C) to count as a usable thermal. */
 private const val MIN_BUOYANCY_C = 0.3f
 
@@ -175,6 +182,7 @@ fun analyzeParcel(
 
     // ── Find dry thermal top: where dry adiabat parcel T < environment T ──
     val dryTopKm = findDryThermalTop(parcelThetaK, aboveSurface, elevationKm)
+    val lclTemperatureC = dryAdiabatTempC(parcelThetaK, lclResult.pressureHpa)
 
     // ── Cloud base determination ──
     val rawCloudBaseKm = maxOf(lclResult.heightKm, cclResult.heightKm)
@@ -184,12 +192,22 @@ fun analyzeParcel(
     var moistEquilibriumTopKm: Float? = null
     if (cloudBaseKm != null) {
         moistEquilibriumTopKm = findMoistEquilibriumTop(
-            parcelThetaK, lclResult.pressureHpa, aboveSurface, cloudBaseKm,
+            lclTemperatureC = lclTemperatureC,
+            lclPressureHpa = lclResult.pressureHpa,
+            profile = aboveSurface,
+            cloudBaseKm = cloudBaseKm,
         )
     }
 
     // ── CAPE / CIN computation ──
-    val capeCin = computeCapeCin(parcelThetaK, surfaceMixingRatio, surfacePressureHpa, aboveSurface)
+    val capeCin = computeCapeCin(
+        parcelThetaK = parcelThetaK,
+        lclTemperatureC = lclTemperatureC,
+        lclPressureHpa = lclResult.pressureHpa,
+        surfaceMixingRatio = surfaceMixingRatio,
+        surfacePressureHpa = surfacePressureHpa,
+        profile = aboveSurface,
+    )
 
     // ── Build thermal cells from local buoyancy ──
     val thermalCells = buildThermalCells(
@@ -304,6 +322,57 @@ fun moistAdiabatTempC(thetaWK: Float, pressureHpa: Float): Float {
         tempK = thetaWK * (pressureHpa / 1000f).pow(KAPPA / (1f + correction))
     }
     return tempK - 273.15f
+}
+
+/**
+ * Integrates a saturated parcel from one known point to another pressure level.
+ *
+ * This is the path that parcel guides and parcel analysis should follow above the LCL. Using the
+ * dry parcel theta as a proxy here keeps the path too close to a dry adiabat, which is exactly
+ * the regression reported on the Stuve interaction.
+ */
+internal fun moistAdiabatTempFromPointC(
+    startTemperatureC: Float,
+    startPressureHpa: Float,
+    targetPressureHpa: Float,
+    stepHpa: Float = 2f,
+): Float {
+    if (abs(targetPressureHpa - startPressureHpa) < 0.01f) return startTemperatureC
+
+    var temperatureK = startTemperatureC + 273.15f
+    var pressureHpa = startPressureHpa
+    val direction = if (targetPressureHpa < startPressureHpa) -1f else 1f
+    val step = stepHpa * direction
+
+    while (
+        (direction < 0f && pressureHpa > targetPressureHpa + 0.01f) ||
+            (direction > 0f && pressureHpa < targetPressureHpa - 0.01f)
+    ) {
+        val nextPressureHpa = if (abs(targetPressureHpa - pressureHpa) <= abs(step)) {
+            targetPressureHpa
+        } else {
+            pressureHpa + step
+        }
+        val midpointPressureHpa = (pressureHpa + nextPressureHpa) / 2f
+        val temperatureC = temperatureK - 273.15f
+        val saturationVaporPressureHpa = satVaporPressureHpa(temperatureC)
+        val saturationMixingRatioKgKg = EPSILON * saturationVaporPressureHpa /
+            (midpointPressureHpa - saturationVaporPressureHpa).coerceAtLeast(0.01f)
+        val latentHeatJKg = 2.501e6f - 2370f * temperatureC
+        val moistLapseRateKPerM = G * (
+            1f + (latentHeatJKg * saturationMixingRatioKgKg) / (RD * temperatureK)
+            ) / (
+            CPD + (latentHeatJKg * latentHeatJKg * saturationMixingRatioKgKg * EPSILON) /
+                (RD * temperatureK * temperatureK)
+            )
+        val virtualTemperatureK = temperatureK * (1f + 0.61f * saturationMixingRatioKgKg)
+        val dTemperatureDpHpa = moistLapseRateKPerM * RD * virtualTemperatureK / (G * midpointPressureHpa)
+
+        temperatureK += dTemperatureDpHpa * (nextPressureHpa - pressureHpa)
+        pressureHpa = nextPressureHpa
+    }
+
+    return temperatureK - 273.15f
 }
 
 /** Tetens formula: saturation vapor pressure (hPa) from temperature (°C). */
@@ -484,7 +553,7 @@ private fun findDryThermalTop(
  * falls below the environmental temperature above cloud base.
  */
 private fun findMoistEquilibriumTop(
-    parcelThetaK: Float,
+    lclTemperatureC: Float,
     lclPressureHpa: Float,
     profile: List<ProfileLevel>,
     cloudBaseKm: Float,
@@ -495,13 +564,17 @@ private fun findMoistEquilibriumTop(
     var foundBuoyant = false
     var prevLevel: ProfileLevel? = null
     for (level in aboveCloudBase) {
-        val moistTemp = moistAdiabatTempC(parcelThetaK, level.pressureHpa)
+        val moistTemp = moistAdiabatTempFromPointC(lclTemperatureC, lclPressureHpa, level.pressureHpa)
         if (moistTemp > level.temperatureC) {
             foundBuoyant = true
         } else if (foundBuoyant) {
             // Equilibrium level found
             if (prevLevel != null) {
-                val prevMoistTemp = moistAdiabatTempC(parcelThetaK, prevLevel.pressureHpa)
+                val prevMoistTemp = moistAdiabatTempFromPointC(
+                    lclTemperatureC,
+                    lclPressureHpa,
+                    prevLevel.pressureHpa,
+                )
                 val prevDiff = prevMoistTemp - prevLevel.temperatureC
                 val currDiff = moistTemp - level.temperatureC
                 val frac = if ((prevDiff - currDiff) > 0.001f) {
@@ -525,6 +598,8 @@ private fun findMoistEquilibriumTop(
  */
 private fun computeCapeCin(
     parcelThetaK: Float,
+    lclTemperatureC: Float,
+    lclPressureHpa: Float,
     surfaceMixingRatio: Float,
     surfacePressureHpa: Float,
     profile: List<ProfileLevel>,
@@ -550,12 +625,12 @@ private fun computeCapeCin(
             val satMr = satMixingRatioGKg(dryTemp, midPressure)
             if (satMr <= surfaceMixingRatio) {
                 reachedLcl = true
-                moistAdiabatTempC(parcelThetaK, midPressure)
+                moistAdiabatTempFromPointC(lclTemperatureC, lclPressureHpa, midPressure)
             } else {
                 dryTemp
             }
         } else {
-            moistAdiabatTempC(parcelThetaK, midPressure)
+            moistAdiabatTempFromPointC(lclTemperatureC, lclPressureHpa, midPressure)
         }
 
         val envTempK = envTempMid + 273.15f

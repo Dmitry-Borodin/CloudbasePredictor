@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
@@ -111,6 +112,64 @@ class ScreenshotCaptureTest {
         composeRule.waitForIdle()
 
         captureCurrentContent("forecast_stuve_selected")
+    }
+
+    @Test
+    fun captureStuveForecastSelectedMidLevel() {
+        val baseState = simulatedState(ForecastMode.STUVE)
+        var visibleTopAltitudeKm by mutableFloatStateOf(DEFAULT_TOP_ALTITUDE_KM)
+
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = baseState.copy(
+                        chartViewport = baseState.chartViewport.copy(
+                            visibleTopAltitudeKm = visibleTopAltitudeKm,
+                        ),
+                    ),
+                    onDateSelected = {},
+                    onForecastViewportTopChanged = { visibleTopAltitudeKm = it },
+                    onOpenMap = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(STUVE_CHART_CANVAS).performTouchInput {
+            click(Offset(width * 0.48f, height * 0.47f))
+        }
+        composeRule.waitForIdle()
+
+        captureCurrentContent("forecast_stuve_selected_midlevel")
+    }
+
+    @Test
+    fun captureStuveForecastSelectedLowerMidLevel() {
+        val baseState = simulatedState(ForecastMode.STUVE)
+        var visibleTopAltitudeKm by mutableFloatStateOf(DEFAULT_TOP_ALTITUDE_KM)
+
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = baseState.copy(
+                        chartViewport = baseState.chartViewport.copy(
+                            visibleTopAltitudeKm = visibleTopAltitudeKm,
+                        ),
+                    ),
+                    onDateSelected = {},
+                    onForecastViewportTopChanged = { visibleTopAltitudeKm = it },
+                    onOpenMap = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(STUVE_CHART_CANVAS).performTouchInput {
+            click(Offset(width * 0.58f, height * 0.66f))
+        }
+        composeRule.waitForIdle()
+
+        captureCurrentContent("forecast_stuve_selected_lower_midlevel")
     }
 
     @Test
