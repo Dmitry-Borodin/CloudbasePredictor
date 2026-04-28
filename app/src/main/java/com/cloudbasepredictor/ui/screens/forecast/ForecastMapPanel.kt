@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.SavedPlace
+import com.cloudbasepredictor.ui.components.MapAttributionOverlay
 import com.cloudbasepredictor.ui.screens.forecast.views.ForecastInformationView
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import kotlinx.coroutines.flow.collectLatest
@@ -47,7 +48,9 @@ import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.layers.CircleLayer
+import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.map.OrnamentOptions
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
@@ -215,6 +218,9 @@ fun ForecastMapPanel(
                                 .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)),
                             baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
                             cameraState = cameraState,
+                            options = MapOptions(
+                                ornamentOptions = OrnamentOptions.AllDisabled,
+                            ),
                             onMapClick = { _, _ -> ClickResult.Consume },
                         ) {
                             // Favorites markers (below selected marker)
@@ -260,6 +266,12 @@ fun ForecastMapPanel(
                                 .width(20.dp)
                                 .height(2.dp)
                                 .background(Color.Black.copy(alpha = 0.4f)),
+                        )
+
+                        MapAttributionOverlay(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 8.dp, bottom = 8.dp),
                         )
 
                         if (isRateLimited) {

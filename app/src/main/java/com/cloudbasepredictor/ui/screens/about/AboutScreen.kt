@@ -2,6 +2,7 @@ package com.cloudbasepredictor.ui.screens.about
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -27,10 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cloudbasepredictor.BuildConfig
@@ -51,6 +48,9 @@ fun AboutScreen(
 ) {
     val context = LocalContext.current
     val linkColor = MaterialTheme.colorScheme.primary
+    fun openUrl(url: String) {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
 
     Column(
         modifier = modifier.fillMaxSize(),
@@ -116,50 +116,87 @@ fun AboutScreen(
                 style = MaterialTheme.typography.titleMedium,
             )
 
-            val forecastText = buildAnnotatedString {
-                append(stringResource(R.string.about_forecast_data_label))
-                pushStringAnnotation(tag = "URL", annotation = "https://open-meteo.com")
-                withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
-                    append(stringResource(R.string.about_open_meteo))
-                }
-                pop()
-            }
-            ClickableText(
-                text = forecastText,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
+            DataSourceLinkRow(
+                label = stringResource(R.string.about_forecast_data_label),
+                links = listOf(
+                    DataSourceLink(
+                        title = stringResource(R.string.about_open_meteo),
+                        url = "https://open-meteo.com",
+                    ),
                 ),
-                onClick = { offset ->
-                    forecastText.getStringAnnotations(tag = "URL", start = offset, end = offset)
-                        .firstOrNull()?.let { annotation ->
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item)))
-                        }
-                },
+                linkColor = linkColor,
+                onOpenUrl = ::openUrl,
             )
 
-            val mapsText = buildAnnotatedString {
-                append(stringResource(R.string.about_map_tiles_label))
-                pushStringAnnotation(tag = "URL", annotation = "https://openfreemap.org")
-                withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
-                    append(stringResource(R.string.about_openfreemap))
-                }
-                pop()
-            }
-            ClickableText(
-                text = mapsText,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
+            DataSourceLinkRow(
+                label = stringResource(R.string.about_map_tiles_label),
+                links = listOf(
+                    DataSourceLink(
+                        title = stringResource(R.string.about_openfreemap),
+                        url = "https://openfreemap.org",
+                    ),
+                    DataSourceLink(
+                        title = stringResource(R.string.about_openmaptiles),
+                        url = "https://openmaptiles.org",
+                    ),
+                    DataSourceLink(
+                        title = stringResource(R.string.about_openstreetmap),
+                        url = "https://www.openstreetmap.org/copyright",
+                    ),
                 ),
-                onClick = { offset ->
-                    mapsText.getStringAnnotations(tag = "URL", start = offset, end = offset)
-                        .firstOrNull()?.let { annotation ->
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item)))
-                        }
-                },
+                linkColor = linkColor,
+                onOpenUrl = ::openUrl,
+            )
+
+            DataSourceLinkRow(
+                label = stringResource(R.string.about_map_sdk_label),
+                links = listOf(
+                    DataSourceLink(
+                        title = stringResource(R.string.about_maplibre),
+                        url = "https://maplibre.org",
+                    ),
+                ),
+                linkColor = linkColor,
+                onOpenUrl = ::openUrl,
             )
         }
     }
 }
+
+@Composable
+private fun DataSourceLinkRow(
+    label: String,
+    links: List<DataSourceLink>,
+    linkColor: androidx.compose.ui.graphics.Color,
+    onOpenUrl: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = label.trimEnd(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        links.forEach { link ->
+            Text(
+                text = link.title,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = linkColor,
+                    textDecoration = TextDecoration.Underline,
+                ),
+                modifier = Modifier.clickable { onOpenUrl(link.url) },
+            )
+        }
+    }
+}
+
+private data class DataSourceLink(
+    val title: String,
+    val url: String,
+)
 
 @Preview(showBackground = true)
 @Composable

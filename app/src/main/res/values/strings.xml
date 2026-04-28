@@ -45,6 +45,10 @@
     <string name="about_open_meteo">Open-Meteo</string>
     <string name="about_map_tiles_label">Map tiles: </string>
     <string name="about_openfreemap">OpenFreeMap</string>
+    <string name="about_openmaptiles">OpenMapTiles</string>
+    <string name="about_openstreetmap">OpenStreetMap contributors</string>
+    <string name="about_map_sdk_label">Map SDK: </string>
+    <string name="about_maplibre">MapLibre</string>
 
     <!-- Forecast -->
     <string name="title_forecast">Forecast</string>
@@ -65,6 +69,9 @@
     <string name="map_unavailable_title">Map provider is unavailable right now.</string>
     <string name="map_unavailable_message">Unable to resolve tiles.openfreemap.org. Retry when network is available.</string>
     <string name="coordinates_lat_lon_format" formatted="false">Lat %.4f, Lon %.4f</string>
+    <string name="map_attribution_compact">© OpenMapTiles · © OpenStreetMap</string>
+    <string name="map_attribution_title">Map attribution</string>
+    <string name="map_attribution_full">© OpenFreeMap © OpenMapTiles Data from OpenStreetMap contributors</string>
 
     <!-- Help dialog - Thermic -->
     <string name="help_thermic_title">Thermic forecast help</string>

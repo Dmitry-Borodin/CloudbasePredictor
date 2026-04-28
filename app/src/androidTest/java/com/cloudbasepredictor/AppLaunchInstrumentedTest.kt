@@ -42,6 +42,7 @@ class AppLaunchInstrumentedTest {
                 useUnmergedTree = true,
             ).fetchSemanticsNodes().isNotEmpty() || composeRule.onAllNodesWithText(
                 "OpenFreeMap",
+                substring = true,
                 useUnmergedTree = true,
             ).fetchSemanticsNodes().isNotEmpty()
         }
@@ -51,6 +52,7 @@ class AppLaunchInstrumentedTest {
         ).fetchSemanticsNodes().isNotEmpty()
         val mapAttributionVisible = composeRule.onAllNodesWithText(
             "OpenFreeMap",
+            substring = true,
             useUnmergedTree = true,
         ).fetchSemanticsNodes().isNotEmpty()
         assertTrue(mapUnavailableVisible || mapAttributionVisible)

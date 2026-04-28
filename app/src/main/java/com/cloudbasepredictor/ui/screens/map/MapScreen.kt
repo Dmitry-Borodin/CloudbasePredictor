@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.components.FavoritesListDialog
+import com.cloudbasepredictor.ui.components.MapAttributionOverlay
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.net.InetAddress
@@ -58,7 +59,9 @@ import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.layers.CircleLayer
+import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.map.OrnamentOptions
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
@@ -167,6 +170,9 @@ fun MapScreen(
                     modifier = Modifier.fillMaxSize(),
                     baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
                     cameraState = cameraState,
+                    options = MapOptions(
+                        ornamentOptions = OrnamentOptions.AllDisabled,
+                    ),
                     onMapClick = { position, _ ->
                         onMapTapped(position.latitude, position.longitude)
                         ClickResult.Consume
@@ -248,11 +254,7 @@ fun MapScreen(
             )
         }
 
-        // Map tile service attribution
-        Text(
-            text = stringResource(R.string.about_openfreemap),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+        MapAttributionOverlay(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .windowInsetsPadding(WindowInsets.navigationBars)
