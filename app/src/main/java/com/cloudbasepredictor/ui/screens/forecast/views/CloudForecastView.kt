@@ -43,6 +43,7 @@ import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_RADIATI
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_RAIN_ROW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_SCROLL
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_SUNSHINE_ROW
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_TIME_AXIS_ROW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
@@ -60,32 +61,32 @@ internal fun CloudForecastView(
             .fillMaxSize()
             .testTag(CLOUD_VIEW),
     ) {
-        val minimumChartHeight = CLOUD_TOP_OVERLAY_CLEARANCE +
+        val minimumRowsHeight = CLOUD_TOP_OVERLAY_CLEARANCE +
             SUNSHINE_ROW_HEIGHT +
             RADIATION_ROW_HEIGHT +
             CLOUD_LAYERS_HEIGHT +
-            RAIN_ROW_HEIGHT +
-            TIME_AXIS_HEIGHT +
-            CLOUD_ROW_MIN_SPACING * CLOUD_ROW_GAP_COUNT
+            RAIN_ROW_HEIGHT
+        val minimumChartHeight = minimumRowsHeight + TIME_AXIS_HEIGHT
         val viewportHeight = if (maxHeight == Dp.Infinity) minimumChartHeight else maxHeight
-        val chartHeight = if (viewportHeight > minimumChartHeight) {
-            viewportHeight
+        val scrollViewportHeight = (viewportHeight - TIME_AXIS_HEIGHT).coerceAtLeast(0.dp)
+        val rowSpacing = if (scrollViewportHeight > minimumRowsHeight) {
+            (scrollViewportHeight - minimumRowsHeight) / CLOUD_ROW_GAP_COUNT.toFloat()
         } else {
-            minimumChartHeight
+            0.dp
         }
-        val rowSpacing = CLOUD_ROW_MIN_SPACING +
-            (chartHeight - minimumChartHeight) / CLOUD_ROW_GAP_COUNT.toFloat()
+        val scrollContentHeight = maxOf(scrollViewportHeight, minimumRowsHeight + rowSpacing * CLOUD_ROW_GAP_COUNT)
 
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .height(scrollViewportHeight)
                 .verticalScroll(rememberScrollState())
                 .testTag(CLOUD_SCROLL),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(chartHeight),
+                    .height(scrollContentHeight),
             ) {
                 Spacer(modifier = Modifier.height(CLOUD_TOP_OVERLAY_CLEARANCE))
 
@@ -132,18 +133,17 @@ internal fun CloudForecastView(
                 )
 
                 Spacer(modifier = Modifier.height(rowSpacing))
-
-                // Time axis at the bottom
-                CloudTimeAxisCanvas(
-                    chart = uiState.cloudChart,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(TIME_AXIS_HEIGHT),
-                )
-
-                Spacer(modifier = Modifier.height(rowSpacing))
             }
         }
+
+        CloudTimeAxisCanvas(
+            chart = uiState.cloudChart,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(TIME_AXIS_HEIGHT)
+                .testTag(CLOUD_TIME_AXIS_ROW),
+        )
 
         if (uiState.isLoading) {
             LinearProgressIndicator(
@@ -697,8 +697,7 @@ private val CLOUD_COLOR = Color(0xFF78909C)
 
 private val LEFT_AXIS_WIDTH = 60.dp
 private val CLOUD_TOP_OVERLAY_CLEARANCE = 64.dp
-private val CLOUD_ROW_MIN_SPACING = 8.dp
-private const val CLOUD_ROW_GAP_COUNT = 5
+private const val CLOUD_ROW_GAP_COUNT = 4
 private val SUNSHINE_ROW_HEIGHT = 32.dp
 private val RADIATION_ROW_HEIGHT = 48.dp
 private val CLOUD_LAYERS_HEIGHT = 144.dp

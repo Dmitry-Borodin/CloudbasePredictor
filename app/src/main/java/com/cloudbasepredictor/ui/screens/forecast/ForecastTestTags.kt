@@ -41,4 +41,5 @@ object ForecastTestTags {
     const val CLOUD_RADIATION_ROW = "forecast_cloud_radiation"
     const val CLOUD_RAIN_ROW = "forecast_cloud_rain"
     const val CLOUD_LAYERS_ROW = "forecast_cloud_layers"
+    const val CLOUD_TIME_AXIS_ROW = "forecast_cloud_time_axis"
 }

@@ -22,6 +22,7 @@ import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_RADIATI
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_RAIN_ROW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_SCROLL
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_SUNSHINE_ROW
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_TIME_AXIS_ROW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.FORECAST_CHART_AREA
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.MAP_PANEL
@@ -230,12 +231,18 @@ class ForecastScreenTest {
 
         val cloudBounds = composeRule.onNodeWithTag(CLOUD_VIEW)
             .fetchSemanticsNode().boundsInRoot
+        val timeAxisBounds = composeRule.onNodeWithTag(CLOUD_TIME_AXIS_ROW)
+            .fetchSemanticsNode().boundsInRoot
         val mapSurfaceBounds = composeRule.onNodeWithTag(MAP_PANEL_SURFACE)
             .fetchSemanticsNode().boundsInRoot
 
         assertTrue(
             "Expanded map panel should reduce cloud forecast height instead of overlaying it",
             cloudBounds.bottom <= mapSurfaceBounds.top + 1f,
+        )
+        assertTrue(
+            "Cloud time axis should stay above the expanded map panel",
+            timeAxisBounds.bottom <= mapSurfaceBounds.top + 1f,
         )
     }
 
@@ -258,6 +265,7 @@ class ForecastScreenTest {
         composeRule.onNodeWithTag(CLOUD_RADIATION_ROW).assertIsDisplayed()
         composeRule.onNodeWithTag(CLOUD_LAYERS_ROW).assertIsDisplayed()
         composeRule.onNodeWithTag(CLOUD_RAIN_ROW).assertIsDisplayed()
+        composeRule.onNodeWithTag(CLOUD_TIME_AXIS_ROW).assertIsDisplayed()
     }
 
     @Test
@@ -341,5 +349,43 @@ class ForecastScreenTest {
         composeRule.onNodeWithTag(CLOUD_RAIN_ROW)
             .performScrollTo()
             .assertIsDisplayed()
+        composeRule.onNodeWithTag(CLOUD_TIME_AXIS_ROW).assertIsDisplayed()
+    }
+
+    @Test
+    fun cloudForecastView_removesRowGapsWhenOnlyMinimumHeightFits() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                CloudForecastView(
+                    uiState = SimulatedTestData.forecastUiState(context, mode = ForecastMode.CLOUD),
+                    modifier = Modifier
+                        .width(360.dp)
+                        .height(364.dp),
+                )
+            }
+        }
+
+        val sunshineBounds = composeRule.onNodeWithTag(CLOUD_SUNSHINE_ROW)
+            .fetchSemanticsNode().boundsInRoot
+        val radiationBounds = composeRule.onNodeWithTag(CLOUD_RADIATION_ROW)
+            .fetchSemanticsNode().boundsInRoot
+        val layersBounds = composeRule.onNodeWithTag(CLOUD_LAYERS_ROW)
+            .fetchSemanticsNode().boundsInRoot
+        val rainBounds = composeRule.onNodeWithTag(CLOUD_RAIN_ROW)
+            .fetchSemanticsNode().boundsInRoot
+
+        assertTrue(
+            "Sunshine and radiation rows should touch at minimum height",
+            radiationBounds.top - sunshineBounds.bottom <= 1f,
+        )
+        assertTrue(
+            "Radiation and cloud layer rows should touch at minimum height",
+            layersBounds.top - radiationBounds.bottom <= 1f,
+        )
+        assertTrue(
+            "Cloud layer and rain rows should touch at minimum height",
+            rainBounds.top - layersBounds.bottom <= 1f,
+        )
     }
 }
