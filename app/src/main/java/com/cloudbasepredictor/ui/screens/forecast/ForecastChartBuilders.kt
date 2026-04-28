@@ -333,6 +333,7 @@ internal fun buildWindChartFromData(
     // Collect all altitude bands from pressure level data (ASL)
     val altitudeSet = sortedSetOf<Float>()
     val cellList = mutableListOf<WindForecastCellUiModel>()
+    val pressureSamples = mutableListOf<WindPressureSample>()
 
     daytimePoints.forEach { hp ->
         // Surface wind
@@ -351,19 +352,41 @@ internal fun buildWindChartFromData(
 
         hp.pressureLevels.forEach { pl ->
             val rawHeightAsl = (pl.geopotentialHeightM ?: return@forEach).toFloat() / 1000f
-            if (rawHeightAsl < elevationKm || rawHeightAsl > elevationKm + maxAltitudeKm) return@forEach
             val speed = pl.windSpeedKmh ?: return@forEach
             val dir = pl.windDirectionDeg ?: return@forEach
-            // Round to nearest 50m to collapse per-hour geopotential height variations
-            val heightAsl = kotlin.math.round(rawHeightAsl * 20f) / 20f
-            altitudeSet.add(heightAsl)
-            cellList += WindForecastCellUiModel(
+            pressureSamples += WindPressureSample(
                 hour = hp.hour,
-                altitudeKm = heightAsl,
+                pressureHpa = pl.pressureHpa,
+                heightAslKm = rawHeightAsl,
                 speedKmh = speed.toFloat(),
                 directionDeg = dir.toFloat(),
             )
         }
+    }
+
+    val representativeAltitudeByPressure = pressureSamples
+        .groupBy { it.pressureHpa }
+        .mapValues { (_, samples) ->
+            // Use one altitude per pressure level for the whole day. Open-Meteo geopotential
+            // heights vary slightly by hour; using those raw per-hour heights as cell keys
+            // creates sparse rows and leaves unpainted holes in the wind chart.
+            val averageHeightKm = samples.map { it.heightAslKm }.average().toFloat()
+            kotlin.math.round(averageHeightKm * 20f) / 20f
+        }
+        .filterValues { heightAslKm ->
+            heightAslKm >= elevationKm && heightAslKm <= elevationKm + maxAltitudeKm
+        }
+
+    pressureSamples.forEach { sample ->
+        val heightAslKm = representativeAltitudeByPressure[sample.pressureHpa]
+            ?: return@forEach
+        altitudeSet.add(heightAslKm)
+        cellList += WindForecastCellUiModel(
+            hour = sample.hour,
+            altitudeKm = heightAslKm,
+            speedKmh = sample.speedKmh,
+            directionDeg = sample.directionDeg,
+        )
     }
 
     if (cellList.isEmpty()) {
@@ -420,6 +443,14 @@ internal fun buildWindChartFromData(
         cclKm = cclMarkers,
     )
 }
+
+private data class WindPressureSample(
+    val hour: Int,
+    val pressureHpa: Int,
+    val heightAslKm: Float,
+    val speedKmh: Float,
+    val directionDeg: Float,
+)
 
 // --- Cloud chart from real data ---
 
