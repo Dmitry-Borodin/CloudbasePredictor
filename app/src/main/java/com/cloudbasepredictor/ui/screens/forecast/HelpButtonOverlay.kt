@@ -173,18 +173,17 @@ internal fun HelpButtonOverlay(
                             )
                         }
                         ForecastMode.CLOUD -> {
-                            Text(
-                                text = helpContent.summary,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
+                            CloudForecastLegend()
                         }
                     }
 
-                    Text(
-                        text = helpContent.statusMessage,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (helpContent.statusMessage.isNotBlank()) {
+                        Text(
+                            text = helpContent.statusMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             },
             confirmButton = {
@@ -224,23 +223,50 @@ private fun rememberForecastHelpContent(uiState: ForecastUiState): ForecastHelpC
         ForecastMode.CLOUD -> ForecastHelpContent(
             title = stringResource(R.string.help_cloud_title),
             summary = stringResource(R.string.help_cloud_summary),
-            statusMessage = forecastStatusMessage(uiState),
+            statusMessage = forecastStatusMessage(uiState, includeSelectedForecast = false),
             tips = emptyList(),
         )
     }
 }
 
 @Composable
-private fun forecastStatusMessage(uiState: ForecastUiState): String {
+private fun forecastStatusMessage(
+    uiState: ForecastUiState,
+    includeSelectedForecast: Boolean = true,
+): String {
+    val errorMessage = uiState.errorMessage
     return when {
         uiState.selectedPlace == null -> stringResource(R.string.help_status_no_place)
-        uiState.errorMessage != null -> stringResource(R.string.help_status_error, uiState.errorMessage!!)
+        errorMessage != null -> stringResource(R.string.help_status_error, errorMessage)
         uiState.isLoading -> stringResource(R.string.help_status_loading, uiState.selectedPlace.name)
+        !includeSelectedForecast -> ""
         else -> stringResource(
             R.string.help_status_showing,
             uiState.selectedForecastMode.name.lowercase(),
             uiState.selectedPlace.name,
             uiState.dayChips.getOrNull(uiState.selectedDayIndex)?.subtitle ?: stringResource(R.string.help_status_selected_day),
+        )
+    }
+}
+
+@Composable
+private fun CloudForecastLegend() {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = stringResource(R.string.help_cloud_legend_sun),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            text = stringResource(R.string.help_cloud_legend_radiation),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            text = stringResource(R.string.help_cloud_legend_layers),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            text = stringResource(R.string.help_cloud_legend_rain),
+            style = MaterialTheme.typography.bodyMedium,
         )
     }
 }

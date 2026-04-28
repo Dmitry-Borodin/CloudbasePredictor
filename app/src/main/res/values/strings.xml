@@ -84,6 +84,10 @@
     <!-- Help dialog - Cloud -->
     <string name="help_cloud_title">Cloud forecast help</string>
     <string name="help_cloud_summary">High / Mid / Low cloud layers with precipitation bars. Darker shading = more coverage.</string>
+    <string name="help_cloud_legend_sun">☀ h - sunshine per hour; circle size means 0-1 h</string>
+    <string name="help_cloud_legend_radiation">W/m² - shortwave radiation; bars show 0-800 W/m²</string>
+    <string name="help_cloud_legend_layers" formatted="false">High / Mid / Low - cloud cover 0-100%; darker means more</string>
+    <string name="help_cloud_legend_rain" formatted="false">Rain - probability % and amount mm</string>
     <string name="help_cloud_tip_1">Use cloud mode together with thermic mode to estimate whether lift reaches cloud base or stays blue.</string>
     <string name="help_cloud_tip_2">Compare altitude bands to spot when cloud development starts climbing higher.</string>
 

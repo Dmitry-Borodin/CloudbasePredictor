@@ -12,6 +12,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -126,24 +127,30 @@ fun ForecastScreen(
             onOpenMap = onOpenMap,
         )
 
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .testTag(ForecastTestTags.FORECAST_CHART_AREA),
         ) {
+            val forecastContentHeight = (maxHeight - mapPanelHeightDp).coerceAtLeast(0.dp)
+
             when {
                 uiState.isLoading -> {
                     ForecastLoadingContent(
                         placeName = uiState.selectedPlace?.name,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(forecastContentHeight),
                     )
                 }
                 uiState.errorMessage != null -> {
                     ForecastErrorContent(
                         errorMessage = uiState.errorMessage,
                         onRetry = onRetryLoad,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(forecastContentHeight),
                     )
                 }
                 else -> {
@@ -152,7 +159,9 @@ fun ForecastScreen(
                         onForecastViewportTopChanged = onForecastViewportTopChanged,
                         onStuveHourChanged = onStuveHourChanged,
                         onModelSelected = onModelSelected,
-                        modifier = Modifier.padding(bottom = mapPanelHeightDp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(forecastContentHeight),
                     )
                 }
             }

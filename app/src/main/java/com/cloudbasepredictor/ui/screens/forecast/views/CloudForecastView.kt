@@ -5,7 +5,9 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +32,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.model.ForecastMode
@@ -52,60 +55,94 @@ internal fun CloudForecastView(
     modifier: Modifier = Modifier,
     onVisibleTopAltitudeChange: (Float) -> Unit = {},
 ) {
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .testTag(CLOUD_VIEW),
     ) {
-        Column(
+        val minimumChartHeight = CLOUD_TOP_OVERLAY_CLEARANCE +
+            SUNSHINE_ROW_HEIGHT +
+            RADIATION_ROW_HEIGHT +
+            CLOUD_LAYERS_HEIGHT +
+            RAIN_ROW_HEIGHT +
+            TIME_AXIS_HEIGHT +
+            CLOUD_ROW_MIN_SPACING * CLOUD_ROW_GAP_COUNT
+        val viewportHeight = if (maxHeight == Dp.Infinity) minimumChartHeight else maxHeight
+        val chartHeight = if (viewportHeight > minimumChartHeight) {
+            viewportHeight
+        } else {
+            minimumChartHeight
+        }
+        val rowSpacing = CLOUD_ROW_MIN_SPACING +
+            (chartHeight - minimumChartHeight) / CLOUD_ROW_GAP_COUNT.toFloat()
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .testTag(CLOUD_SCROLL),
         ) {
-            // Sunshine duration row (short)
-            CloudSunshineCanvas(
-                chart = uiState.cloudChart,
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(SUNSHINE_ROW_HEIGHT)
-                    .testTag(CLOUD_SUNSHINE_ROW),
-            )
+                    .height(chartHeight),
+            ) {
+                Spacer(modifier = Modifier.height(CLOUD_TOP_OVERLAY_CLEARANCE))
 
-            // Shortwave radiation row (bar chart like rain)
-            CloudRadiationCanvas(
-                chart = uiState.cloudChart,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(RADIATION_ROW_HEIGHT)
-                    .testTag(CLOUD_RADIATION_ROW),
-            )
+                // Sunshine duration row (short)
+                CloudSunshineCanvas(
+                    chart = uiState.cloudChart,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(SUNSHINE_ROW_HEIGHT)
+                        .testTag(CLOUD_SUNSHINE_ROW),
+                )
 
-            // Cloud layers (High / Mid / Low)
-            CloudLayersCanvas(
-                chart = uiState.cloudChart,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(CLOUD_LAYERS_HEIGHT)
-                    .testTag(CLOUD_LAYERS_ROW),
-            )
+                Spacer(modifier = Modifier.height(rowSpacing))
 
-            // Rain row (bar chart)
-            CloudRainCanvas(
-                chart = uiState.cloudChart,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(RAIN_ROW_HEIGHT)
-                    .testTag(CLOUD_RAIN_ROW),
-            )
+                // Shortwave radiation row (bar chart like rain)
+                CloudRadiationCanvas(
+                    chart = uiState.cloudChart,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(RADIATION_ROW_HEIGHT)
+                        .testTag(CLOUD_RADIATION_ROW),
+                )
 
-            // Time axis at the bottom
-            CloudTimeAxisCanvas(
-                chart = uiState.cloudChart,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(TIME_AXIS_HEIGHT),
-            )
+                Spacer(modifier = Modifier.height(rowSpacing))
+
+                // Cloud layers (High / Mid / Low)
+                CloudLayersCanvas(
+                    chart = uiState.cloudChart,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(CLOUD_LAYERS_HEIGHT)
+                        .testTag(CLOUD_LAYERS_ROW),
+                )
+
+                Spacer(modifier = Modifier.height(rowSpacing))
+
+                // Rain row (bar chart)
+                CloudRainCanvas(
+                    chart = uiState.cloudChart,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(RAIN_ROW_HEIGHT)
+                        .testTag(CLOUD_RAIN_ROW),
+                )
+
+                Spacer(modifier = Modifier.height(rowSpacing))
+
+                // Time axis at the bottom
+                CloudTimeAxisCanvas(
+                    chart = uiState.cloudChart,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(TIME_AXIS_HEIGHT),
+                )
+
+                Spacer(modifier = Modifier.height(rowSpacing))
+            }
         }
 
         if (uiState.isLoading) {
@@ -659,6 +696,9 @@ private fun radiationColor(wm2: Float): Color {
 private val CLOUD_COLOR = Color(0xFF78909C)
 
 private val LEFT_AXIS_WIDTH = 60.dp
+private val CLOUD_TOP_OVERLAY_CLEARANCE = 64.dp
+private val CLOUD_ROW_MIN_SPACING = 8.dp
+private const val CLOUD_ROW_GAP_COUNT = 5
 private val SUNSHINE_ROW_HEIGHT = 32.dp
 private val RADIATION_ROW_HEIGHT = 48.dp
 private val CLOUD_LAYERS_HEIGHT = 144.dp

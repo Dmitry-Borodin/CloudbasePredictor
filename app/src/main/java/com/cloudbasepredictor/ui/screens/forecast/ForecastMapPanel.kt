@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
@@ -155,7 +156,8 @@ fun ForecastMapPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(with(density) { totalPanelHeight.toDp() })
-                .offset { IntOffset(0, panelOffsetY.roundToInt()) },
+                .offset { IntOffset(0, panelOffsetY.roundToInt()) }
+                .testTag(ForecastTestTags.MAP_PANEL_SURFACE),
             color = MaterialTheme.colorScheme.surfaceContainer,
             shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
             tonalElevation = 4.dp,

@@ -1,5 +1,8 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -7,7 +10,9 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.ForecastMode
@@ -20,10 +25,12 @@ import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_SUNSHIN
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.FORECAST_CHART_AREA
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.MAP_PANEL
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.MAP_PANEL_SURFACE
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_SELECTED_HOUR
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_TIME_SLIDER
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_VIEW
+import com.cloudbasepredictor.ui.screens.forecast.views.CloudForecastView
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -200,6 +207,39 @@ class ForecastScreenTest {
     }
 
     @Test
+    fun forecastScreen_expandedMapPanelReducesCloudForecastHeight() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = SimulatedTestData.forecastUiState(context, mode = ForecastMode.CLOUD),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                    initiallyExpandedMap = true,
+                )
+            }
+        }
+
+        val expandedPanelHeightPx = with(composeRule.density) { 80.dp.toPx() }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onNodeWithTag(MAP_PANEL_SURFACE)
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .height > expandedPanelHeightPx
+        }
+
+        val cloudBounds = composeRule.onNodeWithTag(CLOUD_VIEW)
+            .fetchSemanticsNode().boundsInRoot
+        val mapSurfaceBounds = composeRule.onNodeWithTag(MAP_PANEL_SURFACE)
+            .fetchSemanticsNode().boundsInRoot
+
+        assertTrue(
+            "Expanded map panel should reduce cloud forecast height instead of overlaying it",
+            cloudBounds.bottom <= mapSurfaceBounds.top + 1f,
+        )
+    }
+
+    @Test
     fun forecastScreen_cloudModeShowsAllRows() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         composeRule.setContent {
@@ -245,5 +285,61 @@ class ForecastScreenTest {
         assertTrue("Sunshine should be above radiation", sunshineTop < radiationTop)
         assertTrue("Radiation should be above cloud layers", radiationTop < layersTop)
         assertTrue("Cloud layers should be above rain", layersTop < rainTop)
+    }
+
+    @Test
+    fun cloudForecastView_spreadsRowsWhenHeightAllows() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                CloudForecastView(
+                    uiState = SimulatedTestData.forecastUiState(context, mode = ForecastMode.CLOUD),
+                    modifier = Modifier
+                        .width(360.dp)
+                        .height(640.dp),
+                )
+            }
+        }
+
+        val minimumGapPx = with(composeRule.density) { 24.dp.toPx() }
+        val minimumTopClearancePx = with(composeRule.density) { 56.dp.toPx() }
+        val sunshineBounds = composeRule.onNodeWithTag(CLOUD_SUNSHINE_ROW)
+            .fetchSemanticsNode().boundsInRoot
+        val radiationBounds = composeRule.onNodeWithTag(CLOUD_RADIATION_ROW)
+            .fetchSemanticsNode().boundsInRoot
+        val layersBounds = composeRule.onNodeWithTag(CLOUD_LAYERS_ROW)
+            .fetchSemanticsNode().boundsInRoot
+
+        assertTrue(
+            "Cloud rows should start below the overlay controls",
+            sunshineBounds.top >= minimumTopClearancePx,
+        )
+        assertTrue(
+            "Sunshine and radiation rows should spread apart when space allows",
+            radiationBounds.top - sunshineBounds.bottom >= minimumGapPx,
+        )
+        assertTrue(
+            "Radiation and cloud layer rows should spread apart when space allows",
+            layersBounds.top - radiationBounds.bottom >= minimumGapPx,
+        )
+    }
+
+    @Test
+    fun cloudForecastView_scrollsRowsWhenHeightIsTight() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                CloudForecastView(
+                    uiState = SimulatedTestData.forecastUiState(context, mode = ForecastMode.CLOUD),
+                    modifier = Modifier
+                        .width(360.dp)
+                        .height(220.dp),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(CLOUD_RAIN_ROW)
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 }

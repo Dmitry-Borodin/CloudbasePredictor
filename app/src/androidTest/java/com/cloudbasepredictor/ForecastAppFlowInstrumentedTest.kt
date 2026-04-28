@@ -13,8 +13,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -123,6 +125,8 @@ class ForecastAppFlowInstrumentedTest {
         composeRule.onNodeWithTag(CLOUD_MODE_TAB).performClick()
         composeRule.onNodeWithTag(HELP_BUTTON).performClick()
         composeRule.onNodeWithText("Cloud forecast help").assertIsDisplayed()
+        composeRule.onNodeWithText("☀ h - sunshine per hour; circle size means 0-1 h").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Showing the cloud forecast", substring = true).assertCountEquals(0)
     }
 
     @Test
