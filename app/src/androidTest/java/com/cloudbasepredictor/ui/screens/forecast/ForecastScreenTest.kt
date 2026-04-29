@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.ForecastMode
+import com.cloudbasepredictor.model.ForecastModel
 import com.cloudbasepredictor.testutil.SimulatedTestData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_LAYERS_ROW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_RADIATION_ROW
@@ -27,6 +28,8 @@ import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.FORECAST_CHART_AREA
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.MAP_PANEL
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.MAP_PANEL_SURFACE
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.MODEL_OPTION_PREFIX
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.MODEL_SELECTOR_BUTTON
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_SELECTED_HOUR
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_TIME_SLIDER
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_VIEW
@@ -114,6 +117,36 @@ class ForecastScreenTest {
         }
 
         composeRule.onNodeWithText(expectedLoadingMessage).assertIsDisplayed()
+    }
+
+    @Test
+    fun forecastScreen_loadingStateShowsModelSelectorAndHandlesSelection() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        var selectedModel: ForecastModel? = null
+
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = SimulatedTestData.forecastUiState(context).copy(
+                        isLoading = true,
+                        selectedModel = ForecastModel.ICON_SEAMLESS,
+                    ),
+                    onDateSelected = {},
+                    onModelSelected = { selectedModel = it },
+                    onOpenMap = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(MODEL_SELECTOR_BUTTON)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag(MODEL_OPTION_PREFIX + ForecastModel.ICON_D2.apiName)
+            .performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(ForecastModel.ICON_D2, selectedModel)
+        }
     }
 
     @Test

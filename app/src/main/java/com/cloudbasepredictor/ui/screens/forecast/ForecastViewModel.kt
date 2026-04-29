@@ -23,7 +23,9 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -106,6 +108,8 @@ class ForecastViewModel @Inject constructor(
     private val stuveHour = MutableStateFlow(12)
     private val isLoading = MutableStateFlow(false)
     private val errorMessage = MutableStateFlow<String?>(null)
+    private var forecastLoadJob: Job? = null
+    private var forecastLoadGeneration = 0
 
     private val _networkErrorEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val networkErrorEvent: SharedFlow<String> = _networkErrorEvent
@@ -236,7 +240,7 @@ class ForecastViewModel @Inject constructor(
                     errorMessage.value = null
 
                     if (place == null) {
-                        isLoading.value = false
+                        cancelForecastLoad()
                         return@collect
                     }
 
@@ -250,17 +254,15 @@ class ForecastViewModel @Inject constructor(
                             minimumForecastDays = requiredForecastDays,
                         )
                     ) {
-                        isLoading.value = false
+                        cancelForecastLoad()
                         return@collect
                     }
 
-                    isLoading.value = true
-                    loadForecastWindow(
+                    startForecastLoad(
                         place = place,
                         model = model,
                         forecastDays = requiredForecastDays,
                     )
-                    isLoading.value = false
                 }
         }
     }
@@ -279,18 +281,15 @@ class ForecastViewModel @Inject constructor(
                 minimumForecastDays = requiredForecastDays,
             )
         ) {
+            cancelForecastLoad()
             return
         }
         errorMessage.value = null
-        viewModelScope.launch {
-            isLoading.value = true
-            loadForecastWindow(
-                place = place,
-                model = model,
-                forecastDays = requiredForecastDays,
-            )
-            isLoading.value = false
-        }
+        startForecastLoad(
+            place = place,
+            model = model,
+            forecastDays = requiredForecastDays,
+        )
     }
 
     fun selectForecastMode(mode: ForecastMode) {
@@ -344,16 +343,44 @@ class ForecastViewModel @Inject constructor(
             maxForecastDays = (uiState.value.resolvedModel ?: model).visibleForecastDays(),
         )
         errorMessage.value = null
-        viewModelScope.launch {
+        startForecastLoad(
+            place = place,
+            model = model,
+            forecastDays = requiredForecastDays,
+            forceRefresh = true,
+        )
+    }
+
+    private fun startForecastLoad(
+        place: SavedPlace,
+        model: ForecastModel,
+        forecastDays: Int,
+        forceRefresh: Boolean = false,
+    ) {
+        val generation = ++forecastLoadGeneration
+        forecastLoadJob?.cancel()
+        forecastLoadJob = viewModelScope.launch {
             isLoading.value = true
-            loadForecastWindow(
-                place = place,
-                model = model,
-                forecastDays = requiredForecastDays,
-                forceRefresh = true,
-            )
-            isLoading.value = false
+            try {
+                loadForecastWindow(
+                    place = place,
+                    model = model,
+                    forecastDays = forecastDays,
+                    forceRefresh = forceRefresh,
+                )
+            } finally {
+                if (generation == forecastLoadGeneration) {
+                    isLoading.value = false
+                }
+            }
         }
+    }
+
+    private fun cancelForecastLoad() {
+        forecastLoadGeneration++
+        forecastLoadJob?.cancel()
+        forecastLoadJob = null
+        isLoading.value = false
     }
 
     private suspend fun loadForecastWindow(
@@ -370,6 +397,9 @@ class ForecastViewModel @Inject constructor(
                 forecastDays = forecastDays,
             )
         }.onFailure { throwable ->
+            if (throwable is CancellationException) {
+                throw throwable
+            }
             val msg = throwable.message ?: "Unable to load forecast right now."
             errorMessage.value = msg
             _networkErrorEvent.tryEmit(msg)

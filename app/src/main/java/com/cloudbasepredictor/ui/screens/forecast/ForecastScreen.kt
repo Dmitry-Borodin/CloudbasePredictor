@@ -165,7 +165,6 @@ fun ForecastScreen(
                             uiState = uiState,
                             onForecastViewportTopChanged = onForecastViewportTopChanged,
                             onStuveHourChanged = onStuveHourChanged,
-                            onModelSelected = onModelSelected,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(forecastContentHeight),
@@ -180,6 +179,15 @@ fun ForecastScreen(
                     initiallyExpanded = initiallyExpandedMap,
                     onPanelHeightChanged = { mapPanelHeightPx = it },
                     modifier = Modifier.fillMaxSize().testTag(ForecastTestTags.MAP_PANEL),
+                )
+
+                ModelSelectorOverlay(
+                    selectedModel = uiState.selectedModel,
+                    resolvedModel = uiState.resolvedModel,
+                    onModelSelected = onModelSelected,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 8.dp, end = 8.dp),
                 )
             }
 
@@ -266,7 +274,6 @@ private fun ForecastReadyContent(
     uiState: ForecastUiState,
     onForecastViewportTopChanged: (Float) -> Unit,
     onStuveHourChanged: (Int) -> Unit,
-    onModelSelected: (ForecastModel) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -325,14 +332,6 @@ private fun ForecastReadyContent(
                 .padding(start = 40.dp, top = 8.dp),
         )
 
-        ModelSelectorOverlay(
-            selectedModel = uiState.selectedModel,
-            resolvedModel = uiState.resolvedModel,
-            onModelSelected = onModelSelected,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 8.dp, end = 8.dp),
-        )
     }
 }
 
