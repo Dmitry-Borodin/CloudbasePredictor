@@ -83,6 +83,7 @@
     <string name="help_stuve_tip_1">Where the temperature line is to the right of the parcel path (dashed), the atmosphere is stable; to the left means instability and convection potential.</string>
     <string name="help_stuve_tip_2">The gap between temperature and dewpoint indicates moisture. Where they meet, clouds form (LCL).</string>
     <string name="help_stuve_tip_3">Dots on the sounding lines mark actual model data levels. Use the time slider to view different hours.</string>
+    <string name="help_stuve_moisture_strip_info">The pale strip on the right marks layers with elevated relative humidity. It starts around 55% RH; stronger shading means higher RH. It is a moisture cue, not cloud base. Use LCL/CCL for cloud-base estimates.</string>
 
     <!-- Help dialog - Wind -->
     <string name="help_wind_title">Wind forecast help</string>
@@ -107,8 +108,8 @@
 
     <!-- Help dialog - Model info -->
     <string name="help_model_label">Weather model</string>
-    <string name="help_data_updated_label">Data updated</string>
-    <string name="help_model_generated_label">Model run (estimated)</string>
+    <string name="help_data_downloaded_label">Data downloaded</string>
+    <string name="help_model_generated_label">Model run</string>
     <string name="help_wind_ccl_info">Wind altitudes are referenced to the Convective Condensation Level (CCL) — the height where rising air reaches saturation and cumulus clouds form. Bands show ±200 m around each reported pressure level.</string>
 
     <!-- Database error dialog -->

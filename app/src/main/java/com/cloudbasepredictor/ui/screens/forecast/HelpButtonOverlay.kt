@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
@@ -42,8 +44,9 @@ import com.cloudbasepredictor.model.ForecastModel
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.HELP_BUTTON
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
-import java.text.DateFormat
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 @Composable
 internal fun HelpButtonOverlay(
@@ -75,65 +78,10 @@ internal fun HelpButtonOverlay(
             },
             text = {
                 Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    // Model info section
-                    if (uiState.resolvedModel != null) {
-                        Text(
-                            text = stringResource(R.string.help_model_label),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        val modelText = if (uiState.selectedModel != uiState.resolvedModel) {
-                            "${uiState.selectedModel.displayName} → ${uiState.resolvedModel.displayName}"
-                        } else {
-                            uiState.resolvedModel.displayName
-                        }
-                        Text(
-                            text = modelText,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-
-                    // Update time
-                    if (uiState.forecastUpdatedAtMillis != null) {
-                        val localDateTimeFormat = DateFormat.getDateTimeInstance(
-                            DateFormat.MEDIUM,
-                            DateFormat.SHORT,
-                        )
-                        val formattedTime = localDateTimeFormat.format(
-                            Date(uiState.forecastUpdatedAtMillis),
-                        )
-                        Text(
-                            text = stringResource(R.string.help_data_updated_label),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = formattedTime,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-
-                    // Estimated model generation time
-                    if (uiState.modelGeneratedAtMillis != null) {
-                        val localDateTimeFormat = DateFormat.getDateTimeInstance(
-                            DateFormat.MEDIUM,
-                            DateFormat.SHORT,
-                        )
-                        val formattedModelTime = localDateTimeFormat.format(
-                            Date(uiState.modelGeneratedAtMillis),
-                        )
-                        Text(
-                            text = stringResource(R.string.help_model_generated_label),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = formattedModelTime,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
+                    ForecastHelpModelInfo(uiState = uiState)
 
                     HorizontalDivider()
 
@@ -158,6 +106,11 @@ internal fun HelpButtonOverlay(
                                     modifier = Modifier.padding(start = 4.dp),
                                 )
                             }
+                            Text(
+                                text = stringResource(R.string.help_stuve_moisture_strip_info),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         ForecastMode.WIND -> {
                             Text(
@@ -193,6 +146,51 @@ internal fun HelpButtonOverlay(
             },
         )
     }
+}
+
+@Composable
+private fun ForecastHelpModelInfo(uiState: ForecastUiState) {
+    val resolvedModel = uiState.resolvedModel ?: uiState.selectedModel
+    val modelText = if (uiState.resolvedModel != null && uiState.selectedModel != uiState.resolvedModel) {
+        "${uiState.selectedModel.displayName} -> ${uiState.resolvedModel.displayName}"
+    } else {
+        resolvedModel.displayName
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        ForecastHelpInfoRow(
+            label = stringResource(R.string.help_model_label),
+            value = modelText,
+        )
+        uiState.forecastUpdatedAtMillis?.let { downloadedAtMillis ->
+            ForecastHelpInfoRow(
+                label = stringResource(R.string.help_data_downloaded_label),
+                value = formatHelpDateTime(downloadedAtMillis),
+            )
+        }
+        uiState.modelGeneratedAtMillis?.let { modelRunAtMillis ->
+            ForecastHelpInfoRow(
+                label = stringResource(R.string.help_model_generated_label),
+                value = formatHelpDateTime(modelRunAtMillis),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ForecastHelpInfoRow(
+    label: String,
+    value: String,
+) {
+    Text(
+        text = "$label - $value",
+        style = MaterialTheme.typography.bodySmall,
+        fontWeight = FontWeight.Medium,
+    )
+}
+
+private fun formatHelpDateTime(timestampMillis: Long): String {
+    return SimpleDateFormat("dd.MM.yyyy h:mma", Locale.getDefault()).format(Date(timestampMillis))
 }
 
 @Composable
