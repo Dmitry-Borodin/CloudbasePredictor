@@ -149,23 +149,32 @@ class ForecastViewModel @Inject constructor(
         )
     }
 
-    val uiState: StateFlow<ForecastUiState> = combine(
+    private val uiInputs = combine(
         selectedPlace,
         selectedForecast,
         chartContext,
         isLoading,
         errorMessage,
+    ) { place, snapshot, currentChartContext, loading, currentError ->
+        ForecastUiInputs(
+            place = place,
+            snapshot = snapshot,
+            chartContext = currentChartContext,
+            isLoading = loading,
+            errorMessage = currentError,
+        )
+    }
+
+    val uiState: StateFlow<ForecastUiState> = combine(
+        uiInputs,
         forecastModelRepository.selectedModel,
         placeRepository.observeFavoritePlaces(),
-    ) { values ->
-        @Suppress("UNCHECKED_CAST")
-        val place = values[0] as SavedPlace?
-        val snapshot = values[1] as ForecastSnapshot?
-        val currentChartContext = values[2] as ForecastChartContext
-        val loading = values[3] as Boolean
-        val currentError = values[4] as String?
-        val currentModel = values[5] as ForecastModel
-        val favorites = values[6] as List<SavedPlace>
+    ) { inputs, currentModel, favorites ->
+        val place = inputs.place
+        val snapshot = inputs.snapshot
+        val currentChartContext = inputs.chartContext
+        val loading = inputs.isLoading
+        val currentError = inputs.errorMessage
 
         val loadedForecastDays = snapshot?.days?.size ?: 0
         val availableForecastDays = (snapshot?.resolvedModel ?: currentModel).visibleForecastDays()
@@ -412,6 +421,14 @@ private data class ForecastChartContext(
     val selectedDayIndex: Int,
     val chartViewport: ForecastChartViewport,
     val stuveHour: Int = 12,
+)
+
+private data class ForecastUiInputs(
+    val place: SavedPlace?,
+    val snapshot: ForecastSnapshot?,
+    val chartContext: ForecastChartContext,
+    val isLoading: Boolean,
+    val errorMessage: String?,
 )
 
 private fun buildForecastText(
