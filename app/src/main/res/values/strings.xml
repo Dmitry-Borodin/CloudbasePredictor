@@ -76,6 +76,11 @@
     <!-- Help dialog - Thermic -->
     <string name="help_thermic_title">Thermic forecast help</string>
     <string name="help_thermic_summary">Thermal strength legend (m/s):</string>
+    <string name="help_thermic_model_blocks_info">Shows model time/altitude blocks directly, without smoothing.</string>
+    <string name="help_thermic_dashed_lines_title">Dashed lines:</string>
+    <string name="help_thermic_dry_top_line">Orange - dry thermal top</string>
+    <string name="help_thermic_cloud_base_line">Blue - cloud base</string>
+    <string name="help_thermic_moist_top_line">Purple - moist/cloud top</string>
 
     <!-- Help dialog - Skew-T -->
     <string name="help_stuve_title">Skew-T log-P diagram</string>
@@ -88,6 +93,8 @@
     <!-- Help dialog - Wind -->
     <string name="help_wind_title">Wind forecast help</string>
     <string name="help_wind_summary">Wind speed legend (km/h):</string>
+    <string name="help_wind_moisture_title">Moisture cues:</string>
+    <string name="help_wind_ccl_line">Orange CCL line - estimated thermal cloud-base level.</string>
 
     <!-- Help dialog - Cloud -->
     <string name="help_cloud_title">Cloud forecast help</string>
@@ -103,14 +110,11 @@
     <string name="help_status_no_place">No place is selected yet. Open a point from the map to load forecast context for this screen.</string>
     <string name="help_status_error">Forecast refresh failed: %1$s</string>
     <string name="help_status_loading">Forecast data is currently loading for %1$s.</string>
-    <string name="help_status_showing">Showing the %1$s forecast for %2$s on %3$s.</string>
-    <string name="help_status_selected_day">the selected day</string>
 
     <!-- Help dialog - Model info -->
     <string name="help_model_label">Weather model</string>
     <string name="help_data_downloaded_label">Data downloaded</string>
     <string name="help_model_generated_label">Model run</string>
-    <string name="help_wind_ccl_info">Wind altitudes are referenced to the Convective Condensation Level (CCL) — the height where rising air reaches saturation and cumulus clouds form. Bands show ±200 m around each reported pressure level.</string>
 
     <!-- Database error dialog -->
     <string name="db_error_title">Database Error</string>

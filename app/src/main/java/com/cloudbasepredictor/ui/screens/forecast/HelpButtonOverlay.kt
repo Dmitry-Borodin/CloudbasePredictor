@@ -1,5 +1,6 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,7 +32,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -93,6 +97,12 @@ internal fun HelpButtonOverlay(
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             ThermicStrengthLegend()
+                            Text(
+                                text = stringResource(R.string.help_thermic_model_blocks_info),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            ThermicDiagnosticLineLegend()
                         }
                         ForecastMode.STUVE -> {
                             Text(
@@ -119,11 +129,7 @@ internal fun HelpButtonOverlay(
                             )
                             WindSpeedLegend()
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.help_wind_ccl_info),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            WindMoistureLegend()
                         }
                         ForecastMode.CLOUD -> {
                             CloudForecastLegend()
@@ -221,29 +227,20 @@ private fun rememberForecastHelpContent(uiState: ForecastUiState): ForecastHelpC
         ForecastMode.CLOUD -> ForecastHelpContent(
             title = stringResource(R.string.help_cloud_title),
             summary = stringResource(R.string.help_cloud_summary),
-            statusMessage = forecastStatusMessage(uiState, includeSelectedForecast = false),
+            statusMessage = forecastStatusMessage(uiState),
             tips = emptyList(),
         )
     }
 }
 
 @Composable
-private fun forecastStatusMessage(
-    uiState: ForecastUiState,
-    includeSelectedForecast: Boolean = true,
-): String {
+private fun forecastStatusMessage(uiState: ForecastUiState): String {
     val errorMessage = uiState.errorMessage
     return when {
         uiState.selectedPlace == null -> stringResource(R.string.help_status_no_place)
         errorMessage != null -> stringResource(R.string.help_status_error, errorMessage)
         uiState.isLoading -> stringResource(R.string.help_status_loading, uiState.selectedPlace.name)
-        !includeSelectedForecast -> ""
-        else -> stringResource(
-            R.string.help_status_showing,
-            uiState.selectedForecastMode.name.lowercase(),
-            uiState.selectedPlace.name,
-            uiState.dayChips.getOrNull(uiState.selectedDayIndex)?.subtitle ?: stringResource(R.string.help_status_selected_day),
-        )
+        else -> ""
     }
 }
 
@@ -277,6 +274,70 @@ private data class ForecastHelpContent(
 )
 
 // ── Thermic strength legend (0 → 10 m/s) ────────────────────────────────
+
+@Composable
+private fun ThermicDiagnosticLineLegend() {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = stringResource(R.string.help_thermic_dashed_lines_title),
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        ThermicDiagnosticLineLegendRow(
+            color = Color(0xFFE07020),
+            dashOnDp = 6f,
+            dashOffDp = 4f,
+            label = stringResource(R.string.help_thermic_dry_top_line),
+        )
+        ThermicDiagnosticLineLegendRow(
+            color = Color(0xFF2088E0),
+            dashOnDp = 10f,
+            dashOffDp = 4f,
+            label = stringResource(R.string.help_thermic_cloud_base_line),
+        )
+        ThermicDiagnosticLineLegendRow(
+            color = Color(0xFFA040C0),
+            dashOnDp = 4f,
+            dashOffDp = 6f,
+            label = stringResource(R.string.help_thermic_moist_top_line),
+        )
+    }
+}
+
+@Composable
+private fun ThermicDiagnosticLineLegendRow(
+    color: Color,
+    dashOnDp: Float,
+    dashOffDp: Float,
+    label: String,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Canvas(
+            modifier = Modifier
+                .width(36.dp)
+                .height(12.dp),
+        ) {
+            drawLine(
+                color = color,
+                start = Offset(0f, size.height / 2f),
+                end = Offset(size.width, size.height / 2f),
+                strokeWidth = 2.dp.toPx(),
+                cap = StrokeCap.Round,
+                pathEffect = PathEffect.dashPathEffect(
+                    floatArrayOf(dashOnDp.dp.toPx(), dashOffDp.dp.toPx()),
+                ),
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
 @Composable
 private fun ThermicStrengthLegend() {
@@ -322,6 +383,45 @@ private fun ThermicStrengthLegend() {
 }
 
 // ── Wind speed legend (0 → 60 km/h) ────────────────────────────────
+
+@Composable
+private fun WindMoistureLegend() {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = stringResource(R.string.help_wind_moisture_title),
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        WindCclLegendRow()
+    }
+}
+
+@Composable
+private fun WindCclLegendRow() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Canvas(
+            modifier = Modifier
+                .width(36.dp)
+                .height(12.dp),
+        ) {
+            drawLine(
+                color = Color(0xFFFF8C00),
+                start = Offset(0f, size.height / 2f),
+                end = Offset(size.width, size.height / 2f),
+                strokeWidth = 2.5.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
+        }
+        Text(
+            text = stringResource(R.string.help_wind_ccl_line),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
 @Composable
 private fun WindSpeedLegend() {

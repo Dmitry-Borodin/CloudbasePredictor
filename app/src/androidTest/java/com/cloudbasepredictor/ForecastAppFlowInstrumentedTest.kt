@@ -120,6 +120,16 @@ class ForecastAppFlowInstrumentedTest {
 
         composeRule.onNodeWithTag(HELP_BUTTON).performClick()
         composeRule.onNodeWithText("Thermic forecast help").assertIsDisplayed()
+        composeRule.onNodeWithText("Dashed lines:").assertIsDisplayed()
+        composeRule.onNodeWithText("Shows model time/altitude blocks directly, without smoothing.").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Showing the thermic forecast", substring = true).assertCountEquals(0)
+        composeRule.onNodeWithText("Close").performClick()
+
+        composeRule.onNodeWithTag(WIND_MODE_TAB).performClick()
+        composeRule.onNodeWithTag(HELP_BUTTON).performClick()
+        composeRule.onNodeWithText("Wind forecast help").assertIsDisplayed()
+        composeRule.onNodeWithText("Moisture cues:").assertIsDisplayed()
+        composeRule.onNodeWithText("Orange CCL line - estimated thermal cloud-base level.").assertIsDisplayed()
         composeRule.onNodeWithText("Close").performClick()
 
         composeRule.onNodeWithTag(CLOUD_MODE_TAB).performClick()
