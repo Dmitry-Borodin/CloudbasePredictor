@@ -105,6 +105,7 @@ fun MapScreen(
     onFavoriteClick: (SavedPlace) -> Unit,
     onSaveCameraPosition: (Double, Double, Double) -> Unit,
     onOpenSettings: () -> Unit = {},
+    autoOpenFavoritesOnStartup: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     var availabilityProbeKey by remember { mutableIntStateOf(0) }
@@ -142,6 +143,18 @@ fun MapScreen(
     val favoritesData = buildFavoritesFeatureCollection(uiState.favoritePlaces)
 
     var showFavoritesDialog by rememberSaveable { mutableStateOf(false) }
+    var didAutoOpenFavoritesDialog by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(autoOpenFavoritesOnStartup, uiState.favoritePlaces.size) {
+        if (
+            autoOpenFavoritesOnStartup &&
+            !didAutoOpenFavoritesDialog &&
+            uiState.favoritePlaces.size >= MIN_FAVORITES_FOR_STARTUP_DIALOG
+        ) {
+            showFavoritesDialog = true
+            didAutoOpenFavoritesDialog = true
+        }
+    }
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -270,6 +283,8 @@ fun MapScreen(
         )
     }
 }
+
+private const val MIN_FAVORITES_FOR_STARTUP_DIALOG = 2
 
 @Composable
 private fun MapUnavailableCard(
@@ -422,6 +437,7 @@ private fun MapScreenPreview() {
             onOpenForecast = {},
             onFavoriteClick = {},
             onSaveCameraPosition = { _, _, _ -> },
+            autoOpenFavoritesOnStartup = false,
         )
     }
 }

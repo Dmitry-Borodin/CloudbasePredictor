@@ -18,7 +18,6 @@ class MapViewModelFavoriteMatchTest {
         name = "Innsbruck",
         latitude = 47.2692,
         longitude = 11.4041,
-        defaultModel = "icon_seamless",
         isFavorite = true,
     )
 

@@ -12,7 +12,6 @@ class MapGeoJsonTest {
         name = "Interlaken",
         latitude = 46.6863,
         longitude = 7.8632,
-        defaultModel = "",
         isFavorite = false,
     )
 

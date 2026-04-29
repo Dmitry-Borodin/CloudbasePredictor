@@ -13,6 +13,9 @@ interface SavedPlaceDao {
     @Query("SELECT * FROM saved_places WHERE isFavorite = 1 ORDER BY name ASC")
     fun observeFavoritePlaces(): Flow<List<SavedPlaceEntity>>
 
+    @Query("SELECT * FROM saved_places WHERE isFavorite = 1 ORDER BY name ASC")
+    suspend fun getFavoritePlaces(): List<SavedPlaceEntity>
+
     @Query("SELECT * FROM saved_places WHERE id = :id")
     suspend fun findById(id: String): SavedPlaceEntity?
 

@@ -51,7 +51,6 @@ class ForecastModelE2eTest {
         name = "Innsbruck",
         latitude = 47.2692,
         longitude = 11.4041,
-        defaultModel = "",
         isFavorite = false,
     )
 

@@ -2,17 +2,21 @@ package com.cloudbasepredictor.data.place
 
 import com.cloudbasepredictor.data.local.SavedPlaceDao
 import com.cloudbasepredictor.data.local.SavedPlaceEntity
+import com.cloudbasepredictor.di.ApplicationScope
 import com.cloudbasepredictor.di.IoDispatcher
 import com.cloudbasepredictor.model.SavedPlace
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 interface PlaceRepository {
@@ -34,9 +38,14 @@ interface PlaceRepository {
 @Singleton
 class DefaultPlaceRepository @Inject constructor(
     private val savedPlaceDao: SavedPlaceDao,
+    private val favoritePlacesBackupStore: FavoritePlacesBackupStore,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    @ApplicationScope applicationScope: CoroutineScope,
 ) : PlaceRepository {
     private val mutableSelectedPlace = MutableStateFlow<SavedPlace?>(null)
+    private val restoreJob: Job = applicationScope.launch {
+        restoreFavoritePlacesFromBackup()
+    }
 
     override val selectedPlace: StateFlow<SavedPlace?> = mutableSelectedPlace.asStateFlow()
 
@@ -63,7 +72,6 @@ class DefaultPlaceRepository @Inject constructor(
                     name = place.name,
                     latitude = place.latitude,
                     longitude = place.longitude,
-                    defaultModel = place.defaultModel,
                     isFavorite = false,
                 )
             )
@@ -72,20 +80,24 @@ class DefaultPlaceRepository @Inject constructor(
     }
 
     override suspend fun saveFavorite(placeId: String, name: String) = withContext(ioDispatcher) {
+        restoreJob.join()
         val existing = savedPlaceDao.findById(placeId) ?: return@withContext
         val updated = existing.copy(name = name, isFavorite = true)
         savedPlaceDao.upsert(updated)
+        syncFavoritePlacesToBackup()
         if (mutableSelectedPlace.value?.id == placeId) {
             mutableSelectedPlace.value = updated.toDomainModel()
         }
     }
 
     override suspend fun deleteFavorite(placeId: String) = withContext(ioDispatcher) {
+        restoreJob.join()
         val existing = savedPlaceDao.findById(placeId) ?: return@withContext
         val lat = String.format(Locale.US, "%.4f", existing.latitude)
         val lon = String.format(Locale.US, "%.4f", existing.longitude)
         val updated = existing.copy(name = "$lat, $lon", isFavorite = false)
         savedPlaceDao.upsert(updated)
+        syncFavoritePlacesToBackup()
         if (mutableSelectedPlace.value?.id == placeId) {
             mutableSelectedPlace.value = updated.toDomainModel()
         }
@@ -93,6 +105,17 @@ class DefaultPlaceRepository @Inject constructor(
 
     override suspend fun selectPlace(place: SavedPlace) {
         mutableSelectedPlace.value = place
+    }
+
+    private suspend fun restoreFavoritePlacesFromBackup() = withContext(ioDispatcher) {
+        favoritePlacesBackupStore.readFavoritePlaces().forEach { place ->
+            savedPlaceDao.upsert(place.toFavoriteEntity())
+        }
+    }
+
+    private suspend fun syncFavoritePlacesToBackup() {
+        val favorites = savedPlaceDao.getFavoritePlaces().map(SavedPlaceEntity::toDomainModel)
+        favoritePlacesBackupStore.saveFavoritePlaces(favorites)
     }
 }
 
@@ -102,7 +125,16 @@ private fun SavedPlaceEntity.toDomainModel(): SavedPlace {
         name = name,
         latitude = latitude,
         longitude = longitude,
-        defaultModel = defaultModel,
         isFavorite = isFavorite,
+    )
+}
+
+private fun SavedPlace.toFavoriteEntity(): SavedPlaceEntity {
+    return SavedPlaceEntity(
+        id = id,
+        name = name,
+        latitude = latitude,
+        longitude = longitude,
+        isFavorite = true,
     )
 }

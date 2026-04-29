@@ -23,7 +23,6 @@ object PreviewData {
         name = "Interlaken",
         latitude = 46.5582,
         longitude = 7.8354,
-        defaultModel = "open-meteo",
         isFavorite = true,
     )
 
@@ -34,7 +33,6 @@ object PreviewData {
             name = "Zurich",
             latitude = 47.3769,
             longitude = 8.5417,
-            defaultModel = "open-meteo",
             isFavorite = true,
         ),
         SavedPlace(
@@ -42,7 +40,6 @@ object PreviewData {
             name = "Bern",
             latitude = 46.9480,
             longitude = 7.4474,
-            defaultModel = "open-meteo",
             isFavorite = true,
         ),
     )

@@ -7,7 +7,6 @@ data class SavedPlace(
     val name: String,
     val latitude: Double,
     val longitude: Double,
-    val defaultModel: String,
     val isFavorite: Boolean = false,
 ) {
     /**
@@ -37,7 +36,6 @@ data class SavedPlace(
                 name = displayName,
                 latitude = latitude,
                 longitude = longitude,
-                defaultModel = "",
             )
         }
     }

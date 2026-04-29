@@ -8,6 +8,7 @@ import androidx.security.crypto.MasterKey
 import com.cloudbasepredictor.data.local.AppDatabase
 import com.cloudbasepredictor.data.local.ForecastCacheDao
 import com.cloudbasepredictor.data.local.SavedPlaceDao
+import com.cloudbasepredictor.data.place.FavoritePlacesBackupContract
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -15,7 +16,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import java.security.SecureRandom
+import javax.inject.Qualifier
 import javax.inject.Singleton
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class FavoritePlacesBackupPreferences
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -58,6 +64,14 @@ object DatabaseModule {
         @ApplicationContext context: Context,
     ): SharedPreferences =
         context.getSharedPreferences("cloudbase_prefs", Context.MODE_PRIVATE)
+
+    @Provides
+    @Singleton
+    @FavoritePlacesBackupPreferences
+    fun provideFavoritePlacesBackupPreferences(
+        @ApplicationContext context: Context,
+    ): SharedPreferences =
+        context.getSharedPreferences(FavoritePlacesBackupContract.PREFS_NAME, Context.MODE_PRIVATE)
 
     private fun getOrCreatePassphrase(context: Context): String {
         val masterKey = MasterKey.Builder(context)

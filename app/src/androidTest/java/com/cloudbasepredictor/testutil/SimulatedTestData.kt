@@ -28,7 +28,6 @@ object SimulatedTestData {
         name = SimulatedForecastDataSource.PLACE_NAME,
         latitude = SimulatedForecastDataSource.LATITUDE,
         longitude = SimulatedForecastDataSource.LONGITUDE,
-        defaultModel = ForecastModel.ICON_SEAMLESS.apiName,
         isFavorite = true,
     )
 

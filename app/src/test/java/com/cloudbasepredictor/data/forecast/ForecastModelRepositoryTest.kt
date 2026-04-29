@@ -8,7 +8,7 @@ import org.junit.Test
 class ForecastModelRepositoryTest {
 
     @Test
-    fun defaultModel_isBestMatch() {
+    fun selectedModel_defaultsToBestMatch() {
         val prefs = FakeSharedPreferences()
         val repo = InMemoryForecastModelRepository(prefs)
         assertEquals(ForecastModel.BEST_MATCH, repo.selectedModel.value)
