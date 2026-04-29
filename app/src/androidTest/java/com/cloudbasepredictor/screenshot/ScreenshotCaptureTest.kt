@@ -214,6 +214,21 @@ class ScreenshotCaptureTest {
     }
 
     @Test
+    fun captureForecastLoadingDark() {
+        captureScreen("forecast_loading_dark") {
+            CloudbasePredictorTheme(darkTheme = true) {
+                ForecastScreen(
+                    uiState = PreviewData.forecastLoadingUiState.copy(
+                        selectedPlace = SimulatedTestData.brauneckPlace,
+                    ),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                )
+            }
+        }
+    }
+
+    @Test
     fun captureForecastError() {
         captureScreen("forecast_error") {
             CloudbasePredictorTheme {

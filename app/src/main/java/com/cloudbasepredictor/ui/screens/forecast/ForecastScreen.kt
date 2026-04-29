@@ -31,6 +31,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -113,85 +114,92 @@ fun ForecastScreen(
     var mapPanelHeightPx by remember { mutableFloatStateOf(0f) }
     val mapPanelHeightDp = with(density) { mapPanelHeightPx.toDp() }
 
-    Column(
+    Surface(
         modifier = modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
+            .fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
     ) {
-        ForecastTopBar(
-            placeName = uiState.selectedPlace?.name,
-            isFavorite = uiState.selectedPlace?.isFavorite == true,
-            selectedMode = uiState.selectedForecastMode,
-            onModeSelected = onForecastModeSelected,
-            onFavoriteClick = { showFavoriteDialog = true },
-            onOpenMap = onOpenMap,
-        )
-
-        BoxWithConstraints(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .testTag(ForecastTestTags.FORECAST_CHART_AREA),
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
         ) {
-            val forecastContentHeight = (maxHeight - mapPanelHeightDp).coerceAtLeast(0.dp)
+            ForecastTopBar(
+                placeName = uiState.selectedPlace?.name,
+                isFavorite = uiState.selectedPlace?.isFavorite == true,
+                selectedMode = uiState.selectedForecastMode,
+                onModeSelected = onForecastModeSelected,
+                onFavoriteClick = { showFavoriteDialog = true },
+                onOpenMap = onOpenMap,
+            )
 
-            when {
-                uiState.isLoading -> {
-                    ForecastLoadingContent(
-                        placeName = uiState.selectedPlace?.name,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(forecastContentHeight),
-                    )
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .testTag(ForecastTestTags.FORECAST_CHART_AREA),
+            ) {
+                val forecastContentHeight = (maxHeight - mapPanelHeightDp).coerceAtLeast(0.dp)
+
+                when {
+                    uiState.isLoading -> {
+                        ForecastLoadingContent(
+                            placeName = uiState.selectedPlace?.name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(forecastContentHeight),
+                        )
+                    }
+                    uiState.errorMessage != null -> {
+                        ForecastErrorContent(
+                            errorMessage = uiState.errorMessage,
+                            onRetry = onRetryLoad,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(forecastContentHeight),
+                        )
+                    }
+                    else -> {
+                        ForecastReadyContent(
+                            uiState = uiState,
+                            onForecastViewportTopChanged = onForecastViewportTopChanged,
+                            onStuveHourChanged = onStuveHourChanged,
+                            onModelSelected = onModelSelected,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(forecastContentHeight),
+                        )
+                    }
                 }
-                uiState.errorMessage != null -> {
-                    ForecastErrorContent(
-                        errorMessage = uiState.errorMessage,
-                        onRetry = onRetryLoad,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(forecastContentHeight),
-                    )
-                }
-                else -> {
-                    ForecastReadyContent(
-                        uiState = uiState,
-                        onForecastViewportTopChanged = onForecastViewportTopChanged,
-                        onStuveHourChanged = onStuveHourChanged,
-                        onModelSelected = onModelSelected,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(forecastContentHeight),
-                    )
-                }
+
+                ForecastMapPanel(
+                    currentPlace = uiState.selectedPlace,
+                    favoritePlaces = uiState.favoritePlaces,
+                    onLocationChanged = onMapLocationChanged,
+                    initiallyExpanded = initiallyExpandedMap,
+                    onPanelHeightChanged = { mapPanelHeightPx = it },
+                    modifier = Modifier.fillMaxSize().testTag(ForecastTestTags.MAP_PANEL),
+                )
             }
 
-            ForecastMapPanel(
-                currentPlace = uiState.selectedPlace,
-                favoritePlaces = uiState.favoritePlaces,
-                onLocationChanged = onMapLocationChanged,
-                initiallyExpanded = initiallyExpandedMap,
-                onPanelHeightChanged = { mapPanelHeightPx = it },
-                modifier = Modifier.fillMaxSize().testTag(ForecastTestTags.MAP_PANEL),
+            ForecastDatePicker(
+                dayChips = uiState.dayChips,
+                selectedDayIndex = uiState.selectedDayIndex,
+                onDateSelected = onDateSelected,
             )
         }
 
-        ForecastDatePicker(
-            dayChips = uiState.dayChips,
-            selectedDayIndex = uiState.selectedDayIndex,
-            onDateSelected = onDateSelected,
-        )
-    }
-
-    if (showFavoriteDialog) {
-        val place = uiState.selectedPlace
-        SaveFavoriteDialog(
-            currentName = if (place?.isFavorite == true) place.name else "",
-            isFavorite = place?.isFavorite == true,
-            onSave = onSaveFavorite,
-            onDelete = onDeleteFavorite,
-            onDismiss = { showFavoriteDialog = false },
-        )
+        if (showFavoriteDialog) {
+            val place = uiState.selectedPlace
+            SaveFavoriteDialog(
+                currentName = if (place?.isFavorite == true) place.name else "",
+                isFavorite = place?.isFavorite == true,
+                onSave = onSaveFavorite,
+                onDelete = onDeleteFavorite,
+                onDismiss = { showFavoriteDialog = false },
+            )
+        }
     }
 }
 
@@ -208,9 +216,14 @@ private fun ForecastLoadingContent(
         CircularProgressIndicator(modifier = Modifier.size(48.dp))
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = if (placeName != null) stringResource(R.string.loading_forecast_for_place, placeName) else stringResource(R.string.loading_forecast),
+            text = if (placeName != null) {
+                stringResource(R.string.loading_forecast_for_place, placeName)
+            } else {
+                stringResource(R.string.loading_forecast)
+            },
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground,
         )
         Spacer(modifier = Modifier.height(12.dp))
         LinearProgressIndicator(modifier = Modifier.fillMaxWidth(0.6f))
@@ -339,6 +352,22 @@ private fun ForecastScreenPreview() {
 @Composable
 private fun ForecastScreenLoadingPreview() {
     CloudbasePredictorTheme {
+        ForecastScreen(
+            uiState = PreviewData.forecastLoadingUiState,
+            onDateSelected = {},
+            onOpenMap = {},
+        )
+    }
+}
+
+@Preview(
+    name = "Forecast Loading Dark",
+    showBackground = true,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun ForecastScreenLoadingDarkPreview() {
+    CloudbasePredictorTheme(darkTheme = true) {
         ForecastScreen(
             uiState = PreviewData.forecastLoadingUiState,
             onDateSelected = {},
