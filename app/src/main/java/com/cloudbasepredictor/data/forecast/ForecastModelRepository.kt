@@ -28,11 +28,12 @@ class InMemoryForecastModelRepository @Inject constructor(
     }
 
     private fun loadFromPrefs(): ForecastModel {
-        val apiName = prefs.getString(KEY_SELECTED_MODEL, null) ?: return ForecastModel.BEST_MATCH
-        return ForecastModel.fromApiName(apiName) ?: ForecastModel.BEST_MATCH
+        val apiName = prefs.getString(KEY_SELECTED_MODEL, null) ?: return DEFAULT_MODEL
+        return ForecastModel.fromApiName(apiName) ?: DEFAULT_MODEL
     }
 
     private companion object {
+        val DEFAULT_MODEL = ForecastModel.ICON_SEAMLESS
         const val KEY_SELECTED_MODEL = "selected_forecast_model"
     }
 }

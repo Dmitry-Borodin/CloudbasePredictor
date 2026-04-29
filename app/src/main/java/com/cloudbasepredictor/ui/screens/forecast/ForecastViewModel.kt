@@ -75,7 +75,7 @@ data class ForecastUiState(
     /** Non-null when the last load attempt failed; displayed as error state. */
     val errorMessage: String? = null,
     /** Weather model requested by the user. */
-    val selectedModel: ForecastModel = ForecastModel.BEST_MATCH,
+    val selectedModel: ForecastModel = ForecastModel.ICON_SEAMLESS,
     /** Model actually used after fallback (may differ from [selectedModel]). */
     val resolvedModel: ForecastModel? = null,
     /** Timestamp (UTC millis) when the forecast data was last updated from the server. */

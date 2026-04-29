@@ -8,10 +8,10 @@ import org.junit.Test
 class ForecastModelRepositoryTest {
 
     @Test
-    fun selectedModel_defaultsToBestMatch() {
+    fun selectedModel_defaultsToIconSeamless() {
         val prefs = FakeSharedPreferences()
         val repo = InMemoryForecastModelRepository(prefs)
-        assertEquals(ForecastModel.BEST_MATCH, repo.selectedModel.value)
+        assertEquals(ForecastModel.ICON_SEAMLESS, repo.selectedModel.value)
     }
 
     @Test
@@ -39,11 +39,11 @@ class ForecastModelRepositoryTest {
     }
 
     @Test
-    fun loadFromPrefs_unknownApiName_fallsToBestMatch() {
+    fun loadFromPrefs_unknownApiName_fallsToDefaultModel() {
         val prefs = FakeSharedPreferences()
         prefs.edit().putString("selected_forecast_model", "unknown_model").apply()
         val repo = InMemoryForecastModelRepository(prefs)
-        assertEquals(ForecastModel.BEST_MATCH, repo.selectedModel.value)
+        assertEquals(ForecastModel.ICON_SEAMLESS, repo.selectedModel.value)
     }
 
     /**

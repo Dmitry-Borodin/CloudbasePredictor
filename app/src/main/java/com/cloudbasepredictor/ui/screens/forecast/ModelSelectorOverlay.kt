@@ -118,7 +118,7 @@ private fun ModelSelectorSheetContent(
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        ForecastModel.entries.forEach { model ->
+        forecastModelDisplayOrder.forEach { model ->
             val isSelected = model == selectedModel
             ModelOptionRow(
                 model = model,
@@ -128,6 +128,9 @@ private fun ModelSelectorSheetContent(
         }
     }
 }
+
+private val forecastModelDisplayOrder: List<ForecastModel> =
+    ForecastModel.entries.filterNot { it == ForecastModel.BEST_MATCH } + ForecastModel.BEST_MATCH
 
 @Composable
 private fun ModelOptionRow(
