@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -435,7 +436,7 @@ private fun WindChartCanvas(
                 val lx = plotLeft + index * legendItemWidth
                 val swatchW = legendItemWidth * 0.6f
                 drawRoundRect(
-                    color = windSpeedColor(speedKmh).copy(alpha = 0.7f),
+                    color = windSpeedColor(speedKmh).copy(alpha = 0.92f),
                     topLeft = Offset(lx + (legendItemWidth - swatchW) / 2f, legendY),
                     size = Size(swatchW, swatchH),
                     cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
@@ -670,13 +671,14 @@ private fun DrawScope.drawWindArrow(
     val tailX = centerX - cos(angleRad) * halfSize
     val tailY = centerY - sin(angleRad) * halfSize
 
-    val strokeWidth = (1.5f + speedKmh / 40f).coerceAtMost(3.5f)
+    val strokeWidth = (2f + speedKmh / 50f).coerceAtMost(3.5f)
 
     drawLine(
         color = color,
         start = Offset(tailX, tailY),
         end = Offset(tipX, tipY),
         strokeWidth = strokeWidth,
+        cap = StrokeCap.Round,
     )
 
     val arrowLen = halfSize * 0.35f
@@ -689,6 +691,7 @@ private fun DrawScope.drawWindArrow(
             tipY - sin(angleRad - arrowAngle) * arrowLen,
         ),
         strokeWidth = strokeWidth,
+        cap = StrokeCap.Round,
     )
     drawLine(
         color = color,
@@ -698,20 +701,22 @@ private fun DrawScope.drawWindArrow(
             tipY - sin(angleRad + arrowAngle) * arrowLen,
         ),
         strokeWidth = strokeWidth,
+        cap = StrokeCap.Round,
     )
 }
 
 private fun windSpeedColor(speedKmh: Float): Color {
     val normalized = (speedKmh / 60f).coerceIn(0f, 1f)
     val colorStops = listOf(
-        0f to Color(0xFF81C784),     // Soft green — calm
-        0.15f to Color(0xFF4CAF50),  // Green — light breeze
-        0.3f to Color(0xFFCDDC39),   // Lime — moderate
-        0.45f to Color(0xFFFFEB3B),  // Yellow — fresh breeze
-        0.6f to Color(0xFFFFC107),   // Amber — strong
-        0.75f to Color(0xFFFF9800),  // Orange — near gale
-        0.9f to Color(0xFFE53935),   // Red — gale
-        1f to Color(0xFF9C27B0),     // Purple — storm
+        0f to Color(0xFF1565C0),        // 0 km/h - calm, blue
+        5f / 60f to Color(0xFF00838F),  // 5 km/h - light air, teal
+        10f / 60f to Color(0xFF2E7D32), // 10 km/h - light breeze, green
+        15f / 60f to Color(0xFF9E9D24), // 15 km/h - readable low-mid wind
+        20f / 60f to Color(0xFFF9A825), // 20 km/h - yellow
+        30f / 60f to Color(0xFFFB8C00), // 30 km/h - orange
+        40f / 60f to Color(0xFFE53935), // 40 km/h - red
+        50f / 60f to Color(0xFF8E24AA), // 50 km/h - purple
+        1f to Color(0xFF512DA8),        // 60 km/h - deep purple
     )
 
     val lowerStop = colorStops.lastOrNull { it.first <= normalized } ?: colorStops.first()
@@ -725,7 +730,7 @@ private fun windSpeedColor(speedKmh: Float): Color {
 
 /** Background color for wind cells — same scale as windSpeedColor but with moderate alpha. */
 private fun windSpeedBgColor(speedKmh: Float): Color {
-    return windSpeedColor(speedKmh).copy(alpha = 0.55f)
+    return windSpeedColor(speedKmh).copy(alpha = 0.68f)
 }
 
 private fun altitudeToY(

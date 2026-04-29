@@ -425,7 +425,7 @@ private fun WindCclLegendRow() {
 
 @Composable
 private fun WindSpeedLegend() {
-    val steps = listOf(0, 10, 20, 30, 40, 50, 60)
+    val steps = listOf(0, 5, 10, 15, 20, 30, 40, 50, 60)
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -487,14 +487,22 @@ private fun thermicLegendColor(strengthMps: Float): Color {
 /** Wind speed color scale matching WindForecastView. */
 private fun windLegendColor(speedKmh: Float): Color {
     val normalized = (speedKmh / 60f).coerceIn(0f, 1f)
-    val low = Color(0xFF4CAF50)
-    val medium = Color(0xFFFFC107)
-    val high = Color(0xFFE53935)
-    return if (normalized <= 0.5f) {
-        lerp(low, medium, normalized / 0.5f)
-    } else {
-        lerp(medium, high, (normalized - 0.5f) / 0.5f)
-    }
+    val colorStops = listOf(
+        0f to Color(0xFF1565C0),
+        5f / 60f to Color(0xFF00838F),
+        10f / 60f to Color(0xFF2E7D32),
+        15f / 60f to Color(0xFF9E9D24),
+        20f / 60f to Color(0xFFF9A825),
+        30f / 60f to Color(0xFFFB8C00),
+        40f / 60f to Color(0xFFE53935),
+        50f / 60f to Color(0xFF8E24AA),
+        1f to Color(0xFF512DA8),
+    )
+    val lower = colorStops.lastOrNull { it.first <= normalized } ?: colorStops.first()
+    val upper = colorStops.firstOrNull { it.first >= normalized } ?: colorStops.last()
+    if (lower.first == upper.first) return lower.second
+    val fraction = (normalized - lower.first) / (upper.first - lower.first)
+    return lerp(lower.second, upper.second, fraction)
 }
 
 @Preview(name = "Forecast Help Overlay", showBackground = true)

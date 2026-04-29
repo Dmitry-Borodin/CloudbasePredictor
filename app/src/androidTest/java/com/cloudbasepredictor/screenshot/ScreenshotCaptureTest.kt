@@ -175,7 +175,7 @@ class ScreenshotCaptureTest {
     @Test
     fun captureWindForecast() {
         captureScreen("forecast_wind") {
-            CloudbasePredictorTheme {
+            CloudbasePredictorTheme(darkTheme = false) {
                 ForecastScreen(
                     uiState = simulatedState(ForecastMode.WIND),
                     onDateSelected = {},
