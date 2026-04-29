@@ -1,13 +1,13 @@
 package com.cloudbasepredictor
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cloudbasepredictor.ui.components.MapTestTags
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -35,26 +35,6 @@ class AppLaunchInstrumentedTest {
     private fun assertMapChromeVisible() {
         composeRule.onNodeWithContentDescription("Favorites").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Settings").assertIsDisplayed()
-
-        composeRule.waitUntil(timeoutMillis = 8_000) {
-            composeRule.onAllNodesWithText(
-                "Map provider is unavailable right now.",
-                useUnmergedTree = true,
-            ).fetchSemanticsNodes().isNotEmpty() || composeRule.onAllNodesWithText(
-                "OpenFreeMap",
-                substring = true,
-                useUnmergedTree = true,
-            ).fetchSemanticsNodes().isNotEmpty()
-        }
-        val mapUnavailableVisible = composeRule.onAllNodesWithText(
-            "Map provider is unavailable right now.",
-            useUnmergedTree = true,
-        ).fetchSemanticsNodes().isNotEmpty()
-        val mapAttributionVisible = composeRule.onAllNodesWithText(
-            "OpenFreeMap",
-            substring = true,
-            useUnmergedTree = true,
-        ).fetchSemanticsNodes().isNotEmpty()
-        assertTrue(mapUnavailableVisible || mapAttributionVisible)
+        composeRule.onNodeWithTag(MapTestTags.ATTRIBUTION_OVERLAY).assertIsDisplayed()
     }
 }
