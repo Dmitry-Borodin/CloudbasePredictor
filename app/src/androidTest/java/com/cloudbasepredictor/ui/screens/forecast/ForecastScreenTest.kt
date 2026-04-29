@@ -30,6 +30,7 @@ import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.MAP_PANEL_SUR
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_SELECTED_HOUR
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_TIME_SLIDER
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_VIEW
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_TIME_AXIS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.views.CloudForecastView
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
@@ -180,6 +181,32 @@ class ForecastScreenTest {
         }
 
         composeRule.onNodeWithTag(FORECAST_CHART_AREA).assertIsDisplayed()
+    }
+
+    @Test
+    fun forecastScreen_windModeKeepsTimeAxisVisibleAboveMapPanel() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                ForecastScreen(
+                    uiState = SimulatedTestData.forecastUiState(context, mode = ForecastMode.WIND),
+                    onDateSelected = {},
+                    onOpenMap = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(WIND_TIME_AXIS).assertIsDisplayed()
+
+        val timeAxisBounds = composeRule.onNodeWithTag(WIND_TIME_AXIS)
+            .fetchSemanticsNode().boundsInRoot
+        val mapSurfaceBounds = composeRule.onNodeWithTag(MAP_PANEL_SURFACE)
+            .fetchSemanticsNode().boundsInRoot
+
+        assertTrue(
+            "Wind time axis should stay above the collapsed map panel",
+            timeAxisBounds.bottom <= mapSurfaceBounds.top + 1f,
+        )
     }
 
     @Test

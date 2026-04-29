@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
+import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_TIME_AXIS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
 import com.cloudbasepredictor.ui.screens.forecast.WindForecastCellUiModel
@@ -71,6 +72,14 @@ internal fun WindForecastView(
             elevationKm = uiState.elevationKm,
             onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
             modifier = Modifier.fillMaxSize(),
+        )
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(WIND_TIME_AXIS_HEIGHT)
+                .testTag(WIND_TIME_AXIS),
         )
 
         if (uiState.isLoading) {
@@ -164,8 +173,8 @@ private fun WindChartCanvas(
             size = size,
         )
 
-        val axisWidth = with(density) { 60.dp.toPx() }
-        val bottomAxisHeight = with(density) { 24.dp.toPx() }
+        val axisWidth = with(density) { WIND_AXIS_WIDTH.toPx() }
+        val bottomAxisHeight = with(density) { WIND_BOTTOM_AXIS_HEIGHT.toPx() }
         val arrowSizePx = with(density) { 48.dp.toPx() }
 
         val plotLeft = axisWidth
@@ -411,10 +420,10 @@ private fun WindChartCanvas(
                 unitLabelPaint,
             )
 
-            // Wind speed color legend at bottom
+            // Wind speed color legend and time axis at bottom.
             val legendSteps = listOf(0f, 5f, 10f, 15f, 20f, 30f, 40f, 50f, 60f)
             val legendY = plotBottom + 4.dp.toPx()
-            val legendHeight = bottomAxisHeight - 6.dp.toPx()
+            val swatchH = 6.dp.toPx()
             val legendItemWidth = (plotWidth) / legendSteps.size
             val legendLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = axisLabelPaint.color
@@ -425,7 +434,6 @@ private fun WindChartCanvas(
             legendSteps.forEachIndexed { index, speedKmh ->
                 val lx = plotLeft + index * legendItemWidth
                 val swatchW = legendItemWidth * 0.6f
-                val swatchH = legendHeight * 0.45f
                 drawRoundRect(
                     color = windSpeedColor(speedKmh).copy(alpha = 0.7f),
                     topLeft = Offset(lx + (legendItemWidth - swatchW) / 2f, legendY),
@@ -442,9 +450,27 @@ private fun WindChartCanvas(
             canvas.nativeCanvas.drawText(
                 "km/h",
                 plotLeft - 20.dp.toPx(),
-                legendY + legendHeight / 2f + legendLabelPaint.textSize * 0.35f,
+                legendY + swatchH + legendLabelPaint.textSize + 1.dp.toPx(),
                 legendLabelPaint,
             )
+
+            val timeLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = axisLabelPaint.color
+                textSize = with(density) { 11.sp.toPx() }
+                textAlign = Paint.Align.CENTER
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            }
+            val timeBaseline = size.height - 4.dp.toPx()
+            chart.hours.forEachIndexed { index, hour ->
+                if ((hour - chart.hours.first()) % 3 != 0) return@forEachIndexed
+                val x = plotLeft + index * columnWidth + columnWidth / 2f
+                canvas.nativeCanvas.drawText(
+                    String.format(Locale.US, "%02d", hour),
+                    x,
+                    timeBaseline,
+                    timeLabelPaint,
+                )
+            }
 
             // Speed labels at center of each clustered cell
             clusteredHours.forEach { hour ->
@@ -476,10 +502,12 @@ private fun WindChartCanvas(
                         arrowSizePx,
                         min(columnWidth * hourCluster * 0.8f, bandHeightPx * altCluster * 0.8f),
                     )
+                    val labelBaseline = cellCenterY + arrowDrawSize / 2f + speedLabelPaint.textSize + 1.dp.toPx()
+                    if (labelBaseline > plotBottom - 2.dp.toPx()) return@clusteredAltLabel
                     canvas.nativeCanvas.drawText(
                         "${avgSpeed.toInt()}",
                         cellCenterX,
-                        cellCenterY + arrowDrawSize / 2f + speedLabelPaint.textSize + 1.dp.toPx(),
+                        labelBaseline,
                         speedLabelPaint,
                     )
                 }
@@ -739,7 +767,8 @@ private fun buildAltitudeTicks(
 
 private const val WIND_MIN_VISIBLE_ALTITUDE_RANGE_KM = 0.75f
 private val WIND_AXIS_WIDTH = 60.dp
-private val WIND_BOTTOM_AXIS_HEIGHT = 38.dp
+private val WIND_BOTTOM_AXIS_HEIGHT = 48.dp
+private val WIND_TIME_AXIS_HEIGHT = 16.dp
 
 /** Average wind directions by decomposing into unit vectors and recombining. */
 private fun averageWindDirection(directions: List<Float>): Float {
