@@ -889,6 +889,8 @@ private fun SkewTDiagramCanvas(
                 with(density) { 6.dp.toPx() }
             val temperatureReadoutBaseline = plotBottom + tempLabelPaint.textSize +
                 with(density) { 22.dp.toPx() }
+            val temperatureReadoutLabelRight = (plotRight + rightAltitudeWidth + with(density) { 8.dp.toPx() })
+                .coerceAtMost(size.width - with(density) { 4.dp.toPx() })
             buildTemperatureAxisLabels(tempAxisRange).forEach { tempLabel ->
                 val x = temperatureToX(tempLabel, chartBottomPressure)
                 if (x in plotLeft..plotRight) {
@@ -1012,6 +1014,8 @@ private fun SkewTDiagramCanvas(
                         altitudeLabelPaint = altitudeLabelPaint,
                         temperatureAxisBaseline = temperatureAxisBaseline,
                         temperatureReadoutBaseline = temperatureReadoutBaseline,
+                        temperatureReadoutLabelLeft = plotLeft,
+                        temperatureReadoutLabelRight = temperatureReadoutLabelRight,
                         temperatureAxisRange = tempAxisRange,
                         temperatureAxisLabelPaint = tempLabelPaint,
                         density = density,
@@ -1230,6 +1234,8 @@ private fun drawCursorInlineLabels(
     altitudeLabelPaint: Paint,
     temperatureAxisBaseline: Float,
     temperatureReadoutBaseline: Float,
+    temperatureReadoutLabelLeft: Float,
+    temperatureReadoutLabelRight: Float,
     temperatureAxisRange: TempAxisRange,
     temperatureAxisLabelPaint: Paint,
     density: androidx.compose.ui.unit.Density,
@@ -1389,8 +1395,8 @@ private fun drawCursorInlineLabels(
         canvas = canvas,
         labels = readoutBottomLabels,
         y = temperatureReadoutBaseline,
-        plotLeft = plotLeft,
-        plotRight = plotRight,
+        plotLeft = temperatureReadoutLabelLeft,
+        plotRight = temperatureReadoutLabelRight,
         minimumGapPx = with(density) { 14.dp.toPx() },
     )
 
@@ -1497,52 +1503,110 @@ private fun drawBottomAxisLabels(
     val layout = labels
         .map { label -> label to label.paint.measureText(label.text) }
         .sortedBy { it.first.preferredX }
-        .map { (label, width) ->
-            PositionedBottomAxisLabel(
-                label = label,
-                width = width,
-                centerX = label.preferredX.coerceIn(plotLeft + width / 2f, plotRight - width / 2f),
-            )
-        }
-        .toMutableList()
+    val centers = layoutBottomAxisLabelCenters(
+        preferredCenters = layout.map { it.first.preferredX },
+        widths = layout.map { it.second },
+        left = plotLeft,
+        right = plotRight,
+        minimumGapPx = minimumGapPx,
+    )
 
-    for (index in 1 until layout.size) {
-        val previous = layout[index - 1]
-        val current = layout[index]
-        val minimumCenterX = previous.centerX + previous.width / 2f + minimumGapPx + current.width / 2f
-        if (current.centerX < minimumCenterX) {
-            current.centerX = minimumCenterX
-        }
-    }
-
-    for (index in layout.lastIndex - 1 downTo 0) {
-        val next = layout[index + 1]
-        val current = layout[index]
-        val maximumCenterX = next.centerX - next.width / 2f - minimumGapPx - current.width / 2f
-        if (current.centerX > maximumCenterX) {
-            current.centerX = maximumCenterX
-        }
-    }
-
-    layout.forEach { positioned ->
-        val clampedX = positioned.centerX.coerceIn(
-            plotLeft + positioned.width / 2f,
-            plotRight - positioned.width / 2f,
-        )
+    layout.zip(centers).forEach { (positioned, centerX) ->
         canvas.nativeCanvas.drawText(
-            positioned.label.text,
-            clampedX,
+            positioned.first.text,
+            centerX,
             y,
-            positioned.label.paint,
+            positioned.first.paint,
         )
     }
 }
 
-private data class PositionedBottomAxisLabel(
-    val label: BottomAxisLabel,
-    val width: Float,
-    var centerX: Float,
-)
+internal fun layoutBottomAxisLabelCenters(
+    preferredCenters: List<Float>,
+    widths: List<Float>,
+    left: Float,
+    right: Float,
+    minimumGapPx: Float,
+): List<Float> {
+    require(preferredCenters.size == widths.size)
+    if (preferredCenters.isEmpty()) return emptyList()
+
+    val availableWidth = right - left
+    if (availableWidth <= 0f) return preferredCenters
+
+    val totalLabelWidth = widths.fold(0f) { sum, width -> sum + width }
+    val effectiveGap = if (widths.size > 1) {
+        minOf(
+            minimumGapPx,
+            ((availableWidth - totalLabelWidth) / (widths.size - 1)).coerceAtLeast(0f),
+        )
+    } else {
+        0f
+    }
+
+    fun minCenter(index: Int) = left + widths[index] / 2f
+    fun maxCenter(index: Int) = right - widths[index] / 2f
+    fun clampedCenter(index: Int, center: Float): Float {
+        val minCenter = minCenter(index)
+        val maxCenter = maxCenter(index)
+        return if (minCenter <= maxCenter) {
+            center.coerceIn(minCenter, maxCenter)
+        } else {
+            (left + right) / 2f
+        }
+    }
+
+    fun requiredCenterAfter(previousIndex: Int, currentIndex: Int): Float =
+        widths[previousIndex] / 2f + effectiveGap + widths[currentIndex] / 2f
+
+    val centers = preferredCenters
+        .mapIndexed { index, center -> clampedCenter(index, center) }
+        .toMutableList()
+
+    for (index in 1 until centers.size) {
+        centers[index] = maxOf(
+            centers[index],
+            centers[index - 1] + requiredCenterAfter(index - 1, index),
+        )
+    }
+
+    val rightOverflow = centers.last() + widths.last() / 2f - right
+    if (rightOverflow > 0f) {
+        for (index in centers.indices) {
+            centers[index] -= rightOverflow
+        }
+    }
+
+    val leftOverflow = left - (centers.first() - widths.first() / 2f)
+    if (leftOverflow > 0f) {
+        for (index in centers.indices) {
+            centers[index] += leftOverflow
+        }
+    }
+
+    for (index in 1 until centers.size) {
+        centers[index] = maxOf(
+            centers[index],
+            centers[index - 1] + requiredCenterAfter(index - 1, index),
+        )
+    }
+
+    val finalRightOverflow = centers.last() + widths.last() / 2f - right
+    if (finalRightOverflow > 0f) {
+        for (index in centers.lastIndex downTo 0) {
+            centers[index] -= finalRightOverflow
+        }
+    }
+
+    for (index in centers.lastIndex - 1 downTo 0) {
+        centers[index] = minOf(
+            centers[index],
+            centers[index + 1] - requiredCenterAfter(index, index + 1),
+        )
+    }
+
+    return centers.mapIndexed { index, center -> clampedCenter(index, center) }
+}
 
 private fun buildCursorReadout(
     chart: StuveForecastChartUiModel,

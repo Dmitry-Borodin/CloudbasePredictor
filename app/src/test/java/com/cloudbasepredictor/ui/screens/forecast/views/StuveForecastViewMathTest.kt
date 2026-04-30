@@ -149,6 +149,40 @@ class StuveForecastViewMathTest {
         )
     }
 
+    @Test
+    fun layoutBottomAxisLabelCenters_keepsRightPackedLabelsInsideBoundsAndSeparated() {
+        val centers = layoutBottomAxisLabelCenters(
+            preferredCenters = listOf(170f, 170f, 170f),
+            widths = listOf(40f, 40f, 70f),
+            left = 0f,
+            right = 180f,
+            minimumGapPx = 10f,
+        )
+
+        assertEquals(3, centers.size)
+        assertTrue(centers.first() - 20f >= 0f)
+        assertTrue(centers.last() + 35f <= 180f)
+        assertTrue(centers[1] - 20f >= centers[0] + 20f + 10f)
+        assertTrue(centers[2] - 35f >= centers[1] + 20f + 10f)
+    }
+
+    @Test
+    fun layoutBottomAxisLabelCenters_reducesGapWhenLabelsBarelyFit() {
+        val centers = layoutBottomAxisLabelCenters(
+            preferredCenters = listOf(90f, 90f, 90f),
+            widths = listOf(50f, 50f, 50f),
+            left = 0f,
+            right = 160f,
+            minimumGapPx = 12f,
+        )
+
+        assertEquals(3, centers.size)
+        assertTrue(centers.first() - 25f >= 0f)
+        assertTrue(centers.last() + 25f <= 160f)
+        assertTrue(centers[1] - 25f >= centers[0] + 25f + 5f)
+        assertTrue(centers[2] - 25f >= centers[1] + 25f + 5f)
+    }
+
     private fun sampleChart(
         temperaturePoints: List<StuveProfilePoint>,
         dewpointPoints: List<StuveProfilePoint>,
