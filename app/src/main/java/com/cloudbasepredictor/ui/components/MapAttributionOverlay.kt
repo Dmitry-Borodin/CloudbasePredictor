@@ -22,14 +22,14 @@ fun MapAttributionOverlay(
     Surface(
         modifier = modifier.testTag(MapTestTags.ATTRIBUTION_OVERLAY),
         shape = RoundedCornerShape(4.dp),
-        color = Color.White.copy(alpha = 0.82f),
+        color = Color.White.copy(alpha = 0.68f),
         contentColor = Color(0xFF202124),
         tonalElevation = 1.dp,
     ) {
         Text(
             text = stringResource(R.string.map_attribution_compact),
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
         )
     }
 }

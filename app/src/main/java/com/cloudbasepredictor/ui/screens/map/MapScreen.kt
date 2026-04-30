@@ -289,23 +289,32 @@ fun MapScreen(
             )
         }
 
-        uiState.selectedPlace?.let { selectedPlace ->
-            SelectedPointCard(
-                selectedPlace = selectedPlace,
-                onOpenForecast = onOpenForecast,
+        val selectedPlace = uiState.selectedPlace
+        if (selectedPlace != null) {
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                MapAttributionOverlay()
+                SelectedPointCard(
+                    selectedPlace = selectedPlace,
+                    onOpenForecast = onOpenForecast,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        } else {
+            MapAttributionOverlay(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(end = 8.dp, bottom = 4.dp),
             )
         }
-
-        MapAttributionOverlay(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(end = 8.dp, bottom = 4.dp),
-        )
     }
 
     if (showFavoritesDialog) {
