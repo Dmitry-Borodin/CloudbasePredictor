@@ -121,7 +121,7 @@ class ForecastAppFlowInstrumentedTest {
         composeRule.onNodeWithTag(HELP_BUTTON).performClick()
         composeRule.onNodeWithText("Thermic forecast help").assertIsDisplayed()
         composeRule.onNodeWithText("Lines, bands and diagnostics:").assertIsDisplayed()
-        composeRule.onNodeWithText("Colored rectangles are model time-altitude bins", substring = true)
+        composeRule.onNodeWithText("Colored squares are time-altitude bins", substring = true)
             .assertIsDisplayed()
         composeRule.onNodeWithText("Cursor details show time, altitude, lift range", substring = true)
             .assertIsDisplayed()

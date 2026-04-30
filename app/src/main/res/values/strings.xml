@@ -77,11 +77,11 @@
     <!-- Help dialog - Thermic -->
     <string name="help_thermic_title">Thermic forecast help</string>
     <string name="help_thermic_summary">Color shows estimated air updraft in m/s, not glider net climb.</string>
-    <string name="help_thermic_model_blocks_info">Colored rectangles are model time-altitude bins from raw pressure levels; block edges show model resolution, not terrain.</string>
+    <string name="help_thermic_model_blocks_info">Colored squares are time-altitude bins; bluer solid colors mean stronger updraft.</string>
     <string name="help_thermic_cursor_info">Cursor details show time, altitude, lift range, top range, confidence, limiter, cloud layer, and model diagnostics.</string>
     <string name="help_thermic_dashed_lines_title">Lines, bands and diagnostics:</string>
-    <string name="help_thermic_dry_top_line">Orange - thermal top and top uncertainty</string>
-    <string name="help_thermic_cloud_base_line">Blue - possible cloud layer</string>
+    <string name="help_thermic_dry_top_line">Orange hatch - thermal-top uncertainty</string>
+    <string name="help_thermic_cloud_base_line">Blue translucent area - possible cloud layer, not dry lift</string>
     <string name="help_thermic_moist_top_line">Purple - moist/cloud top</string>
     <string name="help_thermic_pressure_levels_line">Grey dashed - raw pressure levels</string>
 
