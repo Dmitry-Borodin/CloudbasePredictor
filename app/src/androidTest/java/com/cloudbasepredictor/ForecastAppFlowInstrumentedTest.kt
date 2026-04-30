@@ -123,7 +123,7 @@ class ForecastAppFlowInstrumentedTest {
         composeRule.onNodeWithText("Lines, bands and diagnostics:").assertIsDisplayed()
         composeRule.onNodeWithText("Colored blocks use raw pressure-level altitude bands", substring = true)
             .assertIsDisplayed()
-        composeRule.onNodeWithText("CAPE, CIN, LI and PBL are diagnostics only", substring = true)
+        composeRule.onNodeWithText("CAPE, CIN, LI and PBL help calibrate thermic lift", substring = true)
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("Showing the thermic forecast", substring = true).assertCountEquals(0)
         composeRule.onNodeWithText("Close").performClick()

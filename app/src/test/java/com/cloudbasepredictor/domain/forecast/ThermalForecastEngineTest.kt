@@ -69,17 +69,54 @@ class ThermalForecastEngineTest {
     }
 
     @Test
-    fun analyze_modelCapeDoesNotChangeUpdraftSpeed() {
-        val noCape = analyze(profile = crossingProfileWithoutSurface(), modelCapeJKg = 0f)
-        val highCape = analyze(profile = crossingProfileWithoutSurface(), modelCapeJKg = 2500f)
+    fun analyze_modelCapeAndInhibitionCalibrateUpdraftSpeed() {
+        val noCape = analyze(
+            profile = crossingProfileWithoutSurface(),
+            modelCapeJKg = 0f,
+            modelCinJKg = 20f,
+        )
+        val highCape = analyze(
+            profile = crossingProfileWithoutSurface(),
+            modelCapeJKg = 2500f,
+            modelCinJKg = 0f,
+        )
 
         assertNotNull(noCape)
         assertNotNull(highCape)
         noCape!!
         highCape!!
-        assertEquals(noCape.updraftLowMps, highCape.updraftLowMps, 0.0001f)
-        assertEquals(noCape.updraftNominalMps, highCape.updraftNominalMps, 0.0001f)
-        assertEquals(noCape.updraftHighMps, highCape.updraftHighMps, 0.0001f)
+        assertTrue("Zero CAPE should cap optimistic lift", noCape.updraftHighMps <= 3.0f)
+        assertTrue("High CAPE should allow stronger calibrated lift", highCape.updraftNominalMps > noCape.updraftNominalMps)
+    }
+
+    @Test
+    fun analyze_greifenburgLikeZeroCapeProfile_staysWeakToModerate() {
+        val result = analyze(
+            profile = greifenburgIconProfile(),
+            heatingInput = SurfaceHeatingInput(
+                hourOfDay = 15,
+                shortwaveRadiationWm2 = 817.2f,
+                cloudCoverLowPercent = 7f,
+                cloudCoverMidPercent = 0f,
+                cloudCoverHighPercent = 0f,
+                precipitationMm = 0f,
+                isDay = true,
+            ),
+            modelCapeJKg = 0f,
+            modelCinJKg = 0f,
+            liftedIndexC = null,
+            boundaryLayerHeightM = null,
+            surfaceTemperatureC = 6.5f,
+            surfaceDewPointC = -4.3f,
+            surfacePressureHpa = 833.0f,
+            elevationKm = 1.723f,
+        )
+
+        assertNotNull(result)
+        result!!
+        assertTrue("Nominal lift should stay below 3 m/s, got ${result.updraftNominalMps}", result.updraftNominalMps <= 3f)
+        assertTrue("Optimistic lift should not hit the old 10 m/s cap", result.updraftHighMps < 5f)
+        assertTrue("Missing PBL and zero CAPE should lower confidence", result.confidence.ordinal > 0)
     }
 
     @Test
@@ -131,19 +168,25 @@ class ThermalForecastEngineTest {
         profile: List<ProfileLevel>,
         heatingInput: SurfaceHeatingInput = this.heatingInput,
         modelCapeJKg: Float? = 500f,
+        modelCinJKg: Float? = 20f,
+        liftedIndexC: Float? = -1.5f,
         boundaryLayerHeightM: Float? = 1600f,
+        surfaceTemperatureC: Float = SURFACE_TEMPERATURE_C,
+        surfaceDewPointC: Float = SURFACE_DEW_POINT_C,
+        surfacePressureHpa: Float = SURFACE_PRESSURE_HPA,
+        elevationKm: Float = ELEVATION_KM,
     ): ThermalForecastResult? {
         return ThermalForecastEngine.analyze(
             ThermalForecastInput(
                 profile = profile,
-                surfaceTemperatureC = SURFACE_TEMPERATURE_C,
-                surfaceDewPointC = SURFACE_DEW_POINT_C,
-                surfacePressureHpa = SURFACE_PRESSURE_HPA,
-                elevationKm = ELEVATION_KM,
+                surfaceTemperatureC = surfaceTemperatureC,
+                surfaceDewPointC = surfaceDewPointC,
+                surfacePressureHpa = surfacePressureHpa,
+                elevationKm = elevationKm,
                 heatingInput = heatingInput,
                 modelCapeJKg = modelCapeJKg,
-                modelCinJKg = 20f,
-                liftedIndexC = -1.5f,
+                modelCinJKg = modelCinJKg,
+                liftedIndexC = liftedIndexC,
                 boundaryLayerHeightM = boundaryLayerHeightM,
             ),
         )
@@ -182,6 +225,47 @@ class ThermalForecastEngineTest {
             level(900f, 17f, 7f, 1.00f),
             level(800f, 18f, 2f, 2.00f),
             level(700f, 22f, -8f, 3.30f),
+        )
+    }
+
+    private fun greifenburgIconProfile(): List<ProfileLevel> {
+        return listOf(
+            ProfileLevel(
+                pressureHpa = 800f,
+                temperatureC = 1.5f,
+                dewPointC = -5f,
+                heightKm = 2.03687f,
+                relativeHumidityPercent = 60f,
+                cloudCoverPercent = 0f,
+                windSpeedKmh = 14f,
+            ),
+            ProfileLevel(
+                pressureHpa = 700f,
+                temperatureC = -6.2f,
+                dewPointC = -15f,
+                heightKm = 3.096f,
+                relativeHumidityPercent = 40f,
+                cloudCoverPercent = 0f,
+                windSpeedKmh = 18f,
+            ),
+            ProfileLevel(
+                pressureHpa = 600f,
+                temperatureC = -12.3f,
+                dewPointC = -25f,
+                heightKm = 4.287f,
+                relativeHumidityPercent = 25f,
+                cloudCoverPercent = 0f,
+                windSpeedKmh = 22f,
+            ),
+            ProfileLevel(
+                pressureHpa = 500f,
+                temperatureC = -21.5f,
+                dewPointC = -35f,
+                heightKm = 5.656f,
+                relativeHumidityPercent = 20f,
+                cloudCoverPercent = 0f,
+                windSpeedKmh = 28f,
+            ),
         )
     }
 

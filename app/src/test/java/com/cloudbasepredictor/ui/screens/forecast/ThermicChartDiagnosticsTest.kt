@@ -124,15 +124,16 @@ class ThermicChartDiagnosticsTest {
     }
 
     @Test
-    fun buildChart_noCape_stillProducesBuoyancyBasedThermals() {
+    fun buildChart_noCape_capsBuoyancyBasedThermals() {
         val chart = buildThermicChartFromData(makeHourlyData(capeJKg = 0.0), dayIndex = 0)
-        // Even with 0 model CAPE, buoyancy-based analysis should produce thermals
-        // if the profile supports it (which it does — warm surface, standard lapse rate)
-        assertTrue("Should still produce cells with 0 model CAPE", chart.cells.isNotEmpty())
+        val maxOptimistic = chart.slotDiagnostics.maxOfOrNull { it.updraftHighMps } ?: 0f
+
+        assertTrue("Dry profile can still produce capped weak thermals with 0 model CAPE", chart.cells.isNotEmpty())
+        assertTrue("Zero CAPE should keep optimistic lift practical, got $maxOptimistic", maxOptimistic <= 3.0f)
     }
 
     @Test
-    fun buildChart_modelCapeIsDiagnosticOnly() {
+    fun buildChart_modelCapeCalibratesThermicStrength() {
         val lowCape = buildThermicChartFromData(makeHourlyData(capeJKg = 0.0), dayIndex = 0)
         val highCape = buildThermicChartFromData(makeHourlyData(capeJKg = 2500.0), dayIndex = 0)
 
@@ -142,11 +143,10 @@ class ThermicChartDiagnosticsTest {
             highCape.slotDiagnostics.first().modelCapeJKg!!,
             0.0001f,
         )
-        assertEquals(
-            "Model CAPE should not scale nominal updraft",
-            lowCape.slotDiagnostics.first().updraftNominalMps,
-            highCape.slotDiagnostics.first().updraftNominalMps,
-            0.0001f,
+        assertTrue(
+            "Model CAPE should raise calibrated nominal updraft",
+            highCape.slotDiagnostics.first().updraftNominalMps >
+                lowCape.slotDiagnostics.first().updraftNominalMps,
         )
     }
 

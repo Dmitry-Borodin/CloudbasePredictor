@@ -596,7 +596,7 @@ private fun ThermicForecastGrid(
             }
             if (diag != null) {
                 tooltipLines += "Top ${formatAltitudeLabel(diag.topNominalKm)} km  " +
-                    "range ${formatAltitudeLabel(diag.topLowKm)}-${formatAltitudeLabel(diag.topHighKm)}"
+                    "raw range ${formatAltitudeLabel(diag.topLowKm)}-${formatAltitudeLabel(diag.topHighKm)}"
                 if (diag.topLowerPressureHpa != null && diag.topUpperPressureHpa != null) {
                     tooltipLines += "Raw levels ${diag.topLowerPressureHpa.toInt()}-${diag.topUpperPressureHpa.toInt()} hPa"
                 }
@@ -750,11 +750,10 @@ private fun thermicStrengthColor(strengthMps: Float): Color {
     val normalized = clampedStrength / MAX_THERMIC_STRENGTH_MPS
     val colorStops = listOf(
         0f to Color(0xFFFCE0AE),
-        0.17f to Color(0xFFFFFF00),
-        0.33f to Color(0xFF00F6B2),
-        0.5f to Color(0xFF7BD0BC),
-        0.67f to Color(0xFF19C8E0),
-        0.83f to Color(0xFF6A95E6),
+        0.20f to Color(0xFFFFFF00),
+        0.40f to Color(0xFF00F6B2),
+        0.60f to Color(0xFF19C8E0),
+        0.80f to Color(0xFF6A95E6),
         1f to Color(0xFF2015F3),
     )
 
@@ -855,7 +854,7 @@ private const val MIN_VISIBLE_ALTITUDE_RANGE_KM = 0.75f
 private const val ALTITUDE_EPSILON = 0.001f
 private const val THERMIC_DATA_ALTITUDE_STEP_KM = 0.05f
 private const val THERMIC_MAJOR_TIME_STEP_MINUTES = 180
-private const val MAX_THERMIC_STRENGTH_MPS = 10f
+private const val MAX_THERMIC_STRENGTH_MPS = 5f
 private const val MIN_TIME_BUCKET_WIDTH_PX = 28f
 private const val MIN_ALTITUDE_BUCKET_HEIGHT_PX = 20f
 private val THERMIC_AXIS_WIDTH = 60.dp

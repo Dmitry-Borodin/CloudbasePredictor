@@ -278,7 +278,7 @@ private data class ForecastHelpContent(
     val tips: List<String>,
 )
 
-// ── Thermic strength legend (0 → 10 m/s) ────────────────────────────────
+// ── Thermic strength legend (0 → 5+ m/s) ────────────────────────────────
 
 @Composable
 private fun ThermicDiagnosticLineLegend() {
@@ -356,7 +356,7 @@ private fun ThermicDiagnosticLineLegendRow(
 
 @Composable
 private fun ThermicStrengthLegend() {
-    val steps = listOf(0f, 1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f)
+    val steps = listOf("0", "1", "2", "3", "4", "5+")
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -364,7 +364,7 @@ private fun ThermicStrengthLegend() {
         ) {
             steps.forEach { value ->
                 Text(
-                    text = "${value.toInt()}",
+                    text = value,
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
@@ -378,7 +378,7 @@ private fun ThermicStrengthLegend() {
             // Draw gradient bar using thermic color scale
             val colorCount = 40
             repeat(colorCount) { i ->
-                val strength = i.toFloat() / (colorCount - 1) * 10f
+                val strength = i.toFloat() / (colorCount - 1) * THERMIC_LEGEND_MAX_STRENGTH_MPS
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -392,7 +392,7 @@ private fun ThermicStrengthLegend() {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(text = "weak air lift", style = MaterialTheme.typography.labelSmall)
-            Text(text = "strong air lift", style = MaterialTheme.typography.labelSmall)
+            Text(text = "exceptional air lift", style = MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -482,14 +482,13 @@ private fun WindSpeedLegend() {
 
 /** Thermic strength color scale matching ThermicForecastView. */
 private fun thermicLegendColor(strengthMps: Float): Color {
-    val normalized = (strengthMps / 10f).coerceIn(0f, 1f)
+    val normalized = (strengthMps / THERMIC_LEGEND_MAX_STRENGTH_MPS).coerceIn(0f, 1f)
     val colorStops = listOf(
         0f to Color(0xFFFCE0AE),
-        0.17f to Color(0xFFFFFF00),
-        0.33f to Color(0xFF00F6B2),
-        0.5f to Color(0xFF7BD0BC),
-        0.67f to Color(0xFF19C8E0),
-        0.83f to Color(0xFF6A95E6),
+        0.20f to Color(0xFFFFFF00),
+        0.40f to Color(0xFF00F6B2),
+        0.60f to Color(0xFF19C8E0),
+        0.80f to Color(0xFF6A95E6),
         1f to Color(0xFF2015F3),
     )
     val lower = colorStops.lastOrNull { it.first <= normalized } ?: colorStops.first()
@@ -498,6 +497,8 @@ private fun thermicLegendColor(strengthMps: Float): Color {
     val fraction = (normalized - lower.first) / (upper.first - lower.first)
     return lerp(lower.second, upper.second, fraction)
 }
+
+private const val THERMIC_LEGEND_MAX_STRENGTH_MPS = 5f
 
 /** Wind speed color scale matching WindForecastView. */
 private fun windLegendColor(speedKmh: Float): Color {

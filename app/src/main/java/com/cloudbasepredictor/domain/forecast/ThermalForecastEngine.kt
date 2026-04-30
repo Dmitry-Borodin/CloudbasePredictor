@@ -266,7 +266,7 @@ object ThermalForecastEngine {
                         startKm = startKm,
                         endKm = endKm,
                         surfaceHeatingC = scenario.surfaceHeatingC,
-                        dampingFactor = damping.factor,
+                        damping = damping,
                     )
                 }
                 val low = updrafts.minOrNull() ?: 0f
@@ -299,7 +299,7 @@ object ThermalForecastEngine {
         startKm: Float,
         endKm: Float,
         surfaceHeatingC: Float,
-        dampingFactor: Float,
+        damping: ThermalDamping,
     ): Float {
         val thetaK = potentialTemperatureK(input.surfaceTemperatureC + surfaceHeatingC, input.surfacePressureHpa)
         val midPressure = (lower.pressureHpa + upper.pressureHpa) / 2f
@@ -308,10 +308,13 @@ object ThermalForecastEngine {
         val buoyancyC = (parcelTempC - envTempC).coerceAtLeast(0f)
         if (buoyancyC < MIN_LAYER_BUOYANCY_C) return 0f
 
-        val dzMeters = (endKm - startKm) * 1000f
+        val dzMeters = min(
+            (endKm - startKm) * 1000f,
+            MAX_EFFECTIVE_UPDRAFT_LAYER_DEPTH_M,
+        )
         val buoyancyAccel = GRAVITY_MPS2 * buoyancyC / (envTempC + KELVIN_OFFSET)
-        val raw = sqrt(max(0f, 2f * buoyancyAccel * dzMeters)) * UPDRAFT_SCALE * dampingFactor
-        return raw.coerceIn(0f, MAX_UPDRAFT_MPS)
+        val raw = sqrt(max(0f, 2f * buoyancyAccel * dzMeters)) * UPDRAFT_SCALE * damping.factor
+        return raw.coerceIn(0f, min(damping.maxUpdraftMps, dampingFactorLimit(damping.factor)))
     }
 
     private fun computeDryThermalEnergy(
@@ -369,17 +372,144 @@ object ThermalForecastEngine {
             shearKmh > 25f -> 0.8f
             else -> 1f
         }
+        val capeFactor = modelCapeStrengthFactor(input)
+        val cinFactor = modelCinStrengthFactor(input.modelCinJKg)
+        val liftedIndexFactor = liftedIndexStrengthFactor(input.liftedIndexC)
+        val boundaryLayerFactor = boundaryLayerStrengthFactor(input.boundaryLayerHeightM)
+        val heavyLowCloudFactor = heavyLowCloudStrengthFactor(input.heatingInput.cloudCoverLowPercent)
+
         val factor = radiationFactor *
             (1f - cloudPenalty) *
             (1f - profileCloudPenalty) *
             precipFactor *
-            shearFactor
+            shearFactor *
+            capeFactor *
+            cinFactor *
+            liftedIndexFactor *
+            boundaryLayerFactor *
+            heavyLowCloudFactor
         return ThermalDamping(
             factor = factor.coerceIn(0.25f, 1f),
+            maxUpdraftMps = diagnosticUpdraftCapMps(input),
             weakRadiation = radiation != null && radiation < 150f,
             precipitation = (input.heatingInput.precipitationMm ?: 0f) > 0.1f,
             strongWindShear = shearKmh != null && shearKmh > 25f,
+            zeroCape = input.modelCapeJKg != null && input.modelCapeJKg <= 0f,
+            strongCin = (input.modelCinJKg ?: 0f) >= STRONG_CIN_JKG,
+            heavyLowCloud = (input.heatingInput.cloudCoverLowPercent ?: 0f) >= HEAVY_LOW_CLOUD_PERCENT,
+            shallowBoundaryLayer = input.boundaryLayerHeightM != null &&
+                input.boundaryLayerHeightM < SHALLOW_BOUNDARY_LAYER_M,
+            missingBoundaryLayer = input.boundaryLayerHeightM == null,
         )
+    }
+
+    private fun dampingFactorLimit(dampingFactor: Float): Float {
+        return when {
+            dampingFactor <= 0.30f -> 2.0f
+            dampingFactor <= 0.45f -> 2.6f
+            dampingFactor <= 0.65f -> 3.8f
+            dampingFactor <= 0.85f -> 5.0f
+            else -> MAX_UPDRAFT_MPS
+        }
+    }
+
+    private fun modelCapeStrengthFactor(input: ThermalForecastInput): Float {
+        val cape = input.modelCapeJKg ?: return 0.90f
+        return when {
+            cape <= 0f -> {
+                if (hasClearDryThermalSupport(input)) {
+                    0.55f
+                } else {
+                    0.40f
+                }
+            }
+            cape < 100f -> 0.60f
+            cape < 300f -> 0.78f
+            cape < 800f -> 0.95f
+            else -> 1.08f
+        }
+    }
+
+    private fun hasClearDryThermalSupport(input: ThermalForecastInput): Boolean {
+        val radiation = input.heatingInput.shortwaveRadiationWm2 ?: return false
+        val lowCloud = input.heatingInput.cloudCoverLowPercent ?: 100f
+        val precipitation = input.heatingInput.precipitationMm ?: 0f
+        val boundaryLayer = input.boundaryLayerHeightM ?: return false
+        return radiation >= STRONG_RADIATION_WM2 &&
+            lowCloud <= CLEAR_LOW_CLOUD_PERCENT &&
+            precipitation <= 0.1f &&
+            boundaryLayer >= USABLE_BOUNDARY_LAYER_M
+    }
+
+    private fun modelCinStrengthFactor(modelCinJKg: Float?): Float {
+        val cin = modelCinJKg ?: return 1f
+        return when {
+            cin >= 250f -> 0.45f
+            cin >= STRONG_CIN_JKG -> 0.60f
+            cin >= 75f -> 0.78f
+            cin >= 25f -> 0.90f
+            else -> 1f
+        }
+    }
+
+    private fun liftedIndexStrengthFactor(liftedIndexC: Float?): Float {
+        val liftedIndex = liftedIndexC ?: return 1f
+        return when {
+            liftedIndex <= -4f -> 1.08f
+            liftedIndex <= -2f -> 1.02f
+            liftedIndex >= 6f -> 0.65f
+            liftedIndex >= 3f -> 0.82f
+            else -> 1f
+        }
+    }
+
+    private fun boundaryLayerStrengthFactor(boundaryLayerHeightM: Float?): Float {
+        val boundaryLayer = boundaryLayerHeightM ?: return 0.90f
+        return when {
+            boundaryLayer < 300f -> 0.55f
+            boundaryLayer < SHALLOW_BOUNDARY_LAYER_M -> 0.75f
+            boundaryLayer > 1800f -> 1.05f
+            else -> 1f
+        }
+    }
+
+    private fun heavyLowCloudStrengthFactor(lowCloudPercent: Float?): Float {
+        val lowCloud = lowCloudPercent ?: return 1f
+        return when {
+            lowCloud >= HEAVY_LOW_CLOUD_PERCENT -> 0.65f
+            lowCloud >= 60f -> 0.78f
+            lowCloud >= 40f -> 0.90f
+            else -> 1f
+        }
+    }
+
+    private fun diagnosticUpdraftCapMps(input: ThermalForecastInput): Float {
+        val cape = input.modelCapeJKg
+        val baseCap = when {
+            cape == null -> 5.0f
+            cape <= 0f -> if (hasClearDryThermalSupport(input)) 3.0f else 2.6f
+            cape < 100f -> 3.2f
+            cape < 300f -> 4.0f
+            cape < 800f -> 5.2f
+            else -> 7.0f
+        }
+        val cinCap = input.modelCinJKg?.let { cin ->
+            when {
+                cin >= 250f -> 2.0f
+                cin >= STRONG_CIN_JKG -> 2.8f
+                cin >= 75f -> 3.6f
+                else -> MAX_UPDRAFT_MPS
+            }
+        } ?: MAX_UPDRAFT_MPS
+        val boundaryLayerCap = input.boundaryLayerHeightM?.let { boundaryLayer ->
+            when {
+                boundaryLayer < 300f -> 2.0f
+                boundaryLayer < SHALLOW_BOUNDARY_LAYER_M -> 3.0f
+                else -> MAX_UPDRAFT_MPS
+            }
+        } ?: MAX_UPDRAFT_MPS
+
+        return minOf(baseCap, cinCap, boundaryLayerCap, MAX_UPDRAFT_MPS)
     }
 
     private fun lowLevelWindShearKmh(profile: List<ProfileLevel>, topKm: Float): Float? {
@@ -406,7 +536,11 @@ object ThermalForecastEngine {
         if (damping.precipitation) score -= 1
         if (damping.weakRadiation) score -= 1
         if (damping.strongWindShear) score -= 1
-        if (input.boundaryLayerHeightM == null) score -= 1
+        if (damping.zeroCape) score -= 1
+        if (damping.strongCin) score -= 1
+        if (damping.heavyLowCloud) score -= 1
+        if (damping.shallowBoundaryLayer) score -= 1
+        if (damping.missingBoundaryLayer) score -= 1
 
         return when {
             score >= 3 -> ThermalForecastConfidence.HIGH
@@ -431,6 +565,9 @@ object ThermalForecastEngine {
             input.heatingInput.isDay == false -> ThermalLimitingReason.SURFACE_HEATING
             damping.precipitation -> ThermalLimitingReason.PRECIPITATION
             damping.weakRadiation -> ThermalLimitingReason.WEAK_RADIATION
+            damping.heavyLowCloud -> ThermalLimitingReason.WEAK_RADIATION
+            damping.strongCin -> ThermalLimitingReason.INVERSION
+            damping.shallowBoundaryLayer -> ThermalLimitingReason.INVERSION
             nominalTop.profileTopLimited -> ThermalLimitingReason.PROFILE_TOP
             nominalTop.topKm <= input.elevationKm + SHALLOW_THERMAL_DEPTH_KM -> ThermalLimitingReason.INVERSION
             cloudBaseKm != null && cloudBaseKm <= nominalTop.topKm + CLOUD_BASE_REACH_TOLERANCE_KM ->
@@ -585,9 +722,15 @@ object ThermalForecastEngine {
 
     private data class ThermalDamping(
         val factor: Float,
+        val maxUpdraftMps: Float,
         val weakRadiation: Boolean,
         val precipitation: Boolean,
         val strongWindShear: Boolean,
+        val zeroCape: Boolean,
+        val strongCin: Boolean,
+        val heavyLowCloud: Boolean,
+        val shallowBoundaryLayer: Boolean,
+        val missingBoundaryLayer: Boolean,
     )
 
     private data class PressureHeight(
@@ -602,6 +745,7 @@ object ThermalForecastEngine {
     private const val KELVIN_OFFSET = 273.15f
     private const val UPDRAFT_SCALE = 0.55f
     private const val MAX_UPDRAFT_MPS = 10f
+    private const val MAX_EFFECTIVE_UPDRAFT_LAYER_DEPTH_M = 280f
     private const val MIN_DISPLAY_UPDRAFT_MPS = 0.2f
     private const val MIN_LAYER_BUOYANCY_C = 0.25f
     private const val MIN_TOP_BUOYANCY_C = 0f
@@ -613,4 +757,10 @@ object ThermalForecastEngine {
     private const val CLOUD_BASE_REACH_TOLERANCE_KM = 0.05f
     private const val SHALLOW_THERMAL_DEPTH_KM = 0.2f
     private const val TOP_MOISTURE_CONTEXT_KM = 0.75f
+    private const val STRONG_RADIATION_WM2 = 550f
+    private const val CLEAR_LOW_CLOUD_PERCENT = 30f
+    private const val HEAVY_LOW_CLOUD_PERCENT = 80f
+    private const val USABLE_BOUNDARY_LAYER_M = 900f
+    private const val SHALLOW_BOUNDARY_LAYER_M = 700f
+    private const val STRONG_CIN_JKG = 150f
 }
