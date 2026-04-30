@@ -3,26 +3,37 @@ Categories:
   - Sports & Health
 License: GPL-3.0-or-later
 AuthorName: CloudbasePredictor
+WebSite: https://github.com/CloudbasePredictor/CloudbasePredictor
 SourceCode: https://github.com/CloudbasePredictor/CloudbasePredictor
 IssueTracker: https://github.com/CloudbasePredictor/CloudbasePredictor/issues
+Changelog: https://github.com/CloudbasePredictor/CloudbasePredictor/releases
 
 AutoName: Cloudbase Predictor
+Summary: Weather forecasts for soaring and free-flight pilots
+Description: |-
+  Cloudbase Predictor helps paragliding, hang-gliding, and sailplane pilots assess
+  flying conditions for a selected location.
+
+  It visualises atmospheric forecast soundings from Open-Meteo with thermic
+  forecasts, wind profiles, Stüve diagrams, and cloud-cover charts. You can pick
+  a point on an OpenStreetMap-based map, save favourite flying sites, compare
+  forecast models, and use dark mode in the field.
+
+  Forecast data is provided by Open-Meteo. Map tiles are loaded from OpenFreeMap,
+  OpenMapTiles, and OpenStreetMap contributors.
 
 RepoType: git
 Repo: https://github.com/CloudbasePredictor/CloudbasePredictor.git
 
 Builds:
-  - versionName: 0.0.1
-    versionCode: 1
-    commit: v0.0.1
+  - versionName: 0.0.2
+    versionCode: 2
+    commit: v0.0.2
     subdir: app
     gradle:
       - yes
-    srclibs:
-      - rustup@stable
-    ndk: r27c
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v
-CurrentVersion: 0.0.1
-CurrentVersionCode: 1
+CurrentVersion: 0.0.2
+CurrentVersionCode: 2
