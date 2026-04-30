@@ -42,12 +42,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.components.FavoritesListDialog
 import com.cloudbasepredictor.ui.components.MapAttributionOverlay
+import com.cloudbasepredictor.ui.components.MapFavoriteLabelsOverlay
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.net.InetAddress
@@ -55,6 +57,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.expressions.dsl.const
@@ -66,10 +71,14 @@ import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.util.ClickResult
+import org.maplibre.spatialk.geojson.Feature
 import org.maplibre.spatialk.geojson.Position
 
 private const val MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
 private const val MAP_STYLE_HOST = "tiles.openfreemap.org"
+private const val GEOJSON_PROPERTY_NAME = "name"
+private const val GEOJSON_PROPERTY_PLACE_ID = "placeId"
+private const val FAVORITE_POINTS_LAYER_ID = "favorite-points"
 
 @Composable
 fun MapRoute(
@@ -90,6 +99,7 @@ fun MapRoute(
     MapScreen(
         uiState = uiState,
         onMapTapped = viewModel::selectPoint,
+        onFavoriteTapped = viewModel::selectFavoritePlace,
         onOpenForecast = viewModel::openSelectedForecast,
         onFavoriteClick = viewModel::openForecastForPlace,
         onSaveCameraPosition = viewModel::saveCameraPosition,
@@ -101,6 +111,7 @@ fun MapRoute(
 fun MapScreen(
     uiState: MapUiState,
     onMapTapped: (Double, Double) -> Unit,
+    onFavoriteTapped: (SavedPlace) -> Unit,
     onOpenForecast: () -> Unit,
     onFavoriteClick: (SavedPlace) -> Unit,
     onSaveCameraPosition: (Double, Double, Double) -> Unit,
@@ -179,40 +190,62 @@ fun MapScreen(
                 )
             }
             true -> {
-                MaplibreMap(
-                    modifier = Modifier.fillMaxSize(),
-                    baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
-                    cameraState = cameraState,
-                    options = MapOptions(
-                        ornamentOptions = OrnamentOptions.AllDisabled,
-                    ),
-                    onMapClick = { position, _ ->
-                        onMapTapped(position.latitude, position.longitude)
-                        ClickResult.Consume
-                    },
-                ) {
-                    val favoritesSource = rememberGeoJsonSource(
-                        data = GeoJsonData.JsonString(favoritesData),
-                    )
-                    CircleLayer(
-                        id = "favorite-points",
-                        source = favoritesSource,
-                        color = const(Color(0xFFFFD700)),
-                        radius = const(8.dp),
-                        strokeColor = const(Color.White),
-                        strokeWidth = const(2.dp),
-                    )
+                Box(modifier = Modifier.fillMaxSize()) {
+                    MaplibreMap(
+                        modifier = Modifier.fillMaxSize(),
+                        baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
+                        cameraState = cameraState,
+                        options = MapOptions(
+                            ornamentOptions = OrnamentOptions.AllDisabled,
+                        ),
+                        onMapClick = { position, offset ->
+                            val favoritePlace = findFavoritePlaceForFeatures(
+                                features = cameraState.projection
+                                    ?.queryRenderedFeatures(
+                                        offset = offset,
+                                        layerIds = setOf(FAVORITE_POINTS_LAYER_ID),
+                                    )
+                                    .orEmpty(),
+                                favoritePlaces = uiState.favoritePlaces,
+                            )
+                            if (favoritePlace != null) {
+                                onFavoriteTapped(favoritePlace)
+                            } else {
+                                onMapTapped(position.latitude, position.longitude)
+                            }
+                            ClickResult.Consume
+                        },
+                    ) {
+                        val favoritesSource = rememberGeoJsonSource(
+                            data = GeoJsonData.JsonString(favoritesData),
+                        )
+                        CircleLayer(
+                            id = FAVORITE_POINTS_LAYER_ID,
+                            source = favoritesSource,
+                            color = const(Color(0xFFFFD700)),
+                            radius = const(8.dp),
+                            strokeColor = const(Color.White),
+                            strokeWidth = const(2.dp),
+                        )
 
-                    val markerSource = rememberGeoJsonSource(
-                        data = GeoJsonData.JsonString(markerData),
-                    )
-                    CircleLayer(
-                        id = "selected-point",
-                        source = markerSource,
-                        color = const(Color(0xFFE64A5B)),
-                        radius = const(9.dp),
-                        strokeColor = const(Color.White),
-                        strokeWidth = const(3.dp),
+                        val markerSource = rememberGeoJsonSource(
+                            data = GeoJsonData.JsonString(markerData),
+                        )
+                        CircleLayer(
+                            id = "selected-point",
+                            source = markerSource,
+                            color = const(Color(0xFFE64A5B)),
+                            radius = const(9.dp),
+                            strokeColor = const(Color.White),
+                            strokeWidth = const(3.dp),
+                        )
+                    }
+
+                    MapFavoriteLabelsOverlay(
+                        favoritePlaces = uiState.favoritePlaces,
+                        cameraState = cameraState,
+                        markerRadius = 8.dp,
+                        fontSize = 10.sp,
                     )
                 }
             }
@@ -364,7 +397,8 @@ internal fun buildMarkerFeatureCollection(place: SavedPlace): String {
                 "coordinates": [${place.longitude}, ${place.latitude}]
               },
               "properties": {
-                "name": "${place.name.replace("\"", "\\\"")}"
+                "$GEOJSON_PROPERTY_PLACE_ID": "${place.id.escapeJsonString()}",
+                "$GEOJSON_PROPERTY_NAME": "${place.name.escapeJsonString()}"
               }
             }
           ]
@@ -383,7 +417,8 @@ internal fun buildFavoritesFeatureCollection(places: List<SavedPlace>): String {
                 "coordinates": [${place.longitude}, ${place.latitude}]
               },
               "properties": {
-                "name": "${place.name.replace("\"", "\\\"")}"
+                "$GEOJSON_PROPERTY_PLACE_ID": "${place.id.escapeJsonString()}",
+                "$GEOJSON_PROPERTY_NAME": "${place.name.escapeJsonString()}"
               }
             }
         """
@@ -403,6 +438,44 @@ internal fun emptyFeatureCollection(): String {
           "features": []
         }
     """.trimIndent()
+}
+
+internal fun findFavoritePlaceForFeatures(
+    features: List<Feature<*, JsonObject?>>,
+    favoritePlaces: List<SavedPlace>,
+): SavedPlace? {
+    return features.firstNotNullOfOrNull { feature ->
+        val placeId = feature.properties
+            ?.get(GEOJSON_PROPERTY_PLACE_ID)
+            ?.jsonPrimitive
+            ?.contentOrNull
+
+        favoritePlaces.firstOrNull { favorite -> favorite.id == placeId }
+    }
+}
+
+private fun String.escapeJsonString(): String {
+    return buildString(length) {
+        this@escapeJsonString.forEach { char ->
+            when (char) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\b' -> append("\\b")
+                '\u000C' -> append("\\f")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> {
+                    if (char < ' ') {
+                        append("\\u")
+                        append(char.code.toString(16).padStart(4, '0'))
+                    } else {
+                        append(char)
+                    }
+                }
+            }
+        }
+    }
 }
 
 private suspend fun isMapStyleHostReachable(): Boolean {
@@ -434,6 +507,7 @@ private fun MapScreenPreview() {
         MapScreen(
             uiState = PreviewData.mapUiState,
             onMapTapped = { _, _ -> },
+            onFavoriteTapped = {},
             onOpenForecast = {},
             onFavoriteClick = {},
             onSaveCameraPosition = { _, _, _ -> },

@@ -36,9 +36,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.components.MapAttributionOverlay
+import com.cloudbasepredictor.ui.components.MapFavoriteLabelsOverlay
 import com.cloudbasepredictor.ui.screens.forecast.views.ForecastInformationView
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import kotlinx.coroutines.flow.collectLatest
@@ -63,6 +65,7 @@ private const val DRAG_HANDLE_HEIGHT_DP = 24
 private const val MAP_INITIAL_ZOOM = 12.0
 private const val SNAP_THRESHOLD_FRACTION = 0.25f
 private const val LOCATION_UPDATE_RATE_LIMIT_MS = 3_000L
+private const val GEOJSON_PROPERTY_NAME = "name"
 
 /**
  * A draggable map panel that sits at the bottom of the forecast screen.
@@ -252,6 +255,13 @@ fun ForecastMapPanel(
                             )
                         }
 
+                        MapFavoriteLabelsOverlay(
+                            favoritePlaces = favoritePlaces,
+                            cameraState = cameraState,
+                            markerRadius = 6.dp,
+                            fontSize = 9.sp,
+                        )
+
                         // Crosshair center indicator
                         Box(
                             modifier = Modifier
@@ -296,7 +306,7 @@ private fun buildPlaceGeoJson(place: SavedPlace): String {
               "type": "Point",
               "coordinates": [${place.longitude}, ${place.latitude}]
             },
-            "properties": {"name": "${place.name.replace("\"", "\\\"")}" }
+            "properties": {"$GEOJSON_PROPERTY_NAME": "${place.name.replace("\"", "\\\"")}" }
           }]
         }
     """.trimIndent()
@@ -312,7 +322,7 @@ private fun buildFavoritesGeoJson(places: List<SavedPlace>): String {
                 "type": "Point",
                 "coordinates": [${place.longitude}, ${place.latitude}]
               },
-              "properties": {"name": "${place.name.replace("\"", "\\\"")}" }
+              "properties": {"$GEOJSON_PROPERTY_NAME": "${place.name.replace("\"", "\\\"")}" }
             }
         """
     }

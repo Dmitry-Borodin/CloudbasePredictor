@@ -72,6 +72,10 @@ class MapViewModel @Inject constructor(
         )
     }
 
+    fun selectFavoritePlace(place: SavedPlace) {
+        selectedPlaceDraft.value = place
+    }
+
     fun openSelectedForecast() {
         val place = selectedPlaceDraft.value ?: return
 
