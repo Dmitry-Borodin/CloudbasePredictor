@@ -28,10 +28,14 @@ A release keystore is required for signed builds. Generate one (once):
 ```bash
 keytool -genkeypair -v \
   -keystore release.keystore \
+  -storetype PKCS12 \
   -alias cloudbase \
   -keyalg RSA -keysize 2048 -validity 10000 \
-  -storepass <PASSWORD> -keypass <PASSWORD>
+  -storepass <PASSWORD> \
+  -dname "CN=Cloudbase Predictor, O=CloudbasePredictor"
 ```
+
+This creates a PKCS12 keystore. PKCS12 uses the same password for the keystore and the key entry, so use the same value for `KEYSTORE_PASSWORD` and `KEY_PASSWORD`.
 
 Store the keystore securely. **Never commit it to the repository.**
 
@@ -44,7 +48,7 @@ Configure these repository secrets in **Settings → Secrets and variables → A
 | `KEYSTORE_BASE64` | Base64-encoded keystore: `base64 -w0 release.keystore` |
 | `KEYSTORE_PASSWORD` | Keystore password |
 | `KEY_ALIAS` | Key alias (e.g. `cloudbase`) |
-| `KEY_PASSWORD` | Key password |
+| `KEY_PASSWORD` | Key password (same as `KEYSTORE_PASSWORD` for the PKCS12 command above) |
 
 For Google Play publishing (optional):
 
@@ -136,7 +140,7 @@ To build a signed release locally:
 export KEYSTORE_PATH=/path/to/release.keystore
 export KEYSTORE_PASSWORD=<password>
 export KEY_ALIAS=cloudbase
-export KEY_PASSWORD=<password>
+export KEY_PASSWORD=<password> # same as KEYSTORE_PASSWORD for the PKCS12 command above
 
 ./gradlew :app:assembleRelease
 ```
