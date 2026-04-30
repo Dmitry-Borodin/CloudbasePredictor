@@ -3,13 +3,13 @@ Categories:
   - Sports & Health
 License: GPL-3.0-or-later
 AuthorName: CloudbasePredictor
-SourceCode: https://github.com/Dmitry-Borodin/CloudbasePredictor
-IssueTracker: https://github.com/Dmitry-Borodin/CloudbasePredictor/issues
+SourceCode: https://github.com/CloudbasePredictor/CloudbasePredictor
+IssueTracker: https://github.com/CloudbasePredictor/CloudbasePredictor/issues
 
 AutoName: Cloudbase Predictor
 
 RepoType: git
-Repo: https://github.com/Dmitry-Borodin/CloudbasePredictor.git
+Repo: https://github.com/CloudbasePredictor/CloudbasePredictor.git
 
 Builds:
   - versionName: 0.0.1

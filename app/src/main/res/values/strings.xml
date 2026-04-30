@@ -40,6 +40,7 @@
     <string name="about_app_name">Cloudbase Predictor</string>
     <string name="about_version_format">v%1$s (%2$s)</string>
     <string name="about_foss_label">is Free and Open Source Software</string>
+    <string name="about_source_code">Source code</string>
     <string name="about_data_sources">Data sources</string>
     <string name="about_forecast_data_label">Forecast data: </string>
     <string name="about_open_meteo">Open-Meteo</string>

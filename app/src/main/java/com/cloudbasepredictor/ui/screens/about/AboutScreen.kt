@@ -1,7 +1,5 @@
 package com.cloudbasepredictor.ui.screens.about
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,7 +23,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import com.cloudbasepredictor.BuildConfig
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
+
+private const val SOURCE_CODE_URL = "https://github.com/CloudbasePredictor/CloudbasePredictor"
 
 @Composable
 fun AboutRoute(
@@ -46,10 +47,10 @@ fun AboutScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val linkColor = MaterialTheme.colorScheme.primary
     fun openUrl(url: String) {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        uriHandler.openUri(url)
     }
 
     Column(
@@ -103,11 +104,22 @@ fun AboutScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Text(
-                text = stringResource(R.string.about_foss_label),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.about_foss_label),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                LinkText(
+                    title = stringResource(R.string.about_source_code),
+                    url = SOURCE_CODE_URL,
+                    linkColor = linkColor,
+                    onOpenUrl = ::openUrl,
+                )
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -167,7 +179,7 @@ fun AboutScreen(
 private fun DataSourceLinkRow(
     label: String,
     links: List<DataSourceLink>,
-    linkColor: androidx.compose.ui.graphics.Color,
+    linkColor: Color,
     onOpenUrl: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -181,16 +193,32 @@ private fun DataSourceLinkRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         links.forEach { link ->
-            Text(
-                text = link.title,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = linkColor,
-                    textDecoration = TextDecoration.Underline,
-                ),
-                modifier = Modifier.clickable { onOpenUrl(link.url) },
+            LinkText(
+                title = link.title,
+                url = link.url,
+                linkColor = linkColor,
+                onOpenUrl = onOpenUrl,
             )
         }
     }
+}
+
+@Composable
+private fun LinkText(
+    title: String,
+    url: String,
+    linkColor: Color,
+    onOpenUrl: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.bodyMedium.copy(
+            color = linkColor,
+            textDecoration = TextDecoration.Underline,
+        ),
+        modifier = modifier.clickable { onOpenUrl(url) },
+    )
 }
 
 private data class DataSourceLink(
