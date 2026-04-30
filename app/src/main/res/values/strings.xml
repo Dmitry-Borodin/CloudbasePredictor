@@ -68,7 +68,7 @@
 
     <!-- Map -->
     <string name="map_unavailable_title">Map provider is unavailable right now.</string>
-    <string name="map_unavailable_message">Unable to resolve tiles.openfreemap.org. Retry when network is available.</string>
+    <string name="map_unavailable_message">Unable to load the map. Check network access or try again.</string>
     <string name="coordinates_lat_lon_format" formatted="false">Lat %.4f, Lon %.4f</string>
     <string name="map_attribution_compact">© OpenMapTiles · © OpenStreetMap</string>
     <string name="map_attribution_title">Map attribution</string>

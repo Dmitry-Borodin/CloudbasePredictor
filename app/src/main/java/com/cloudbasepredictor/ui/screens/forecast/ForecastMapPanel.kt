@@ -1,5 +1,6 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -22,6 +23,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -30,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -37,6 +40,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cloudbasepredictor.BuildConfig
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.components.MapAttributionOverlay
@@ -82,7 +86,9 @@ fun ForecastMapPanel(
     initiallyExpanded: Boolean = false,
     onPanelHeightChanged: (Float) -> Unit = {},
 ) {
+    val context = LocalContext.current
     val density = LocalDensity.current
+    val mapUnavailableMessage = stringResource(R.string.map_unavailable_message)
     val scope = rememberCoroutineScope()
     var parentHeightPx by remember { mutableFloatStateOf(0f) }
     val panelHeightAnim = remember { Animatable(0f) }
@@ -129,6 +135,18 @@ fun ForecastMapPanel(
 
     var lastUpdateTimeMs by remember { mutableLongStateOf(0L) }
     var isRateLimited by remember { mutableStateOf(false) }
+    var mapLoadError by rememberSaveable { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(mapLoadError) {
+        val error = mapLoadError ?: return@LaunchedEffect
+        if (BuildConfig.DEBUG) {
+            Toast.makeText(
+                context.applicationContext,
+                error,
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
 
     // When camera stops moving, update forecast location (rate-limited)
     LaunchedEffect(cameraState) {
@@ -224,6 +242,12 @@ fun ForecastMapPanel(
                             options = MapOptions(
                                 ornamentOptions = OrnamentOptions.AllDisabled,
                             ),
+                            onMapLoadFailed = { reason ->
+                                mapLoadError = reason?.takeIf { it.isNotBlank() } ?: mapUnavailableMessage
+                            },
+                            onMapLoadFinished = {
+                                mapLoadError = null
+                            },
                             onMapClick = { _, _ -> ClickResult.Consume },
                         ) {
                             // Favorites markers (below selected marker)
@@ -284,8 +308,11 @@ fun ForecastMapPanel(
                                 .padding(end = 8.dp, bottom = 8.dp),
                         )
 
-                        if (isRateLimited) {
-                            ForecastInformationView(
+                        when {
+                            mapLoadError != null -> ForecastInformationView(
+                                message = mapUnavailableMessage,
+                            )
+                            isRateLimited -> ForecastInformationView(
                                 message = stringResource(R.string.forecast_map_rate_limited),
                             )
                         }

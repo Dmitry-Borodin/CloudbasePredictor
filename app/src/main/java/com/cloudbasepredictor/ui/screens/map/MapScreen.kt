@@ -1,5 +1,6 @@
 package com.cloudbasepredictor.ui.screens.map
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,6 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -29,9 +29,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -39,12 +39,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cloudbasepredictor.BuildConfig
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.components.FavoritesListDialog
@@ -52,11 +54,7 @@ import com.cloudbasepredictor.ui.components.MapAttributionOverlay
 import com.cloudbasepredictor.ui.components.MapFavoriteLabelsOverlay
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
-import java.net.InetAddress
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -75,7 +73,6 @@ import org.maplibre.spatialk.geojson.Feature
 import org.maplibre.spatialk.geojson.Position
 
 private const val MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
-private const val MAP_STYLE_HOST = "tiles.openfreemap.org"
 private const val GEOJSON_PROPERTY_NAME = "name"
 private const val GEOJSON_PROPERTY_PLACE_ID = "placeId"
 private const val FAVORITE_POINTS_LAYER_ID = "favorite-points"
@@ -119,12 +116,20 @@ fun MapScreen(
     autoOpenFavoritesOnStartup: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    var availabilityProbeKey by remember { mutableIntStateOf(0) }
-    val isStyleHostReachable by produceState<Boolean?>(
-        initialValue = null,
-        key1 = availabilityProbeKey,
-    ) {
-        value = isMapStyleHostReachable()
+    val context = LocalContext.current
+    val unavailableMessage = stringResource(R.string.map_unavailable_message)
+    var mapRetryKey by rememberSaveable { mutableIntStateOf(0) }
+    var mapLoadError by rememberSaveable { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(mapLoadError) {
+        val error = mapLoadError ?: return@LaunchedEffect
+        if (BuildConfig.DEBUG) {
+            Toast.makeText(
+                context.applicationContext,
+                error,
+                Toast.LENGTH_LONG,
+            ).show()
+        }
     }
 
     val initialCamera = uiState.initialCamera
@@ -170,85 +175,83 @@ fun MapScreen(
     Box(
         modifier = modifier.fillMaxSize(),
     ) {
-        when (isStyleHostReachable) {
-            null -> {
-                Box(
+        Box(modifier = Modifier.fillMaxSize()) {
+            key(mapRetryKey) {
+                MaplibreMap(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-            false -> {
-                MapUnavailableCard(
-                    onRetry = {
-                        availabilityProbeKey++
+                    baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
+                    cameraState = cameraState,
+                    options = MapOptions(
+                        ornamentOptions = OrnamentOptions.AllDisabled,
+                    ),
+                    onMapLoadFailed = { reason ->
+                        mapLoadError = reason?.takeIf { it.isNotBlank() } ?: unavailableMessage
                     },
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(16.dp),
-                )
-            }
-            true -> {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    MaplibreMap(
-                        modifier = Modifier.fillMaxSize(),
-                        baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
-                        cameraState = cameraState,
-                        options = MapOptions(
-                            ornamentOptions = OrnamentOptions.AllDisabled,
-                        ),
-                        onMapClick = { position, offset ->
-                            val favoritePlace = findFavoritePlaceForFeatures(
-                                features = cameraState.projection
-                                    ?.queryRenderedFeatures(
-                                        offset = offset,
-                                        layerIds = setOf(FAVORITE_POINTS_LAYER_ID),
-                                    )
-                                    .orEmpty(),
-                                favoritePlaces = uiState.favoritePlaces,
-                            )
-                            if (favoritePlace != null) {
-                                onFavoriteTapped(favoritePlace)
-                            } else {
-                                onMapTapped(position.latitude, position.longitude)
-                            }
-                            ClickResult.Consume
-                        },
-                    ) {
-                        val favoritesSource = rememberGeoJsonSource(
-                            data = GeoJsonData.JsonString(favoritesData),
+                    onMapLoadFinished = {
+                        mapLoadError = null
+                    },
+                    onMapClick = { position, offset ->
+                        val favoritePlace = findFavoritePlaceForFeatures(
+                            features = cameraState.projection
+                                ?.queryRenderedFeatures(
+                                    offset = offset,
+                                    layerIds = setOf(FAVORITE_POINTS_LAYER_ID),
+                                )
+                                .orEmpty(),
+                            favoritePlaces = uiState.favoritePlaces,
                         )
-                        CircleLayer(
-                            id = FAVORITE_POINTS_LAYER_ID,
-                            source = favoritesSource,
-                            color = const(Color(0xFFFFD700)),
-                            radius = const(8.dp),
-                            strokeColor = const(Color.White),
-                            strokeWidth = const(2.dp),
-                        )
+                        if (favoritePlace != null) {
+                            onFavoriteTapped(favoritePlace)
+                        } else {
+                            onMapTapped(position.latitude, position.longitude)
+                        }
+                        ClickResult.Consume
+                    },
+                ) {
+                    val favoritesSource = rememberGeoJsonSource(
+                        data = GeoJsonData.JsonString(favoritesData),
+                    )
+                    CircleLayer(
+                        id = FAVORITE_POINTS_LAYER_ID,
+                        source = favoritesSource,
+                        color = const(Color(0xFFFFD700)),
+                        radius = const(8.dp),
+                        strokeColor = const(Color.White),
+                        strokeWidth = const(2.dp),
+                    )
 
-                        val markerSource = rememberGeoJsonSource(
-                            data = GeoJsonData.JsonString(markerData),
-                        )
-                        CircleLayer(
-                            id = "selected-point",
-                            source = markerSource,
-                            color = const(Color(0xFFE64A5B)),
-                            radius = const(9.dp),
-                            strokeColor = const(Color.White),
-                            strokeWidth = const(3.dp),
-                        )
-                    }
-
-                    MapFavoriteLabelsOverlay(
-                        favoritePlaces = uiState.favoritePlaces,
-                        cameraState = cameraState,
-                        markerRadius = 8.dp,
-                        fontSize = 10.sp,
+                    val markerSource = rememberGeoJsonSource(
+                        data = GeoJsonData.JsonString(markerData),
+                    )
+                    CircleLayer(
+                        id = "selected-point",
+                        source = markerSource,
+                        color = const(Color(0xFFE64A5B)),
+                        radius = const(9.dp),
+                        strokeColor = const(Color.White),
+                        strokeWidth = const(3.dp),
                     )
                 }
             }
+
+            MapFavoriteLabelsOverlay(
+                favoritePlaces = uiState.favoritePlaces,
+                cameraState = cameraState,
+                markerRadius = 8.dp,
+                fontSize = 10.sp,
+            )
+        }
+
+        if (mapLoadError != null) {
+            MapUnavailableCard(
+                onRetry = {
+                    mapLoadError = null
+                    mapRetryKey++
+                },
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(16.dp),
+            )
         }
 
         if (uiState.favoritePlaces.isNotEmpty()) {
@@ -487,17 +490,6 @@ private fun String.escapeJsonString(): String {
             }
         }
     }
-}
-
-private suspend fun isMapStyleHostReachable(): Boolean {
-    val resolution = withTimeoutOrNull(2_000L) {
-        withContext(Dispatchers.IO) {
-            runCatching {
-                InetAddress.getByName(MAP_STYLE_HOST)
-            }.isSuccess
-        }
-    }
-    return resolution == true
 }
 
 @Preview(showBackground = true)
