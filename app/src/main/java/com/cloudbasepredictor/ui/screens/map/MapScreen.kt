@@ -251,24 +251,26 @@ fun MapScreen(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(start = 12.dp, top = 42.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FloatingActionButton(
-                onClick = { showFavoritesDialog = true },
-                modifier = Modifier.size(40.dp),
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                contentColor = Color(0xFFFFD700),
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+        if (uiState.favoritePlaces.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(start = 12.dp, top = 42.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = stringResource(R.string.cd_favorites),
-                )
+                FloatingActionButton(
+                    onClick = { showFavoritesDialog = true },
+                    modifier = Modifier.size(40.dp),
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                    contentColor = Color(0xFFFFD700),
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = stringResource(R.string.cd_favorites),
+                    )
+                }
             }
         }
 
@@ -326,7 +328,7 @@ fun MapScreen(
     }
 }
 
-private const val MIN_FAVORITES_FOR_STARTUP_DIALOG = 2
+private const val MIN_FAVORITES_FOR_STARTUP_DIALOG = 3
 
 @Composable
 private fun MapUnavailableCard(

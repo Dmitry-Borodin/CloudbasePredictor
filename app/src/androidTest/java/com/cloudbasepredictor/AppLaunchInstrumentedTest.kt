@@ -1,7 +1,9 @@
 package com.cloudbasepredictor
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -33,7 +35,7 @@ class AppLaunchInstrumentedTest {
     }
 
     private fun assertMapChromeVisible() {
-        composeRule.onNodeWithContentDescription("Favorites").assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("Favorites").assertCountEquals(0)
         composeRule.onNodeWithContentDescription("Settings").assertIsDisplayed()
         composeRule.onNodeWithTag(MapTestTags.ATTRIBUTION_OVERLAY).assertIsDisplayed()
     }
