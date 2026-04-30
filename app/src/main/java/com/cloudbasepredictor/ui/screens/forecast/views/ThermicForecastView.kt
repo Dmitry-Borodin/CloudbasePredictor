@@ -602,8 +602,13 @@ private fun ThermicForecastGrid(
                 }
                 tooltipLines += "Conf ${formatConfidenceLabel(diag.confidence)}  limit " +
                     formatLimitingReasonLabel(diag.limitingReason)
-                diag.cloudBaseKm?.let {
-                    tooltipLines += "Cloud base ${formatAltitudeLabel(it)} km"
+                diag.cloudBaseKm?.let { cloudBaseKm ->
+                    val moistTopKm = diag.moistEquilibriumTopKm
+                    tooltipLines += if (moistTopKm != null && moistTopKm > cloudBaseKm + 0.1f) {
+                        "Cloud layer ${formatAltitudeLabel(cloudBaseKm)}-${formatAltitudeLabel(moistTopKm)} km"
+                    } else {
+                        "Cloud base ${formatAltitudeLabel(cloudBaseKm)} km"
+                    }
                 }
                 val convectionDiagnostics = buildList {
                     diag.modelCapeJKg?.let { add("CAPE ${it.toInt()}") }

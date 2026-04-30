@@ -53,6 +53,37 @@ class ThermicForecastChartUiModelTest {
     }
 
     @Test
+    fun aggregatedForDisplay_keepsRawPressureLevelBoundaries() {
+        val rawCells = listOf(
+            ThermicForecastCellUiModel(
+                startMinuteOfDayLocal = 720,
+                startAltitudeKm = 0.45f,
+                endAltitudeKm = 0.82f,
+                strengthMps = 1.2f,
+            ),
+            ThermicForecastCellUiModel(
+                startMinuteOfDayLocal = 720,
+                startAltitudeKm = 0.82f,
+                endAltitudeKm = 1.46f,
+                strengthMps = 1.8f,
+            ),
+        )
+        val chart = ThermicForecastChartUiModel(
+            timeSlots = listOf(720),
+            cells = rawCells,
+            cloudMarkers = emptyList(),
+            pressureLevelAltitudesKm = listOf(0.82f, 1.46f),
+        )
+
+        val aggregated = chart.aggregatedForDisplay(
+            timeBucketSlotCount = 1,
+            altitudeBucketStepKm = 0.1f,
+        )
+
+        assertEquals(rawCells, aggregated.cells)
+    }
+
+    @Test
     fun aggregatedForDisplay_preservesThermalTopAndCloudHeights() {
         val chart = ThermicForecastChartUiModel(
             timeSlots = listOf(360, 375),

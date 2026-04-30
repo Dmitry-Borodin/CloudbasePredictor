@@ -242,6 +242,10 @@ internal fun ThermicForecastChartUiModel.aggregatedForDisplay(
     if (timeSlots.isEmpty()) {
         return this
     }
+    // Real forecast data is already bounded by model pressure levels; keep those raw boundaries visible.
+    if (pressureLevelAltitudesKm.isNotEmpty()) {
+        return this
+    }
 
     val slotCount = timeBucketSlotCount.coerceAtLeast(1)
     val baseAltitudeStepKm = cells.minOfOrNull { it.endAltitudeKm - it.startAltitudeKm }
