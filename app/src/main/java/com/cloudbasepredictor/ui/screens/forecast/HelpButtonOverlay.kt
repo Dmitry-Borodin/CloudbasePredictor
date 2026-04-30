@@ -97,12 +97,17 @@ internal fun HelpButtonOverlay(
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                             ThermicStrengthLegend()
+                            ThermicDiagnosticLineLegend()
                             Text(
                                 text = stringResource(R.string.help_thermic_model_blocks_info),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            ThermicDiagnosticLineLegend()
+                            Text(
+                                text = stringResource(R.string.help_thermic_cursor_info),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         ForecastMode.STUVE -> {
                             Text(
@@ -301,6 +306,12 @@ private fun ThermicDiagnosticLineLegend() {
             dashOffDp = 6f,
             label = stringResource(R.string.help_thermic_moist_top_line),
         )
+        ThermicDiagnosticLineLegendRow(
+            color = MaterialTheme.colorScheme.outline,
+            dashOnDp = 2f,
+            dashOffDp = 6f,
+            label = stringResource(R.string.help_thermic_pressure_levels_line),
+        )
     }
 }
 
@@ -346,7 +357,7 @@ private fun ThermicDiagnosticLineLegendRow(
 @Composable
 private fun ThermicStrengthLegend() {
     val steps = listOf(0f, 1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f)
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -380,8 +391,8 @@ private fun ThermicStrengthLegend() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(text = "weak", style = MaterialTheme.typography.labelSmall)
-            Text(text = "strong", style = MaterialTheme.typography.labelSmall)
+            Text(text = "weak air lift", style = MaterialTheme.typography.labelSmall)
+            Text(text = "strong air lift", style = MaterialTheme.typography.labelSmall)
         }
     }
 }

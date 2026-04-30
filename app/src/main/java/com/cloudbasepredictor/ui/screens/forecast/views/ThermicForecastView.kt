@@ -95,6 +95,7 @@ private fun ThermicForecastGrid(
     val density = LocalDensity.current
     val axisLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val cellTextColor = MaterialTheme.colorScheme.onSurface
+    val tooltipBackgroundColor = MaterialTheme.colorScheme.surface
     val gridBackgroundColor = lerp(
         start = MaterialTheme.colorScheme.surface,
         stop = MaterialTheme.colorScheme.onSurface,
@@ -124,11 +125,18 @@ private fun ThermicForecastGrid(
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
         }
     }
-    val tooltipPaint = remember(density, cellTextColor) {
+    val tooltipHeaderPaint = remember(density, cellTextColor) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = cellTextColor.toArgb()
             textSize = with(density) { 12.sp.toPx() }
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        }
+    }
+    val tooltipBodyPaint = remember(density, cellTextColor) {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = cellTextColor.toArgb()
+            textSize = with(density) { 11.sp.toPx() }
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
         }
     }
     var crosshairPos by remember { mutableStateOf<Offset?>(null) }
@@ -582,45 +590,51 @@ private fun ThermicForecastGrid(
 
             val diag = diagnosticsBySlot[timeSlot]
             val tooltipLines = mutableListOf<String>()
-            tooltipLines += "${formatTimeLabel(timeSlot)}  ${formatAltitudeLabel(altKm)} km"
+            tooltipLines += "${formatTimeLabel(timeSlot)}  Alt ${formatAltitudeLabel(altKm)} km"
             if (cell != null) {
-                tooltipLines += "${formatThermicRangeLabel(cell.updraftLowMps, cell.updraftHighMps)} m/s air"
+                tooltipLines += "Air lift ${formatThermicRangeLabel(cell.updraftLowMps, cell.updraftHighMps)} m/s"
             }
             if (diag != null) {
-                tooltipLines += "Top ${formatAltitudeLabel(diag.topNominalKm)} km " +
-                    "(${formatAltitudeLabel(diag.topLowKm)}-${formatAltitudeLabel(diag.topHighKm)})"
+                tooltipLines += "Top ${formatAltitudeLabel(diag.topNominalKm)} km  " +
+                    "range ${formatAltitudeLabel(diag.topLowKm)}-${formatAltitudeLabel(diag.topHighKm)}"
                 if (diag.topLowerPressureHpa != null && diag.topUpperPressureHpa != null) {
-                    tooltipLines += "Bracket ${diag.topLowerPressureHpa.toInt()}-${diag.topUpperPressureHpa.toInt()} hPa"
+                    tooltipLines += "Raw levels ${diag.topLowerPressureHpa.toInt()}-${diag.topUpperPressureHpa.toInt()} hPa"
                 }
-                tooltipLines += "${formatConfidenceLabel(diag.confidence)}, ${formatLimitingReasonLabel(diag.limitingReason)}"
+                tooltipLines += "Conf ${formatConfidenceLabel(diag.confidence)}  limit " +
+                    formatLimitingReasonLabel(diag.limitingReason)
                 diag.cloudBaseKm?.let {
-                    tooltipLines += "Cu base ${formatAltitudeLabel(it)} km"
+                    tooltipLines += "Cloud base ${formatAltitudeLabel(it)} km"
                 }
-                val modelDiagnostics = buildList {
+                val convectionDiagnostics = buildList {
                     diag.modelCapeJKg?.let { add("CAPE ${it.toInt()}") }
                     diag.modelCinJKg?.let { add("CIN ${it.toInt()}") }
                     diag.liftedIndexC?.let { add("LI ${formatSignedValue(it)}") }
-                    diag.boundaryLayerHeightM?.let { add("PBL ${it.toInt()} m") }
                 }
-                if (modelDiagnostics.isNotEmpty()) {
-                    tooltipLines += "Model ${modelDiagnostics.joinToString("  ")}"
+                if (convectionDiagnostics.isNotEmpty()) {
+                    tooltipLines += "Diag ${convectionDiagnostics.joinToString("  ")}"
+                }
+                diag.boundaryLayerHeightM?.let {
+                    tooltipLines += "PBL ${it.toInt()} m"
                 }
             }
 
-            val lineH = tooltipPaint.textSize * 1.3f
-            val maxTextW = tooltipLines.maxOf { tooltipPaint.measureText(it) }
+            val lineH = max(tooltipHeaderPaint.textSize, tooltipBodyPaint.textSize) * 1.35f
+            val maxTextW = tooltipLines.withIndex().maxOf { (index, line) ->
+                if (index == 0) tooltipHeaderPaint.measureText(line) else tooltipBodyPaint.measureText(line)
+            }
             val padH = with(density) { 8.dp.toPx() }
             val padV = with(density) { 6.dp.toPx() }
             val ttW = maxTextW + padH * 2
             val ttH = lineH * tooltipLines.size + padV * 2
-            val ttX = if (cx + reticleR + ttW + 8.dp.toPx() < plotRight)
+            val preferredTtX = if (cx + reticleR + ttW + 8.dp.toPx() < plotRight)
                 cx + reticleR + 8.dp.toPx()
             else
                 cx - reticleR - ttW - 8.dp.toPx()
+            val ttX = preferredTtX.coerceIn(plotLeft, (plotRight - ttW).coerceAtLeast(plotLeft))
             val ttY = (cy - ttH / 2f).coerceIn(plotTop, plotBottom - ttH)
 
             drawRoundRect(
-                color = gridBackgroundColor.copy(alpha = 0.92f),
+                color = tooltipBackgroundColor.copy(alpha = 0.96f),
                 topLeft = Offset(ttX, ttY),
                 size = Size(ttW, ttH),
                 cornerRadius = CornerRadius(4.dp.toPx()),
@@ -634,11 +648,12 @@ private fun ThermicForecastGrid(
             )
             drawIntoCanvas { canvas ->
                 tooltipLines.forEachIndexed { idx, line ->
+                    val paint = if (idx == 0) tooltipHeaderPaint else tooltipBodyPaint
                     canvas.nativeCanvas.drawText(
                         line,
                         ttX + padH,
                         ttY + padV + (idx + 1) * lineH - lineH * 0.15f,
-                        tooltipPaint,
+                        paint,
                     )
                 }
             }
@@ -798,20 +813,20 @@ private fun formatThermicRangeLabel(low: Float, high: Float): String {
 
 private fun formatConfidenceLabel(confidence: ThermalForecastConfidence): String {
     return when (confidence) {
-        ThermalForecastConfidence.HIGH -> "High confidence"
-        ThermalForecastConfidence.MEDIUM -> "Medium confidence"
-        ThermalForecastConfidence.LOW -> "Low confidence"
+        ThermalForecastConfidence.HIGH -> "HIGH"
+        ThermalForecastConfidence.MEDIUM -> "MED"
+        ThermalForecastConfidence.LOW -> "LOW"
     }
 }
 
 private fun formatLimitingReasonLabel(reason: ThermalLimitingReason): String {
     return when (reason) {
-        ThermalLimitingReason.SURFACE_HEATING -> "surface heating"
+        ThermalLimitingReason.SURFACE_HEATING -> "heating"
         ThermalLimitingReason.INVERSION -> "inversion"
         ThermalLimitingReason.CLOUD_BASE -> "cloud base"
         ThermalLimitingReason.PROFILE_TOP -> "profile top"
-        ThermalLimitingReason.PRECIPITATION -> "precipitation"
-        ThermalLimitingReason.WEAK_RADIATION -> "weak radiation"
+        ThermalLimitingReason.PRECIPITATION -> "rain"
+        ThermalLimitingReason.WEAK_RADIATION -> "weak sun"
         ThermalLimitingReason.WIND_SHEAR -> "wind shear"
         ThermalLimitingReason.MISSING_DATA -> "missing data"
     }

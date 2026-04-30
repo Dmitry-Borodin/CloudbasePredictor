@@ -75,12 +75,14 @@
 
     <!-- Help dialog - Thermic -->
     <string name="help_thermic_title">Thermic forecast help</string>
-    <string name="help_thermic_summary">Air updraft legend (m/s), estimated from model profiles for soaring thermals:</string>
-    <string name="help_thermic_model_blocks_info">Shows raw model time slots and pressure-level altitude bands. CAPE, CIN and lifted index are deep-convection diagnostics only; they do not scale thermic strength. Hatched orange bands show thermal-top uncertainty from vertical resolution.</string>
-    <string name="help_thermic_dashed_lines_title">Lines and bands:</string>
-    <string name="help_thermic_dry_top_line">Orange - nominal thermal top; hatched band - low/high top range</string>
-    <string name="help_thermic_cloud_base_line">Blue - cloud base</string>
-    <string name="help_thermic_moist_top_line">Purple - moist/cloud top</string>
+    <string name="help_thermic_summary">Color shows vertical air updraft speed in m/s, estimated from model profiles for soaring thermals. It is air motion, not glider net climb.</string>
+    <string name="help_thermic_model_blocks_info">Columns are real model time slots. Colored blocks use raw pressure-level altitude bands; thin grey dashed lines mark those source levels, so coarse vertical resolution remains visible.</string>
+    <string name="help_thermic_cursor_info">Cursor details show altitude/time, air-lift range, thermal-top range, confidence, limiting factor, cloud base, and model diagnostics. CAPE, CIN, LI and PBL are diagnostics only; they do not scale thermic lift.</string>
+    <string name="help_thermic_dashed_lines_title">Lines, bands and diagnostics:</string>
+    <string name="help_thermic_dry_top_line">Orange line - nominal thermal top; orange hatch - low/high top uncertainty</string>
+    <string name="help_thermic_cloud_base_line">Blue dashed line/band - cloud base and cloud depth</string>
+    <string name="help_thermic_moist_top_line">Purple dashed line - moist/cloud equilibrium top</string>
+    <string name="help_thermic_pressure_levels_line">Grey dashed horizontal lines - raw model pressure-level heights</string>
 
     <!-- Help dialog - Skew-T -->
     <string name="help_stuve_title">Skew-T log-P diagram</string>
