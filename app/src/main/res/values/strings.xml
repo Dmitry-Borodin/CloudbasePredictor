@@ -76,14 +76,14 @@
 
     <!-- Help dialog - Thermic -->
     <string name="help_thermic_title">Thermic forecast help</string>
-    <string name="help_thermic_summary">Color shows vertical air updraft speed in m/s, estimated from model profiles for soaring thermals. It is air motion, not glider net climb.</string>
-    <string name="help_thermic_model_blocks_info">Columns are real model time slots. Colored blocks use raw pressure-level altitude bands; thin grey dashed lines mark those source levels, so coarse vertical resolution remains visible.</string>
-    <string name="help_thermic_cursor_info">Cursor details show altitude/time, air-lift range, thermal-top raw range, confidence, limiting factor, cloud layer, and model diagnostics. CAPE, CIN, LI and PBL help calibrate thermic lift and confidence when available.</string>
+    <string name="help_thermic_summary">Color shows estimated air updraft in m/s, not glider net climb.</string>
+    <string name="help_thermic_model_blocks_info">Colored rectangles are model time-altitude bins from raw pressure levels; block edges show model resolution, not terrain.</string>
+    <string name="help_thermic_cursor_info">Cursor details show time, altitude, lift range, top range, confidence, limiter, cloud layer, and model diagnostics.</string>
     <string name="help_thermic_dashed_lines_title">Lines, bands and diagnostics:</string>
-    <string name="help_thermic_dry_top_line">Orange line - nominal thermal top; orange hatch - low/high top uncertainty</string>
-    <string name="help_thermic_cloud_base_line">Blue dashed line/band - possible cloud layer from base to moist top, not dry soarable lift</string>
-    <string name="help_thermic_moist_top_line">Purple dashed line - moist/cloud equilibrium top</string>
-    <string name="help_thermic_pressure_levels_line">Grey dashed horizontal lines - raw model pressure-level heights</string>
+    <string name="help_thermic_dry_top_line">Orange - thermal top and top uncertainty</string>
+    <string name="help_thermic_cloud_base_line">Blue - possible cloud layer</string>
+    <string name="help_thermic_moist_top_line">Purple - moist/cloud top</string>
+    <string name="help_thermic_pressure_levels_line">Grey dashed - raw pressure levels</string>
 
     <!-- Help dialog - Skew-T -->
     <string name="help_stuve_title">Skew-T log-P diagram</string>
@@ -101,11 +101,11 @@
 
     <!-- Help dialog - Cloud -->
     <string name="help_cloud_title">Cloud forecast help</string>
-    <string name="help_cloud_summary">High / Mid / Low cloud layers with precipitation bars. Darker shading = more coverage.</string>
-    <string name="help_cloud_legend_sun">☀ h - sunshine per hour; circle size means 0-1 h</string>
-    <string name="help_cloud_legend_radiation">W/m² - shortwave radiation; bars show 0-800 W/m²</string>
-    <string name="help_cloud_legend_layers" formatted="false">High / Mid / Low - cloud cover 0-100%; darker means more</string>
-    <string name="help_cloud_legend_rain" formatted="false">Rain - probability % and amount mm</string>
+    <string name="help_cloud_summary">Cloud coverage and solar energy at the ground.</string>
+    <string name="help_cloud_legend_sun">Sun h - direct sun time above the WMO threshold; clouds may still cover the sky.</string>
+    <string name="help_cloud_legend_radiation">W/m² - solar energy reaching the ground; main heating signal for thermals.</string>
+    <string name="help_cloud_legend_layers" formatted="false">High / Mid / Low - sky coverage by cloud layer, not cloud thickness.</string>
+    <string name="help_cloud_legend_rain" formatted="false">Rain - probability and amount.</string>
     <string name="help_cloud_tip_1">Use cloud mode together with thermic mode to estimate whether lift reaches cloud base or stays blue.</string>
     <string name="help_cloud_tip_2">Compare altitude bands to spot when cloud development starts climbing higher.</string>
 

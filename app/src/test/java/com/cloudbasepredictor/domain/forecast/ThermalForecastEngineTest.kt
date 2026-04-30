@@ -152,6 +152,35 @@ class ThermalForecastEngineTest {
     }
 
     @Test
+    fun analyze_knownStrongRadiation_doesNotDoublePenalizeHighAndMidCloud() {
+        val clear = analyze(
+            profile = crossingProfileWithoutSurface(),
+            heatingInput = heatingInput.copy(
+                shortwaveRadiationWm2 = 744f,
+                cloudCoverLowPercent = 0f,
+                cloudCoverMidPercent = 0f,
+                cloudCoverHighPercent = 0f,
+            ),
+        )
+        val thinHighMidCloud = analyze(
+            profile = crossingProfileWithoutSurface(),
+            heatingInput = heatingInput.copy(
+                shortwaveRadiationWm2 = 744f,
+                cloudCoverLowPercent = 0f,
+                cloudCoverMidPercent = 100f,
+                cloudCoverHighPercent = 100f,
+            ),
+        )
+
+        assertNotNull(clear)
+        assertNotNull(thinHighMidCloud)
+        clear!!
+        thinHighMidCloud!!
+        assertEquals(clear.updraftNominalMps, thinHighMidCloud.updraftNominalMps, 0.001f)
+        assertEquals(clear.updraftHighMps, thinHighMidCloud.updraftHighMps, 0.001f)
+    }
+
+    @Test
     fun analyze_missingNewOpenMeteoFieldsStillProducesLowerConfidenceForecast() {
         val result = analyze(
             profile = crossingProfileWithoutSurface(includeMoistureDiagnostics = false),

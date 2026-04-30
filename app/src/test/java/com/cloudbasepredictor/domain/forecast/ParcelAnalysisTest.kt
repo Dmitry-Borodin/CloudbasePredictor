@@ -143,7 +143,7 @@ class ParcelAnalysisTest {
     }
 
     @Test
-    fun surfaceHeating_overcast_reduced() {
+    fun surfaceHeating_heavyLowCloud_reduced() {
         val clear = SurfaceHeatingInput(
             hourOfDay = 13,
             shortwaveRadiationWm2 = 700f,
@@ -153,10 +153,33 @@ class ParcelAnalysisTest {
             precipitationMm = 0f,
             isDay = true,
         )
-        val overcast = clear.copy(cloudCoverLowPercent = 80f, cloudCoverMidPercent = 50f)
+        val overcast = clear.copy(cloudCoverLowPercent = 80f)
         val heatingClear = estimateSurfaceHeating(clear)
         val heatingOvercast = estimateSurfaceHeating(overcast)
-        assertTrue("Overcast heating should be less than clear", heatingOvercast < heatingClear)
+        assertTrue("Heavy low cloud should reduce heating", heatingOvercast < heatingClear)
+    }
+
+    @Test
+    fun surfaceHeating_knownStrongRadiation_ignoresHighAndMidCloudCoverage() {
+        val clear = SurfaceHeatingInput(
+            hourOfDay = 13,
+            shortwaveRadiationWm2 = 744f,
+            cloudCoverLowPercent = 0f,
+            cloudCoverMidPercent = 0f,
+            cloudCoverHighPercent = 0f,
+            precipitationMm = 0f,
+            isDay = true,
+        )
+        val thinHighMidCloud = clear.copy(
+            cloudCoverMidPercent = 100f,
+            cloudCoverHighPercent = 100f,
+        )
+
+        val heatingClear = estimateSurfaceHeating(clear)
+        val heatingCloudy = estimateSurfaceHeating(thinHighMidCloud)
+
+        assertTrue("Strong radiation should still produce strong heating", heatingCloudy >= 4f)
+        assertEquals(heatingClear, heatingCloudy, 0.001f)
     }
 
     @Test

@@ -121,9 +121,9 @@ class ForecastAppFlowInstrumentedTest {
         composeRule.onNodeWithTag(HELP_BUTTON).performClick()
         composeRule.onNodeWithText("Thermic forecast help").assertIsDisplayed()
         composeRule.onNodeWithText("Lines, bands and diagnostics:").assertIsDisplayed()
-        composeRule.onNodeWithText("Colored blocks use raw pressure-level altitude bands", substring = true)
+        composeRule.onNodeWithText("Colored rectangles are model time-altitude bins", substring = true)
             .assertIsDisplayed()
-        composeRule.onNodeWithText("CAPE, CIN, LI and PBL help calibrate thermic lift", substring = true)
+        composeRule.onNodeWithText("Cursor details show time, altitude, lift range", substring = true)
             .assertIsDisplayed()
         composeRule.onAllNodesWithText("Showing the thermic forecast", substring = true).assertCountEquals(0)
         composeRule.onNodeWithText("Close").performClick()
@@ -138,7 +138,8 @@ class ForecastAppFlowInstrumentedTest {
         composeRule.onNodeWithTag(CLOUD_MODE_TAB).performClick()
         composeRule.onNodeWithTag(HELP_BUTTON).performClick()
         composeRule.onNodeWithText("Cloud forecast help").assertIsDisplayed()
-        composeRule.onNodeWithText("☀ h - sunshine per hour; circle size means 0-1 h").assertIsDisplayed()
+        composeRule.onNodeWithText("Sun h - direct sun time above the WMO threshold", substring = true)
+            .assertIsDisplayed()
         composeRule.onAllNodesWithText("Showing the cloud forecast", substring = true).assertCountEquals(0)
     }
 

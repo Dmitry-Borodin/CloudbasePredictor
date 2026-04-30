@@ -259,12 +259,18 @@ fun estimateSurfaceHeating(input: SurfaceHeatingInput): Float {
         (it / REFERENCE_RADIATION_WM2).coerceIn(0f, 1.2f)
     }
 
-    // Cloud penalty
-    val cloudPenalty = run {
+    val cloudPenalty = if (radiationFraction != null) {
+        val low = input.cloudCoverLowPercent ?: 0f
+        when {
+            low >= 85f -> 0.60f
+            low >= 70f -> 0.40f
+            low >= 50f -> 0.20f
+            else -> 0f
+        }
+    } else {
         val low = (input.cloudCoverLowPercent ?: 0f) / 100f
         val mid = (input.cloudCoverMidPercent ?: 0f) / 100f
         val high = (input.cloudCoverHighPercent ?: 0f) / 100f
-        // Low clouds block most radiation, high clouds less
         (low * 0.7f + mid * 0.4f + high * 0.15f).coerceIn(0f, 0.85f)
     }
 

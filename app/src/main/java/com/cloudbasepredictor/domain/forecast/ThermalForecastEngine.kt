@@ -351,19 +351,33 @@ object ThermalForecastEngine {
             radiation < 300f -> 0.75f
             else -> 1f
         }
-        val cloudPenalty = (
-            ((input.heatingInput.cloudCoverLowPercent ?: 0f) / 100f) * 0.45f +
-                ((input.heatingInput.cloudCoverMidPercent ?: 0f) / 100f) * 0.25f +
-                ((input.heatingInput.cloudCoverHighPercent ?: 0f) / 100f) * 0.10f
-            ).coerceIn(0f, 0.55f)
-        val profileCloudPenalty = profile
-            .filter { it.heightKm <= topKm + 0.2f }
-            .mapNotNull(ProfileLevel::cloudCoverPercent)
-            .takeIf { it.isNotEmpty() }
-            ?.average()
-            ?.toFloat()
-            ?.let { (it / 100f * 0.25f).coerceIn(0f, 0.35f) }
-            ?: 0f
+        val cloudPenalty = if (radiation != null) {
+            val lowCloud = input.heatingInput.cloudCoverLowPercent ?: 0f
+            when {
+                lowCloud >= 85f -> 0.25f
+                lowCloud >= 70f -> 0.15f
+                lowCloud >= 50f -> 0.08f
+                else -> 0f
+            }
+        } else {
+            (
+                ((input.heatingInput.cloudCoverLowPercent ?: 0f) / 100f) * 0.45f +
+                    ((input.heatingInput.cloudCoverMidPercent ?: 0f) / 100f) * 0.25f +
+                    ((input.heatingInput.cloudCoverHighPercent ?: 0f) / 100f) * 0.10f
+                ).coerceIn(0f, 0.55f)
+        }
+        val profileCloudPenalty = if (radiation == null) {
+            profile
+                .filter { it.heightKm <= topKm + 0.2f }
+                .mapNotNull(ProfileLevel::cloudCoverPercent)
+                .takeIf { it.isNotEmpty() }
+                ?.average()
+                ?.toFloat()
+                ?.let { (it / 100f * 0.25f).coerceIn(0f, 0.35f) }
+                ?: 0f
+        } else {
+            0f
+        }
         val precipFactor = if ((input.heatingInput.precipitationMm ?: 0f) > 0.1f) 0.55f else 1f
         val shearKmh = lowLevelWindShearKmh(profile, topKm)
         val shearFactor = when {
