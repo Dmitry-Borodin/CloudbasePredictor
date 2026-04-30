@@ -59,6 +59,12 @@ data class OpenMeteoHourlyResponse(
 
     // --- CAPE ---
     val cape: List<Double?>? = null,
+    @SerialName("lifted_index")
+    val liftedIndex: List<Double?>? = null,
+    @SerialName("convective_inhibition")
+    val convectiveInhibition: List<Double?>? = null,
+    @SerialName("boundary_layer_height")
+    val boundaryLayerHeight: List<Double?>? = null,
 
     // --- Freezing level ---
     @SerialName("freezing_level_height")
@@ -163,6 +169,86 @@ data class OpenMeteoHourlyResponse(
     val dewPoint250hPa: List<Double?>? = null,
     @SerialName("dew_point_200hPa")
     val dewPoint200hPa: List<Double?>? = null,
+
+    // --- Relative humidity at pressure levels (%) ---
+    @SerialName("relative_humidity_1000hPa")
+    val relativeHumidity1000hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_975hPa")
+    val relativeHumidity975hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_950hPa")
+    val relativeHumidity950hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_925hPa")
+    val relativeHumidity925hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_900hPa")
+    val relativeHumidity900hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_875hPa")
+    val relativeHumidity875hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_850hPa")
+    val relativeHumidity850hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_800hPa")
+    val relativeHumidity800hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_750hPa")
+    val relativeHumidity750hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_700hPa")
+    val relativeHumidity700hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_650hPa")
+    val relativeHumidity650hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_600hPa")
+    val relativeHumidity600hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_550hPa")
+    val relativeHumidity550hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_500hPa")
+    val relativeHumidity500hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_450hPa")
+    val relativeHumidity450hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_400hPa")
+    val relativeHumidity400hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_350hPa")
+    val relativeHumidity350hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_300hPa")
+    val relativeHumidity300hPa: List<Double?>? = null,
+    @SerialName("relative_humidity_250hPa")
+    val relativeHumidity250hPa: List<Double?>? = null,
+
+    // --- Cloud cover at pressure levels (%) ---
+    @SerialName("cloud_cover_1000hPa")
+    val cloudCover1000hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_975hPa")
+    val cloudCover975hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_950hPa")
+    val cloudCover950hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_925hPa")
+    val cloudCover925hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_900hPa")
+    val cloudCover900hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_875hPa")
+    val cloudCover875hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_850hPa")
+    val cloudCover850hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_800hPa")
+    val cloudCover800hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_750hPa")
+    val cloudCover750hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_700hPa")
+    val cloudCover700hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_650hPa")
+    val cloudCover650hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_600hPa")
+    val cloudCover600hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_550hPa")
+    val cloudCover550hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_500hPa")
+    val cloudCover500hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_450hPa")
+    val cloudCover450hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_400hPa")
+    val cloudCover400hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_350hPa")
+    val cloudCover350hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_300hPa")
+    val cloudCover300hPa: List<Double?>? = null,
+    @SerialName("cloud_cover_250hPa")
+    val cloudCover250hPa: List<Double?>? = null,
 
     // --- Wind speed at pressure levels (km/h) ---
     @SerialName("wind_speed_1000hPa")
@@ -336,6 +422,50 @@ data class OpenMeteoHourlyResponse(
         dewPoint350hPa?.let { 350 to it },
         dewPoint300hPa?.let { 300 to it },
         dewPoint250hPa?.let { 250 to it },
+    )
+
+    fun relativeHumidityByPressure(): List<Pair<Int, List<Double?>>> = listOfNotNull(
+        relativeHumidity1000hPa?.let { 1000 to it },
+        relativeHumidity975hPa?.let { 975 to it },
+        relativeHumidity950hPa?.let { 950 to it },
+        relativeHumidity925hPa?.let { 925 to it },
+        relativeHumidity900hPa?.let { 900 to it },
+        relativeHumidity875hPa?.let { 875 to it },
+        relativeHumidity850hPa?.let { 850 to it },
+        relativeHumidity800hPa?.let { 800 to it },
+        relativeHumidity750hPa?.let { 750 to it },
+        relativeHumidity700hPa?.let { 700 to it },
+        relativeHumidity650hPa?.let { 650 to it },
+        relativeHumidity600hPa?.let { 600 to it },
+        relativeHumidity550hPa?.let { 550 to it },
+        relativeHumidity500hPa?.let { 500 to it },
+        relativeHumidity450hPa?.let { 450 to it },
+        relativeHumidity400hPa?.let { 400 to it },
+        relativeHumidity350hPa?.let { 350 to it },
+        relativeHumidity300hPa?.let { 300 to it },
+        relativeHumidity250hPa?.let { 250 to it },
+    )
+
+    fun cloudCoverByPressure(): List<Pair<Int, List<Double?>>> = listOfNotNull(
+        cloudCover1000hPa?.let { 1000 to it },
+        cloudCover975hPa?.let { 975 to it },
+        cloudCover950hPa?.let { 950 to it },
+        cloudCover925hPa?.let { 925 to it },
+        cloudCover900hPa?.let { 900 to it },
+        cloudCover875hPa?.let { 875 to it },
+        cloudCover850hPa?.let { 850 to it },
+        cloudCover800hPa?.let { 800 to it },
+        cloudCover750hPa?.let { 750 to it },
+        cloudCover700hPa?.let { 700 to it },
+        cloudCover650hPa?.let { 650 to it },
+        cloudCover600hPa?.let { 600 to it },
+        cloudCover550hPa?.let { 550 to it },
+        cloudCover500hPa?.let { 500 to it },
+        cloudCover450hPa?.let { 450 to it },
+        cloudCover400hPa?.let { 400 to it },
+        cloudCover350hPa?.let { 350 to it },
+        cloudCover300hPa?.let { 300 to it },
+        cloudCover250hPa?.let { 250 to it },
     )
 
     fun windSpeedsByPressure(): List<Pair<Int, List<Double?>>> = listOfNotNull(

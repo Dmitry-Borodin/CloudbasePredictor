@@ -24,13 +24,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -38,6 +38,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.R
+import com.cloudbasepredictor.domain.forecast.ThermalForecastConfidence
+import com.cloudbasepredictor.domain.forecast.ThermalLimitingReason
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
@@ -93,7 +95,6 @@ private fun ThermicForecastGrid(
     val density = LocalDensity.current
     val axisLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val cellTextColor = MaterialTheme.colorScheme.onSurface
-    val cloudOutlineColor = MaterialTheme.colorScheme.onSurface
     val gridBackgroundColor = lerp(
         start = MaterialTheme.colorScheme.surface,
         stop = MaterialTheme.colorScheme.onSurface,
@@ -266,10 +267,98 @@ private fun ThermicForecastGrid(
             )
         }
 
+        val diagnosticsBySlot = displayChart.slotDiagnostics
+            .associateBy { it.startMinuteOfDayLocal }
+
         // Build cloud altitude lookup per time slot for clipping cells at cloud base.
-        val cloudAltitudeBySlot = displayChart.cloudMarkers
-            .groupBy { it.startMinuteOfDayLocal }
-            .mapValues { (_, markers) -> markers.minOf { it.altitudeKm } }
+        val cloudAltitudeBySlot = diagnosticsBySlot
+            .mapNotNull { (minute, diag) -> diag.cloudBaseKm?.let { minute to it } }
+            .toMap()
+            .ifEmpty {
+                displayChart.cloudMarkers
+                    .groupBy { it.startMinuteOfDayLocal }
+                    .mapValues { (_, markers) -> markers.minOf { it.altitudeKm } }
+            }
+
+        val pressureLevelDash = PathEffect.dashPathEffect(floatArrayOf(2f, 6f))
+        displayChart.pressureLevelAltitudesKm
+            .distinctBy { (it * 1000f).toInt() }
+            .filter { it in elevationKm..effectiveTopAltitudeKm }
+            .forEach { altitudeKm ->
+                val y = altitudeToY(
+                    altitudeKm = altitudeKm,
+                    minAltitudeKm = elevationKm,
+                    maxAltitudeKm = effectiveTopAltitudeKm,
+                    plotTop = plotTop,
+                    plotBottom = plotBottom,
+                )
+                drawLine(
+                    color = outlineColor.copy(alpha = 0.28f),
+                    start = Offset(plotLeft, y),
+                    end = Offset(plotRight, y),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = pressureLevelDash,
+                )
+                drawLine(
+                    color = outlineColor.copy(alpha = 0.5f),
+                    start = Offset(plotLeft - 7.dp.toPx(), y),
+                    end = Offset(plotLeft, y),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
+
+        val thermalTopColor = Color(0xFFE07020)
+        val cloudBaseColor = Color(0xFF2088E0)
+        val moistTopColor = Color(0xFFA040C0)
+
+        displayChart.timeSlots.forEachIndexed { index, minute ->
+            val diag = diagnosticsBySlot[minute] ?: return@forEachIndexed
+            val columnLeft = plotLeft + (index * columnWidth)
+            val bandLeft = columnLeft + tileInset
+            val bandRight = columnLeft + columnWidth - tileInset
+
+            val rangeLowKm = diag.topLowKm.coerceIn(elevationKm, effectiveTopAltitudeKm)
+            val rangeHighKm = diag.topHighKm.coerceIn(elevationKm, effectiveTopAltitudeKm)
+            if (rangeHighKm > rangeLowKm + ALTITUDE_EPSILON) {
+                val rangeTopY = altitudeToY(rangeHighKm, elevationKm, effectiveTopAltitudeKm, plotTop, plotBottom)
+                val rangeBottomY = altitudeToY(rangeLowKm, elevationKm, effectiveTopAltitudeKm, plotTop, plotBottom)
+                drawHatchedVerticalBand(
+                    left = bandLeft,
+                    top = rangeTopY,
+                    right = bandRight,
+                    bottom = rangeBottomY,
+                    fillColor = thermalTopColor.copy(alpha = 0.12f),
+                    hatchColor = thermalTopColor.copy(alpha = 0.30f),
+                )
+            }
+
+            val cloudBaseKm = diag.cloudBaseKm
+            val cloudTopKm = diag.moistEquilibriumTopKm?.coerceAtLeast(cloudBaseKm ?: 0f)
+            if (cloudBaseKm != null && cloudBaseKm <= effectiveTopAltitudeKm) {
+                val baseY = altitudeToY(
+                    altitudeKm = cloudBaseKm.coerceIn(elevationKm, effectiveTopAltitudeKm),
+                    minAltitudeKm = elevationKm,
+                    maxAltitudeKm = effectiveTopAltitudeKm,
+                    plotTop = plotTop,
+                    plotBottom = plotBottom,
+                )
+                val topY = altitudeToY(
+                    altitudeKm = (cloudTopKm ?: cloudBaseKm).coerceIn(elevationKm, effectiveTopAltitudeKm),
+                    minAltitudeKm = elevationKm,
+                    maxAltitudeKm = effectiveTopAltitudeKm,
+                    plotTop = plotTop,
+                    plotBottom = plotBottom,
+                )
+                if (baseY - topY > 2.dp.toPx()) {
+                    drawRoundRect(
+                        color = cloudBaseColor.copy(alpha = 0.10f),
+                        topLeft = Offset(bandLeft, topY),
+                        size = Size(bandRight - bandLeft, baseY - topY),
+                        cornerRadius = CornerRadius(2.dp.toPx()),
+                    )
+                }
+            }
+        }
 
         displayChart.cells.forEach { cell ->
             val timeIndex = timeIndexLookup[cell.startMinuteOfDayLocal] ?: return@forEach
@@ -346,20 +435,15 @@ private fun ThermicForecastGrid(
             style = Stroke(width = 1.dp.toPx()),
         )
 
-        // ── Diagnostic lines: dry top, cloud base, moist top ──────
-        val diagnosticsBySlot = displayChart.slotDiagnostics
-            .associateBy { it.startMinuteOfDayLocal }
-        val dryTopDash = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
+        // ── Diagnostic lines: nominal top, cloud base, moist top ──────
         val cloudBaseDash = PathEffect.dashPathEffect(floatArrayOf(10f, 4f))
         val moistTopDash = PathEffect.dashPathEffect(floatArrayOf(4f, 6f))
-        val dryTopColor = Color(0xFFE07020)       // warm orange
-        val cloudBaseColor = Color(0xFF2088E0)     // blue
-        val moistTopColor = Color(0xFFA040C0)      // purple
         val diagLineWidth = 2.dp.toPx()
 
         fun drawDiagnosticLine(
             color: Color,
-            pathEffect: PathEffect,
+            pathEffect: PathEffect?,
+            strokeWidth: Float = diagLineWidth,
             valueSelector: (ThermicSlotDiagnostics) -> Float?,
         ) {
             var prevX: Float? = null
@@ -379,7 +463,7 @@ private fun ThermicForecastGrid(
                         color = color,
                         start = Offset(prevX!!, prevY!!),
                         end = Offset(x, y),
-                        strokeWidth = diagLineWidth,
+                        strokeWidth = strokeWidth,
                         pathEffect = pathEffect,
                     )
                 }
@@ -391,47 +475,8 @@ private fun ThermicForecastGrid(
         drawDiagnosticLine(moistTopColor, moistTopDash) { it.moistEquilibriumTopKm }
         // Cloud base line
         drawDiagnosticLine(cloudBaseColor, cloudBaseDash) { it.cloudBaseKm }
-        // Dry thermal top line
-        drawDiagnosticLine(dryTopColor, dryTopDash) { it.dryThermalTopKm }
-
-        val cloudMarkerWidth = minOf(columnWidth * 0.9f, 96.dp.toPx())
-        val cloudMarkerHeight = minOf(columnWidth * 0.6f, 40.dp.toPx())
-        val drawnCloudMarkers = mutableListOf<Offset>()
-
-        displayChart.cloudMarkers.forEach { marker ->
-            val timeIndex = timeIndexLookup[marker.startMinuteOfDayLocal] ?: return@forEach
-            if (marker.altitudeKm !in elevationKm..effectiveTopAltitudeKm) {
-                return@forEach
-            }
-
-            val center = Offset(
-                x = plotLeft + (timeIndex * columnWidth) + (columnWidth / 2f),
-                y = altitudeToY(
-                    altitudeKm = marker.altitudeKm,
-                    minAltitudeKm = elevationKm,
-                    maxAltitudeKm = effectiveTopAltitudeKm,
-                    plotTop = plotTop,
-                    plotBottom = plotBottom,
-                ),
-            )
-
-            // Skip if overlapping with an already-drawn marker
-            val tooClose = drawnCloudMarkers.any { existing ->
-                val dx = kotlin.math.abs(existing.x - center.x)
-                val dy = kotlin.math.abs(existing.y - center.y)
-                dx < cloudMarkerWidth * 0.8f && dy < cloudMarkerHeight * 0.8f
-            }
-            if (tooClose) return@forEach
-            drawnCloudMarkers += center
-
-            drawCloudMarker(
-                center = center,
-                width = cloudMarkerWidth,
-                height = cloudMarkerHeight,
-                fillColor = Color.White.copy(alpha = 0.94f),
-                outlineColor = cloudOutlineColor,
-            )
-        }
+        // Nominal dry thermal top line
+        drawDiagnosticLine(thermalTopColor, pathEffect = null, strokeWidth = diagLineWidth * 1.2f) { it.topNominalKm }
 
         drawIntoCanvas { canvas ->
             majorAltitudeTicks.forEach { altitudeKm ->
@@ -539,17 +584,27 @@ private fun ThermicForecastGrid(
             val tooltipLines = mutableListOf<String>()
             tooltipLines += "${formatTimeLabel(timeSlot)}  ${formatAltitudeLabel(altKm)} km"
             if (cell != null) {
-                tooltipLines += "${formatThermicStrengthLabel(cell.strengthMps)} m/s"
+                tooltipLines += "${formatThermicRangeLabel(cell.updraftLowMps, cell.updraftHighMps)} m/s air"
             }
             if (diag != null) {
-                tooltipLines += "Dry top ${formatAltitudeLabel(diag.dryThermalTopKm)} km"
+                tooltipLines += "Top ${formatAltitudeLabel(diag.topNominalKm)} km " +
+                    "(${formatAltitudeLabel(diag.topLowKm)}-${formatAltitudeLabel(diag.topHighKm)})"
+                if (diag.topLowerPressureHpa != null && diag.topUpperPressureHpa != null) {
+                    tooltipLines += "Bracket ${diag.topLowerPressureHpa.toInt()}-${diag.topUpperPressureHpa.toInt()} hPa"
+                }
+                tooltipLines += "${formatConfidenceLabel(diag.confidence)}, ${formatLimitingReasonLabel(diag.limitingReason)}"
                 diag.cloudBaseKm?.let {
                     tooltipLines += "Cu base ${formatAltitudeLabel(it)} km"
                 }
-                diag.modelCapeJKg?.let {
-                    tooltipLines += "CAPE ${it.toInt()} (model)"
+                val modelDiagnostics = buildList {
+                    diag.modelCapeJKg?.let { add("CAPE ${it.toInt()}") }
+                    diag.modelCinJKg?.let { add("CIN ${it.toInt()}") }
+                    diag.liftedIndexC?.let { add("LI ${formatSignedValue(it)}") }
+                    diag.boundaryLayerHeightM?.let { add("PBL ${it.toInt()} m") }
                 }
-                tooltipLines += "CAPE ${diag.computedCapeJKg.toInt()} (calc)"
+                if (modelDiagnostics.isNotEmpty()) {
+                    tooltipLines += "Model ${modelDiagnostics.joinToString("  ")}"
+                }
             }
 
             val lineH = tooltipPaint.textSize * 1.3f
@@ -694,73 +749,76 @@ private fun thermicStrengthColor(strengthMps: Float): Color {
     return lerp(lowerStop.second, upperStop.second, fraction)
 }
 
-private fun DrawScope.drawCloudMarker(
-    center: Offset,
-    width: Float,
-    height: Float,
+private fun DrawScope.drawHatchedVerticalBand(
+    left: Float,
+    top: Float,
+    right: Float,
+    bottom: Float,
     fillColor: Color,
-    outlineColor: Color,
+    hatchColor: Color,
 ) {
-    val strokeWidth = max(width * 0.08f, 1.5f)
-    val baseHeight = height * 0.36f
-    val baseWidth = width * 0.66f
-    val baseTop = center.y + (height * 0.05f)
-    val baseLeft = center.x - (baseWidth / 2f)
-    val radiusSmall = height * 0.23f
-    val radiusMedium = height * 0.28f
-    val radiusLarge = height * 0.33f
+    val resolvedTop = minOf(top, bottom)
+    val resolvedBottom = maxOf(top, bottom)
+    val width = right - left
+    val height = resolvedBottom - resolvedTop
+    if (width <= 0f || height <= 0f) return
 
     drawRoundRect(
         color = fillColor,
-        topLeft = Offset(baseLeft, baseTop),
-        size = Size(baseWidth, baseHeight),
-        cornerRadius = CornerRadius(baseHeight / 2f, baseHeight / 2f),
+        topLeft = Offset(left, resolvedTop),
+        size = Size(width, height),
+        cornerRadius = CornerRadius(2.dp.toPx()),
     )
-    drawCircle(
-        color = fillColor,
-        radius = radiusMedium,
-        center = Offset(center.x - (width * 0.18f), center.y),
-    )
-    drawCircle(
-        color = fillColor,
-        radius = radiusLarge,
-        center = Offset(center.x, center.y - (height * 0.1f)),
-    )
-    drawCircle(
-        color = fillColor,
-        radius = radiusSmall,
-        center = Offset(center.x + (width * 0.2f), center.y + (height * 0.02f)),
-    )
-
-    drawRoundRect(
-        color = outlineColor,
-        topLeft = Offset(baseLeft, baseTop),
-        size = Size(baseWidth, baseHeight),
-        cornerRadius = CornerRadius(baseHeight / 2f, baseHeight / 2f),
-        style = Stroke(width = strokeWidth),
-    )
-    drawCircle(
-        color = outlineColor,
-        radius = radiusMedium,
-        center = Offset(center.x - (width * 0.18f), center.y),
-        style = Stroke(width = strokeWidth),
-    )
-    drawCircle(
-        color = outlineColor,
-        radius = radiusLarge,
-        center = Offset(center.x, center.y - (height * 0.1f)),
-        style = Stroke(width = strokeWidth),
-    )
-    drawCircle(
-        color = outlineColor,
-        radius = radiusSmall,
-        center = Offset(center.x + (width * 0.2f), center.y + (height * 0.02f)),
-        style = Stroke(width = strokeWidth),
-    )
+    clipRect(left = left, top = resolvedTop, right = right, bottom = resolvedBottom) {
+        var x = left - height
+        val step = 8.dp.toPx()
+        while (x < right + height) {
+            drawLine(
+                color = hatchColor,
+                start = Offset(x, resolvedBottom),
+                end = Offset(x + height, resolvedTop),
+                strokeWidth = 1.dp.toPx(),
+            )
+            x += step
+        }
+    }
 }
 
 private fun formatThermicStrengthLabel(value: Float): String {
     return String.format(Locale.US, "%.1f", value)
+}
+
+private fun formatThermicRangeLabel(low: Float, high: Float): String {
+    return if (kotlin.math.abs(high - low) < 0.05f) {
+        formatThermicStrengthLabel(high)
+    } else {
+        "${formatThermicStrengthLabel(low)}-${formatThermicStrengthLabel(high)}"
+    }
+}
+
+private fun formatConfidenceLabel(confidence: ThermalForecastConfidence): String {
+    return when (confidence) {
+        ThermalForecastConfidence.HIGH -> "High confidence"
+        ThermalForecastConfidence.MEDIUM -> "Medium confidence"
+        ThermalForecastConfidence.LOW -> "Low confidence"
+    }
+}
+
+private fun formatLimitingReasonLabel(reason: ThermalLimitingReason): String {
+    return when (reason) {
+        ThermalLimitingReason.SURFACE_HEATING -> "surface heating"
+        ThermalLimitingReason.INVERSION -> "inversion"
+        ThermalLimitingReason.CLOUD_BASE -> "cloud base"
+        ThermalLimitingReason.PROFILE_TOP -> "profile top"
+        ThermalLimitingReason.PRECIPITATION -> "precipitation"
+        ThermalLimitingReason.WEAK_RADIATION -> "weak radiation"
+        ThermalLimitingReason.WIND_SHEAR -> "wind shear"
+        ThermalLimitingReason.MISSING_DATA -> "missing data"
+    }
+}
+
+private fun formatSignedValue(value: Float): String {
+    return String.format(Locale.US, "%+.1f", value)
 }
 
 private fun formatAltitudeLabel(altitudeKm: Float): String {

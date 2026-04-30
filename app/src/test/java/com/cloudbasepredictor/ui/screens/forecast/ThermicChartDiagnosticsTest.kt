@@ -12,12 +12,12 @@ import org.junit.Test
 class ThermicChartDiagnosticsTest {
 
     private val pressureLevels = listOf(
-        PressureLevelPoint(950, 18.0, 8.0, 10.0, 270.0, 600.0),
-        PressureLevelPoint(900, 14.0, 4.0, 15.0, 280.0, 1000.0),
-        PressureLevelPoint(850, 10.0, 1.0, 20.0, 290.0, 1500.0),
-        PressureLevelPoint(800, 6.0, -2.0, 25.0, 300.0, 2000.0),
-        PressureLevelPoint(700, -1.0, -10.0, 30.0, 310.0, 3000.0),
-        PressureLevelPoint(600, -8.0, -18.0, 35.0, 320.0, 4200.0),
+        PressureLevelPoint(950, 18.0, 8.0, 10.0, 270.0, 600.0, 45.0, 5.0),
+        PressureLevelPoint(900, 14.0, 4.0, 15.0, 280.0, 1000.0, 42.0, 5.0),
+        PressureLevelPoint(850, 10.0, 1.0, 20.0, 290.0, 1500.0, 38.0, 5.0),
+        PressureLevelPoint(800, 6.0, -2.0, 25.0, 300.0, 2000.0, 35.0, 10.0),
+        PressureLevelPoint(700, -1.0, -10.0, 30.0, 310.0, 3000.0, 30.0, 10.0),
+        PressureLevelPoint(600, -8.0, -18.0, 35.0, 320.0, 4200.0, 25.0, 5.0),
     )
 
     private fun makeHourlyData(
@@ -44,7 +44,13 @@ class ThermicChartDiagnosticsTest {
                 windDirection10mDeg = 270.0,
                 capeJKg = capeJKg,
                 freezingLevelHeightM = 3500.0,
+                surfacePressureHpa = 955.0,
+                shortwaveRadiationWm2 = 700.0,
+                isDay = 1.0,
                 pressureLevels = pressureLevels,
+                liftedIndexC = -1.5,
+                convectiveInhibitionJKg = 25.0,
+                boundaryLayerHeightM = 1800.0,
             ),
         ),
         dailyForecasts = listOf(
@@ -57,10 +63,17 @@ class ThermicChartDiagnosticsTest {
         val chart = buildThermicChartFromData(makeHourlyData(), dayIndex = 0)
         assertTrue("Should have diagnostics", chart.slotDiagnostics.isNotEmpty())
         val diag = chart.slotDiagnostics.first()
-        assertTrue("Dry top should be > elevation", diag.dryThermalTopKm > 0.5f)
+        assertTrue("Nominal top should be > elevation", diag.topNominalKm > 0.5f)
         assertTrue("LCL should be > elevation", diag.lclKm > 0.5f)
         assertTrue("CCL should be > elevation", diag.cclKm > 0.5f)
         assertNotNull("Model CAPE should be present", diag.modelCapeJKg)
+        assertNotNull("Model CIN should be present", diag.modelCinJKg)
+        assertNotNull("Model lifted index should be present", diag.liftedIndexC)
+        assertNotNull("Model PBL height should be present", diag.boundaryLayerHeightM)
+        assertTrue("Top range should contain nominal top", diag.topLowKm <= diag.topNominalKm)
+        assertTrue("Top range should contain nominal top", diag.topHighKm >= diag.topNominalKm)
+        assertTrue("Updraft range should contain nominal value", diag.updraftLowMps <= diag.updraftNominalMps)
+        assertTrue("Updraft range should contain nominal value", diag.updraftHighMps >= diag.updraftNominalMps)
         assertTrue("Computed CAPE should be >= 0", diag.computedCapeJKg >= 0f)
     }
 
@@ -74,43 +87,26 @@ class ThermicChartDiagnosticsTest {
 
         if (maxCellTop != null) {
             assertTrue(
-                "Cell top ($maxCellTop) should not exceed dry top (${diag.dryThermalTopKm})",
-                maxCellTop <= diag.dryThermalTopKm + 0.02f,
+                "Cell top ($maxCellTop) should not exceed nominal top (${diag.topNominalKm})",
+                maxCellTop <= diag.topNominalKm + 0.02f,
             )
         }
     }
 
     @Test
-    fun buildChart_cloudMarkers_spanFromCloudBaseToMoistTop() {
+    fun buildChart_cloudDiagnostics_preserveCloudBaseAndMoistTop() {
         val chart = buildThermicChartFromData(makeHourlyData(), dayIndex = 0)
         val diag = chart.slotDiagnostics.firstOrNull() ?: return
         val cloudBase = diag.cloudBaseKm ?: return
 
-        val markers = chart.cloudMarkers
-            .filter { it.startMinuteOfDayLocal == diag.startMinuteOfDayLocal }
-        assertTrue("Should have cloud markers", markers.isNotEmpty())
-
-        val lowestMarker = markers.minOf { it.altitudeKm }
-        assertEquals(
-            "Lowest cloud marker should be at cloud base",
-            cloudBase,
-            lowestMarker,
-            0.1f,
-        )
-
-        // If moist equilibrium top exists, markers should span up to it
         val moistTop = diag.moistEquilibriumTopKm
         if (moistTop != null && moistTop > cloudBase + 0.1f) {
             assertTrue(
-                "Should have multiple cloud markers spanning to moist top",
-                markers.size > 1,
-            )
-            val highestMarker = markers.maxOf { it.altitudeKm }
-            assertTrue(
-                "Highest marker ($highestMarker) should reach near moist top ($moistTop)",
-                highestMarker >= moistTop - 0.35f,
+                "Moist top should stay above cloud base",
+                moistTop > cloudBase,
             )
         }
+        assertTrue("Cloud markers should no longer be repeated icons", chart.cloudMarkers.isEmpty())
     }
 
     @Test
@@ -133,6 +129,25 @@ class ThermicChartDiagnosticsTest {
         // Even with 0 model CAPE, buoyancy-based analysis should produce thermals
         // if the profile supports it (which it does — warm surface, standard lapse rate)
         assertTrue("Should still produce cells with 0 model CAPE", chart.cells.isNotEmpty())
+    }
+
+    @Test
+    fun buildChart_modelCapeIsDiagnosticOnly() {
+        val lowCape = buildThermicChartFromData(makeHourlyData(capeJKg = 0.0), dayIndex = 0)
+        val highCape = buildThermicChartFromData(makeHourlyData(capeJKg = 2500.0), dayIndex = 0)
+
+        assertEquals(
+            "Model CAPE should be preserved as a diagnostic",
+            2500f,
+            highCape.slotDiagnostics.first().modelCapeJKg!!,
+            0.0001f,
+        )
+        assertEquals(
+            "Model CAPE should not scale nominal updraft",
+            lowCape.slotDiagnostics.first().updraftNominalMps,
+            highCape.slotDiagnostics.first().updraftNominalMps,
+            0.0001f,
+        )
     }
 
     @Test

@@ -1,5 +1,7 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import com.cloudbasepredictor.domain.forecast.ThermalForecastConfidence
+import com.cloudbasepredictor.domain.forecast.ThermalLimitingReason
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -90,6 +92,46 @@ class ThermicForecastChartUiModelTest {
                     altitudeKm = 1.6f,
                 ),
             ),
+            slotDiagnostics = listOf(
+                ThermicSlotDiagnostics(
+                    startMinuteOfDayLocal = 360,
+                    dryThermalTopKm = 1.4f,
+                    topLowKm = 1.1f,
+                    topNominalKm = 1.4f,
+                    topHighKm = 1.7f,
+                    updraftLowMps = 0.8f,
+                    updraftNominalMps = 1.1f,
+                    updraftHighMps = 1.5f,
+                    confidence = ThermalForecastConfidence.HIGH,
+                    limitingReason = ThermalLimitingReason.SURFACE_HEATING,
+                    cloudBaseKm = 1.2f,
+                    moistEquilibriumTopKm = 2.0f,
+                    modelCapeJKg = 100f,
+                    computedCapeJKg = 50f,
+                    computedCinJKg = 0f,
+                    lclKm = 1.1f,
+                    cclKm = 1.2f,
+                ),
+                ThermicSlotDiagnostics(
+                    startMinuteOfDayLocal = 375,
+                    dryThermalTopKm = 1.8f,
+                    topLowKm = 1.3f,
+                    topNominalKm = 1.8f,
+                    topHighKm = 2.4f,
+                    updraftLowMps = 1.0f,
+                    updraftNominalMps = 1.4f,
+                    updraftHighMps = 1.9f,
+                    confidence = ThermalForecastConfidence.LOW,
+                    limitingReason = ThermalLimitingReason.WIND_SHEAR,
+                    cloudBaseKm = 1.6f,
+                    moistEquilibriumTopKm = 2.6f,
+                    modelCapeJKg = 200f,
+                    computedCapeJKg = 75f,
+                    computedCinJKg = 0f,
+                    lclKm = 1.5f,
+                    cclKm = 1.6f,
+                ),
+            ),
         )
 
         val aggregated = chart.aggregatedForDisplay(
@@ -100,6 +142,12 @@ class ThermicForecastChartUiModelTest {
         assertEquals(2, aggregated.cells.size)
         assertEquals(0.15f, aggregated.cells.last().endAltitudeKm, 0.0001f)
         assertEquals(listOf(1.2f, 1.6f), aggregated.cloudMarkers.map { it.altitudeKm })
+        val diag = aggregated.slotDiagnostics.single()
+        assertEquals(1.1f, diag.topLowKm, 0.0001f)
+        assertEquals(1.6f, diag.topNominalKm, 0.0001f)
+        assertEquals(2.4f, diag.topHighKm, 0.0001f)
+        assertEquals(ThermalForecastConfidence.LOW, diag.confidence)
+        assertEquals(ThermalLimitingReason.WIND_SHEAR, diag.limitingReason)
     }
 
     @Test

@@ -120,8 +120,11 @@ class ForecastAppFlowInstrumentedTest {
 
         composeRule.onNodeWithTag(HELP_BUTTON).performClick()
         composeRule.onNodeWithText("Thermic forecast help").assertIsDisplayed()
-        composeRule.onNodeWithText("Dashed lines:").assertIsDisplayed()
-        composeRule.onNodeWithText("Shows model time/altitude blocks directly, without smoothing.").assertIsDisplayed()
+        composeRule.onNodeWithText("Lines and bands:").assertIsDisplayed()
+        composeRule.onNodeWithText("raw model time slots and pressure-level altitude bands", substring = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("CAPE, CIN and lifted index are deep-convection diagnostics only", substring = true)
+            .assertIsDisplayed()
         composeRule.onAllNodesWithText("Showing the thermic forecast", substring = true).assertCountEquals(0)
         composeRule.onNodeWithText("Close").performClick()
 

@@ -75,10 +75,10 @@
 
     <!-- Help dialog - Thermic -->
     <string name="help_thermic_title">Thermic forecast help</string>
-    <string name="help_thermic_summary">Thermal strength legend (m/s):</string>
-    <string name="help_thermic_model_blocks_info">Shows model time/altitude blocks directly, without smoothing.</string>
-    <string name="help_thermic_dashed_lines_title">Dashed lines:</string>
-    <string name="help_thermic_dry_top_line">Orange - dry thermal top</string>
+    <string name="help_thermic_summary">Air updraft legend (m/s), estimated from model profiles for soaring thermals:</string>
+    <string name="help_thermic_model_blocks_info">Shows raw model time slots and pressure-level altitude bands. CAPE, CIN and lifted index are deep-convection diagnostics only; they do not scale thermic strength. Hatched orange bands show thermal-top uncertainty from vertical resolution.</string>
+    <string name="help_thermic_dashed_lines_title">Lines and bands:</string>
+    <string name="help_thermic_dry_top_line">Orange - nominal thermal top; hatched band - low/high top range</string>
     <string name="help_thermic_cloud_base_line">Blue - cloud base</string>
     <string name="help_thermic_moist_top_line">Purple - moist/cloud top</string>
 

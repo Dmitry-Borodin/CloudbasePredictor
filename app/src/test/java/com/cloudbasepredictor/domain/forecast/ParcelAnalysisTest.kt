@@ -359,7 +359,7 @@ class ParcelAnalysisTest {
     }
 
     @Test
-    fun parcelAnalysis_modelCapeUsedForCalibration() {
+    fun parcelAnalysis_modelCapeIsDiagnosticOnly() {
         val resultNoModel = analyzeParcel(
             profile = standardProfile,
             surfaceTemperatureC = 22f,
@@ -381,9 +381,12 @@ class ParcelAnalysisTest {
 
         assertNotNull(resultNoModel)
         assertNotNull(resultWithModel)
-        // Both should produce results; model CAPE calibrates but doesn't prevent thermals
+        // Both should produce the same thermic cells; model CAPE is carried as a diagnostic only.
         assertTrue(resultNoModel!!.thermalCells.isNotEmpty())
         assertTrue(resultWithModel!!.thermalCells.isNotEmpty())
+        resultNoModel.thermalCells.zip(resultWithModel.thermalCells).forEach { (withoutCape, withCape) ->
+            assertEquals(withoutCape.strengthMps, withCape.strengthMps, 0.0001f)
+        }
     }
 
     @Test
@@ -458,7 +461,7 @@ class ParcelAnalysisTest {
     @Test
     fun capeDiscrepancy_documentedFactors() {
         // This test documents why computed CAPE differs from model CAPE.
-        // The calibration factor (model/computed, clamped 0.5..1.5) compensates.
+        // Computed CAPE is retained for parcel diagnostics, not for thermic strength calibration.
         val result = analyzeParcel(
             profile = standardProfile,
             surfaceTemperatureC = 22f,
@@ -479,8 +482,6 @@ class ParcelAnalysisTest {
         // 4. Simplified moist adiabat (4 Newton iterations vs full integration)
         // 5. Model likely uses mixed-layer CAPE (avg lowest 100 hPa) vs our surface-based parcel
         //
-        // The calibrationFactor = (modelCape / computedCape).coerceIn(0.5, 1.5)
-        // ensures thermal strength stays within a reasonable envelope.
         assertTrue(
             "Computed CAPE (${result.computedCapeJKg}) should be positive",
             result.computedCapeJKg > 0f,

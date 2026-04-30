@@ -2,8 +2,10 @@ package com.cloudbasepredictor.data.remote
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.serialization.json.Json
 
 class HourlyForecastConversionTest {
 
@@ -110,5 +112,73 @@ class HourlyForecastConversionTest {
         assertTrue(level250.temperatureC < level450.temperatureC)
         assertTrue(level250.dewPointC!! < level250.temperatureC)
         assertTrue(requireNotNull(level250.geopotentialHeightM) > requireNotNull(level450.geopotentialHeightM))
+    }
+
+    @Test
+    fun toHourlyForecastData_mapsNewThermalDiagnosticsAndPressureFields() {
+        val response = OpenMeteoHourlyForecastResponse(
+            latitude = 47.66,
+            longitude = 11.5,
+            elevation = 1523.0,
+            hourly = OpenMeteoHourlyResponse(
+                time = listOf("2026-04-18T12:00"),
+                temperature2m = listOf(10.8),
+                dewPoint2m = listOf(1.8),
+                cape = listOf(350.0),
+                liftedIndex = listOf(-2.5),
+                convectiveInhibition = listOf(45.0),
+                boundaryLayerHeight = listOf(1750.0),
+                temperature850hPa = listOf(8.8),
+                dewPoint850hPa = listOf(1.0),
+                relativeHumidity850hPa = listOf(61.0),
+                cloudCover850hPa = listOf(35.0),
+                windSpeed850hPa = listOf(14.0),
+                windDirection850hPa = listOf(260.0),
+                geopotentialHeight850hPa = listOf(1541.0),
+            ),
+        )
+
+        val point = response.toHourlyForecastData().hourlyPoints.single()
+        val level850 = requireNotNull(point.pressureLevels.firstOrNull { it.pressureHpa == 850 })
+
+        assertEquals(-2.5, point.liftedIndexC!!, 0.0001)
+        assertEquals(45.0, point.convectiveInhibitionJKg!!, 0.0001)
+        assertEquals(1750.0, point.boundaryLayerHeightM!!, 0.0001)
+        assertEquals(61.0, level850.relativeHumidityPercent!!, 0.0001)
+        assertEquals(35.0, level850.cloudCoverPercent!!, 0.0001)
+        assertEquals(false, level850.isSynthetic)
+    }
+
+    @Test
+    fun oldCachedJsonWithoutNewFieldsStillDecodes() {
+        val json = Json {
+            ignoreUnknownKeys = true
+            explicitNulls = false
+        }
+        val response = json.decodeFromString<OpenMeteoHourlyForecastResponse>(
+            """
+            {
+              "latitude": 47.66,
+              "longitude": 11.5,
+              "elevation": 1523.0,
+              "hourly": {
+                "time": ["2026-04-18T12:00"],
+                "temperature_2m": [10.8],
+                "dew_point_2m": [1.8],
+                "temperature_850hPa": [8.8],
+                "dew_point_850hPa": [1.0],
+                "geopotential_height_850hPa": [1541.0]
+              }
+            }
+            """.trimIndent(),
+        )
+
+        val point = response.toHourlyForecastData().hourlyPoints.single()
+        val level850 = requireNotNull(point.pressureLevels.firstOrNull { it.pressureHpa == 850 })
+        assertNull(point.liftedIndexC)
+        assertNull(point.convectiveInhibitionJKg)
+        assertNull(point.boundaryLayerHeightM)
+        assertNull(level850.relativeHumidityPercent)
+        assertNull(level850.cloudCoverPercent)
     }
 }

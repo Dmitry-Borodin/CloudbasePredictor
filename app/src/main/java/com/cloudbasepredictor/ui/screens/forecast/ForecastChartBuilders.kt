@@ -1,9 +1,10 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
 import com.cloudbasepredictor.data.remote.HourlyForecastData
-import com.cloudbasepredictor.data.remote.HourlyPoint
 import com.cloudbasepredictor.domain.forecast.ProfileLevel
 import com.cloudbasepredictor.domain.forecast.SurfaceHeatingInput
+import com.cloudbasepredictor.domain.forecast.ThermalForecastEngine
+import com.cloudbasepredictor.domain.forecast.ThermalForecastInput
 import com.cloudbasepredictor.domain.forecast.analyzeParcel
 import com.cloudbasepredictor.domain.forecast.estimateSurfacePressure
 import com.cloudbasepredictor.domain.forecast.satMixingRatioGKg
@@ -198,6 +199,7 @@ internal fun buildThermicChartFromData(
     val cells = mutableListOf<ThermicForecastCellUiModel>()
     val cloudMarkers = mutableListOf<ThermicForecastCloudMarkerUiModel>()
     val diagnostics = mutableListOf<ThermicSlotDiagnostics>()
+    val pressureLevelAltitudesKm = sortedSetOf<Float>()
 
     daytimePoints.forEach { hp ->
         val startMinute = hp.hour * 60
@@ -208,20 +210,41 @@ internal fun buildThermicChartFromData(
         val surfacePressure = hp.surfacePressureHpa?.toFloat()
             ?: estimateSurfacePressure(elevation)
 
-        // Build atmospheric profile from pressure levels
-        val profile = hp.pressureLevels
-            .filter { it.geopotentialHeightM != null }
+        // Build the thermic profile from the real model pressure-level boundaries plus an explicit surface level.
+        val pressureProfile = hp.pressureLevels
+            .filter { it.geopotentialHeightM != null && !it.isSynthetic }
             .map { pl ->
                 ProfileLevel(
                     pressureHpa = pl.pressureHpa.toFloat(),
                     temperatureC = pl.temperatureC.toFloat(),
                     dewPointC = pl.dewPointC?.toFloat(),
                     heightKm = (pl.geopotentialHeightM!! / 1000.0).toFloat(),
+                    relativeHumidityPercent = pl.relativeHumidityPercent?.toFloat(),
+                    cloudCoverPercent = pl.cloudCoverPercent?.toFloat(),
+                    windSpeedKmh = pl.windSpeedKmh?.toFloat(),
+                    isSynthetic = pl.isSynthetic,
                 )
             }
             .sortedByDescending { it.pressureHpa }
 
+        val profile = buildList {
+            add(
+                ProfileLevel(
+                    pressureHpa = surfacePressure,
+                    temperatureC = surfaceTemp,
+                    dewPointC = surfaceDew,
+                    heightKm = elevationKm,
+                    windSpeedKmh = hp.windSpeed10mKmh?.toFloat(),
+                    isSynthetic = false,
+                ),
+            )
+            addAll(pressureProfile)
+        }.sortedByDescending { it.pressureHpa }
+
         if (profile.size < 2) return@forEach
+        pressureProfile
+            .filter { it.heightKm >= elevationKm - 0.01f }
+            .forEach { pressureLevelAltitudesKm += it.heightKm }
 
         val heatingInput = SurfaceHeatingInput(
             hourOfDay = hp.hour,
@@ -233,59 +256,62 @@ internal fun buildThermicChartFromData(
             isDay = hp.isDay?.let { it > 0.5 },
         )
 
-        val analysis = analyzeParcel(
-            profile = profile,
-            surfaceTemperatureC = surfaceTemp,
-            surfaceDewPointC = surfaceDew,
-            surfacePressureHpa = surfacePressure,
-            elevationKm = elevationKm,
-            heatingInput = heatingInput,
-            modelCapeJKg = hp.capeJKg?.toFloat(),
+        val forecast = ThermalForecastEngine.analyze(
+            ThermalForecastInput(
+                profile = profile,
+                surfaceTemperatureC = surfaceTemp,
+                surfaceDewPointC = surfaceDew,
+                surfacePressureHpa = surfacePressure,
+                elevationKm = elevationKm,
+                heatingInput = heatingInput,
+                modelCapeJKg = hp.capeJKg?.toFloat(),
+                modelCinJKg = hp.convectiveInhibitionJKg?.toFloat(),
+                liftedIndexC = hp.liftedIndexC?.toFloat(),
+                boundaryLayerHeightM = hp.boundaryLayerHeightM?.toFloat(),
+            ),
         ) ?: return@forEach
 
-        // Add thermal cells (usable thermals up to dry top)
-        analysis.thermalCells.forEach { tc ->
+        forecast.layers.forEach { layer ->
+            val confidence = if (forecast.confidence.ordinal >= layer.confidence.ordinal) {
+                forecast.confidence
+            } else {
+                layer.confidence
+            }
             cells += ThermicForecastCellUiModel(
                 startMinuteOfDayLocal = startMinute,
-                startAltitudeKm = tc.startAltitudeKm,
-                endAltitudeKm = tc.endAltitudeKm,
-                strengthMps = tc.strengthMps,
+                startAltitudeKm = layer.startAltitudeKm,
+                endAltitudeKm = layer.endAltitudeKm,
+                strengthMps = layer.updraftNominalMps,
+                updraftLowMps = layer.updraftLowMps,
+                updraftNominalMps = layer.updraftNominalMps,
+                updraftHighMps = layer.updraftHighMps,
+                confidence = confidence,
             )
-        }
-
-        // Cloud markers from cloud base to moist equilibrium top
-        val cloudBase = analysis.cloudBaseKm
-        val cloudTop = analysis.moistEquilibriumTopKm ?: cloudBase
-        if (cloudBase != null && cloudBase > elevationKm + 0.3f) {
-            val top = cloudTop?.coerceAtLeast(cloudBase) ?: cloudBase
-            val cloudRange = top - cloudBase
-            val stepKm = if (cloudRange > 0.01f) {
-                // Space markers ~0.3 km apart, at least 1 marker
-                (cloudRange / ((cloudRange / 0.3f).toInt().coerceAtLeast(1))).coerceAtMost(0.3f)
-            } else {
-                0.3f
-            }
-            var alt = cloudBase
-            while (alt <= top + 0.001f) {
-                cloudMarkers += ThermicForecastCloudMarkerUiModel(
-                    startMinuteOfDayLocal = startMinute,
-                    altitudeKm = alt,
-                )
-                alt += stepKm
-                if (stepKm < 0.01f) break
-            }
         }
 
         diagnostics += ThermicSlotDiagnostics(
             startMinuteOfDayLocal = startMinute,
-            dryThermalTopKm = analysis.dryThermalTopKm,
-            cloudBaseKm = analysis.cloudBaseKm,
-            moistEquilibriumTopKm = analysis.moistEquilibriumTopKm,
-            modelCapeJKg = analysis.modelCapeJKg,
-            computedCapeJKg = analysis.computedCapeJKg,
-            computedCinJKg = analysis.computedCinJKg,
-            lclKm = analysis.lclKm,
-            cclKm = analysis.cclKm,
+            dryThermalTopKm = forecast.topNominalKm,
+            topLowKm = forecast.topLowKm,
+            topNominalKm = forecast.topNominalKm,
+            topHighKm = forecast.topHighKm,
+            updraftLowMps = forecast.updraftLowMps,
+            updraftNominalMps = forecast.updraftNominalMps,
+            updraftHighMps = forecast.updraftHighMps,
+            confidence = forecast.confidence,
+            limitingReason = forecast.limitingReason,
+            topLowerPressureHpa = forecast.lowerSourceLevel?.pressureHpa,
+            topUpperPressureHpa = forecast.upperSourceLevel?.pressureHpa,
+            cloudBaseKm = forecast.cloudBaseKm,
+            moistEquilibriumTopKm = forecast.moistEquilibriumTopKm,
+            modelCapeJKg = forecast.modelCapeJKg,
+            modelCinJKg = forecast.modelCinJKg,
+            liftedIndexC = forecast.liftedIndexC,
+            boundaryLayerHeightM = forecast.boundaryLayerHeightM,
+            computedCapeJKg = forecast.thermalEnergyJKg,
+            computedCinJKg = 0f,
+            lclKm = forecast.lclKm,
+            cclKm = forecast.cclKm,
         )
     }
 
@@ -297,6 +323,7 @@ internal fun buildThermicChartFromData(
         cells = emptyList(),
         cloudMarkers = emptyList(),
         slotDiagnostics = diagnostics,
+        pressureLevelAltitudesKm = pressureLevelAltitudesKm.toList(),
     )
 
     return ThermicForecastChartUiModel(
@@ -304,6 +331,7 @@ internal fun buildThermicChartFromData(
         cells = cells,
         cloudMarkers = cloudMarkers,
         slotDiagnostics = diagnostics,
+        pressureLevelAltitudesKm = pressureLevelAltitudesKm.toList(),
     )
 }
 

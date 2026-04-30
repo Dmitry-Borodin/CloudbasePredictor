@@ -17,6 +17,8 @@ fun OpenMeteoHourlyForecastResponse.toHourlyForecastData(): HourlyForecastData {
 
     val tempByPressure = hourly.temperaturesByPressure().toMap()
     val dewByPressure = hourly.dewPointsByPressure().toMap()
+    val relativeHumidityByPressure = hourly.relativeHumidityByPressure().toMap()
+    val cloudCoverByPressure = hourly.cloudCoverByPressure().toMap()
     val windSpeedByPressure = hourly.windSpeedsByPressure().toMap()
     val windDirByPressure = hourly.windDirectionsByPressure().toMap()
     val geoHeightByPressure = hourly.geopotentialHeightsByPressure().toMap()
@@ -29,6 +31,8 @@ fun OpenMeteoHourlyForecastResponse.toHourlyForecastData(): HourlyForecastData {
         val pressureLevelData = STANDARD_PRESSURE_LEVELS.mapNotNull { pHpa ->
             val temp = tempByPressure[pHpa]?.getOrNull(i)
             val dew = dewByPressure[pHpa]?.getOrNull(i)
+            val relativeHumidity = relativeHumidityByPressure[pHpa]?.getOrNull(i)
+            val cloudCover = cloudCoverByPressure[pHpa]?.getOrNull(i)
             val ws = windSpeedByPressure[pHpa]?.getOrNull(i)
             val wd = windDirByPressure[pHpa]?.getOrNull(i)
             val gh = geoHeightByPressure[pHpa]?.getOrNull(i)
@@ -40,6 +44,8 @@ fun OpenMeteoHourlyForecastResponse.toHourlyForecastData(): HourlyForecastData {
                 windSpeedKmh = ws,
                 windDirectionDeg = wd,
                 geopotentialHeightM = gh,
+                relativeHumidityPercent = relativeHumidity,
+                cloudCoverPercent = cloudCover,
             )
         }
         val completedPressureLevelData = completePressureLevels(pressureLevelData)
@@ -63,6 +69,9 @@ fun OpenMeteoHourlyForecastResponse.toHourlyForecastData(): HourlyForecastData {
             sunshineDurationS = hourly.sunshineDuration?.getOrNull(i),
             isDay = hourly.isDay?.getOrNull(i),
             pressureLevels = completedPressureLevelData,
+            liftedIndexC = hourly.liftedIndex?.getOrNull(i),
+            convectiveInhibitionJKg = hourly.convectiveInhibition?.getOrNull(i),
+            boundaryLayerHeightM = hourly.boundaryLayerHeight?.getOrNull(i),
         )
     }
 
@@ -136,6 +145,12 @@ data class HourlyPoint(
     val isDay: Double? = null,
     /** Data at each requested pressure level. */
     val pressureLevels: List<PressureLevelPoint>,
+    /** Lifted index, °C. Negative values indicate increasing moist-convection potential. */
+    val liftedIndexC: Double? = null,
+    /** Model-supplied convective inhibition, J/kg. */
+    val convectiveInhibitionJKg: Double? = null,
+    /** Model-supplied boundary-layer height, metres above ground. */
+    val boundaryLayerHeightM: Double? = null,
 )
 
 /**
@@ -155,6 +170,12 @@ data class PressureLevelPoint(
     val windDirectionDeg: Double?,
     /** Geopotential height, metres above sea level. */
     val geopotentialHeightM: Double?,
+    /** Relative humidity at this pressure level, percent. Null if unavailable. */
+    val relativeHumidityPercent: Double? = null,
+    /** Cloud cover at this pressure level, percent. Null if unavailable. */
+    val cloudCoverPercent: Double? = null,
+    /** True when this level was synthesized by interpolation/extrapolation, not returned directly. */
+    val isSynthetic: Boolean = false,
 )
 
 private val STANDARD_PRESSURE_LEVELS = listOf(
@@ -221,6 +242,7 @@ private fun synthesizePressureLevel(
         windSpeedKmh = windSpeedKmh,
         windDirectionDeg = windDirectionDeg,
         geopotentialHeightM = geopotentialHeightM,
+        isSynthetic = true,
     )
 }
 

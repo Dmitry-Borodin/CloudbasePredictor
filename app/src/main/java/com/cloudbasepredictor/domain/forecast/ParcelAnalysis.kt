@@ -69,6 +69,10 @@ data class ProfileLevel(
     val temperatureC: Float,
     val dewPointC: Float?,
     val heightKm: Float,
+    val relativeHumidityPercent: Float? = null,
+    val cloudCoverPercent: Float? = null,
+    val windSpeedKmh: Float? = null,
+    val isSynthetic: Boolean = false,
 )
 
 /**
@@ -217,8 +221,6 @@ fun analyzeParcel(
         profile = aboveSurface,
         elevationKm = elevationKm,
         dryTopKm = dryTopKm,
-        modelCapeJKg = modelCapeJKg,
-        computedCapeJKg = capeCin.first,
     )
 
     return ParcelAnalysisResult(
@@ -657,19 +659,9 @@ private fun buildThermalCells(
     profile: List<ProfileLevel>,
     elevationKm: Float,
     dryTopKm: Float,
-    modelCapeJKg: Float?,
-    computedCapeJKg: Float,
 ): List<ThermalCell> {
     val cells = mutableListOf<ThermalCell>()
     if (profile.size < 2) return cells
-
-    // Calibration factor from model CAPE comparison (0.5 .. 1.5 range)
-    val calibrationFactor = if (modelCapeJKg != null && computedCapeJKg > 10f) {
-        val ratio = modelCapeJKg / computedCapeJKg
-        ratio.coerceIn(0.5f, 1.5f)
-    } else {
-        1f
-    }
 
     for (i in 0 until profile.size - 1) {
         val lower = profile[i]
@@ -695,7 +687,7 @@ private fun buildThermalCells(
         val envTempK = envTemp + 273.15f
         val buoyancyAccel = G * buoyancyC / envTempK
         // Local updraft estimate using integrated buoyancy
-        val rawStrength = sqrt(max(0f, 2f * buoyancyAccel * dz)) * BUOYANCY_TO_UPDRAFT_SCALE * calibrationFactor
+        val rawStrength = sqrt(max(0f, 2f * buoyancyAccel * dz)) * BUOYANCY_TO_UPDRAFT_SCALE
         val strength = rawStrength.coerceIn(0f, MAX_THERMAL_STRENGTH_MPS)
 
         if (strength >= MIN_DISPLAY_STRENGTH_MPS) {

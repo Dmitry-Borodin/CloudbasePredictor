@@ -1,5 +1,7 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import com.cloudbasepredictor.domain.forecast.ThermalForecastConfidence
+import com.cloudbasepredictor.domain.forecast.ThermalLimitingReason
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -22,24 +24,52 @@ data class ThermicForecastChartUiModel(
     val cloudMarkers: List<ThermicForecastCloudMarkerUiModel>,
     /** Per-time-slot diagnostic data from parcel analysis. */
     val slotDiagnostics: List<ThermicSlotDiagnostics> = emptyList(),
+    /** Real pressure-level altitudes available for the selected day, km ASL. */
+    val pressureLevelAltitudesKm: List<Float> = emptyList(),
 )
 
 /**
- * Per-time-slot diagnostic data from the parcel analysis.
- * Used for drawing dry-top / cloud-base / moist-top lines and tooltip info.
+ * Per-time-slot diagnostic data from the soaring thermal forecast.
+ * Used for drawing top-range / cloud-base / moist-top lines and tooltip info.
  */
 data class ThermicSlotDiagnostics(
     /** Time slot, minute-of-day in local time. */
     val startMinuteOfDayLocal: Int,
-    /** Dry thermal top altitude, km ASL. */
+    /** Legacy dry thermal top altitude, km ASL. For the new thermic chart this equals [topNominalKm]. */
     val dryThermalTopKm: Float,
+    /** Conservative thermal top estimate, km ASL. */
+    val topLowKm: Float = dryThermalTopKm,
+    /** Nominal thermal top estimate, km ASL. */
+    val topNominalKm: Float = dryThermalTopKm,
+    /** Optimistic thermal top estimate, km ASL. */
+    val topHighKm: Float = dryThermalTopKm,
+    /** Maximum conservative vertical air updraft, m/s. */
+    val updraftLowMps: Float = 0f,
+    /** Maximum nominal vertical air updraft, m/s. */
+    val updraftNominalMps: Float = 0f,
+    /** Maximum optimistic vertical air updraft, m/s. */
+    val updraftHighMps: Float = 0f,
+    /** Forecast confidence derived from raw vertical resolution and missing diagnostics. */
+    val confidence: ThermalForecastConfidence = ThermalForecastConfidence.MEDIUM,
+    /** Main limiting factor for thermal usability. */
+    val limitingReason: ThermalLimitingReason = ThermalLimitingReason.MISSING_DATA,
+    /** Lower raw source pressure level bracketing the top, hPa. */
+    val topLowerPressureHpa: Float? = null,
+    /** Upper raw source pressure level bracketing the top, hPa. */
+    val topUpperPressureHpa: Float? = null,
     /** Cloud base altitude, km ASL. Null if cumulus not expected. */
     val cloudBaseKm: Float?,
     /** Moist/cloud equilibrium top, km ASL. Null if no moist convection. */
     val moistEquilibriumTopKm: Float?,
     /** Model-supplied CAPE, J/kg. */
     val modelCapeJKg: Float?,
-    /** Computed CAPE from parcel analysis, J/kg. */
+    /** Model-supplied convective inhibition, J/kg. */
+    val modelCinJKg: Float? = null,
+    /** Model-supplied lifted index, °C. */
+    val liftedIndexC: Float? = null,
+    /** Model-supplied boundary-layer height, metres above ground. */
+    val boundaryLayerHeightM: Float? = null,
+    /** Legacy computed-energy field retained for compatibility; not used as model CAPE or a strength multiplier. */
     val computedCapeJKg: Float,
     /** Computed CIN from parcel analysis, J/kg. */
     val computedCinJKg: Float,
@@ -58,6 +88,14 @@ data class ThermicForecastCellUiModel(
     val endAltitudeKm: Float,
     /** Thermal updraft strength, m/s (metres per second). */
     val strengthMps: Float,
+    /** Conservative vertical air updraft estimate, m/s. */
+    val updraftLowMps: Float = strengthMps,
+    /** Nominal vertical air updraft estimate, m/s. */
+    val updraftNominalMps: Float = strengthMps,
+    /** Optimistic vertical air updraft estimate, m/s. */
+    val updraftHighMps: Float = strengthMps,
+    /** Confidence for this altitude band. */
+    val confidence: ThermalForecastConfidence = ThermalForecastConfidence.MEDIUM,
 )
 
 data class ThermicForecastCloudMarkerUiModel(
@@ -134,6 +172,10 @@ internal fun buildPlaceholderThermicForecastChart(
                         startAltitudeKm = currentAltitudeKm,
                         endAltitudeKm = nextAltitudeKm,
                         strengthMps = roundDisplayedStrength(rawStrength),
+                        updraftLowMps = roundDisplayedStrength(rawStrength * 0.75f),
+                        updraftNominalMps = roundDisplayedStrength(rawStrength),
+                        updraftHighMps = roundDisplayedStrength(rawStrength * 1.25f),
+                        confidence = ThermalForecastConfidence.MEDIUM,
                     ),
                 )
 
@@ -166,6 +208,14 @@ internal fun buildPlaceholderThermicForecastChart(
         ThermicSlotDiagnostics(
             startMinuteOfDayLocal = startMinute,
             dryThermalTopKm = dryTop,
+            topLowKm = (dryTop - 0.25f).coerceAtLeast(0f),
+            topNominalKm = dryTop,
+            topHighKm = dryTop + 0.25f,
+            updraftLowMps = slotCells.maxOfOrNull { it.updraftLowMps } ?: 0f,
+            updraftNominalMps = slotCells.maxOfOrNull { it.updraftNominalMps } ?: 0f,
+            updraftHighMps = slotCells.maxOfOrNull { it.updraftHighMps } ?: 0f,
+            confidence = ThermalForecastConfidence.MEDIUM,
+            limitingReason = ThermalLimitingReason.SURFACE_HEATING,
             cloudBaseKm = cloudBase,
             moistEquilibriumTopKm = cloudBase?.let { it + 1.5f },
             modelCapeJKg = 400f + dryTop * 100f,
@@ -181,6 +231,7 @@ internal fun buildPlaceholderThermicForecastChart(
         cells = cells,
         cloudMarkers = cloudMarkers,
         slotDiagnostics = diagnostics,
+        pressureLevelAltitudesKm = listOf(0.5f, 1f, 1.5f, 2f, 3f, 4f),
     )
 }
 
@@ -233,15 +284,32 @@ internal fun ThermicForecastChartUiModel.aggregatedForDisplay(
                 }
 
                 if (overlappingCells.isNotEmpty()) {
-                    val averagedStrength = overlappingCells.weightedAverageStrength(
+                    val averagedNominal = overlappingCells.weightedAverageValue(
                         bucketStartAltitudeKm = currentAltitudeKm,
                         bucketEndAltitudeKm = nextAltitudeKm,
+                        selector = ThermicForecastCellUiModel::updraftNominalMps,
                     )
                     aggregatedCells += ThermicForecastCellUiModel(
                         startMinuteOfDayLocal = groupStartMinute,
                         startAltitudeKm = currentAltitudeKm,
                         endAltitudeKm = nextAltitudeKm,
-                        strengthMps = roundDisplayedStrength(averagedStrength),
+                        strengthMps = roundDisplayedStrength(averagedNominal),
+                        updraftLowMps = roundDisplayedStrength(
+                            overlappingCells.weightedAverageValue(
+                                bucketStartAltitudeKm = currentAltitudeKm,
+                                bucketEndAltitudeKm = nextAltitudeKm,
+                                selector = ThermicForecastCellUiModel::updraftLowMps,
+                            ),
+                        ),
+                        updraftNominalMps = roundDisplayedStrength(averagedNominal),
+                        updraftHighMps = roundDisplayedStrength(
+                            overlappingCells.weightedAverageValue(
+                                bucketStartAltitudeKm = currentAltitudeKm,
+                                bucketEndAltitudeKm = nextAltitudeKm,
+                                selector = ThermicForecastCellUiModel::updraftHighMps,
+                            ),
+                        ),
+                        confidence = overlappingCells.lowestCellConfidence(),
                     )
                 }
 
@@ -266,7 +334,18 @@ internal fun ThermicForecastChartUiModel.aggregatedForDisplay(
         // Average numeric values, take first non-null for optional fields
         ThermicSlotDiagnostics(
             startMinuteOfDayLocal = groupStartMinute,
-            dryThermalTopKm = slotDiags.map { it.dryThermalTopKm }.average().toFloat(),
+            dryThermalTopKm = slotDiags.map { it.topNominalKm }.average().toFloat(),
+            topLowKm = slotDiags.minOf { it.topLowKm },
+            topNominalKm = slotDiags.map { it.topNominalKm }.average().toFloat(),
+            topHighKm = slotDiags.maxOf { it.topHighKm },
+            updraftLowMps = slotDiags.minOf { it.updraftLowMps },
+            updraftNominalMps = slotDiags.map { it.updraftNominalMps }.average().toFloat(),
+            updraftHighMps = slotDiags.maxOf { it.updraftHighMps },
+            confidence = slotDiags.lowestDiagnosticConfidence(),
+            limitingReason = slotDiags.firstOrNull { it.limitingReason != ThermalLimitingReason.SURFACE_HEATING }
+                ?.limitingReason ?: slotDiags.first().limitingReason,
+            topLowerPressureHpa = slotDiags.mapNotNull { it.topLowerPressureHpa }.maxOrNull(),
+            topUpperPressureHpa = slotDiags.mapNotNull { it.topUpperPressureHpa }.minOrNull(),
             cloudBaseKm = slotDiags.mapNotNull { it.cloudBaseKm }.let {
                 if (it.isEmpty()) null else it.average().toFloat()
             },
@@ -274,6 +353,15 @@ internal fun ThermicForecastChartUiModel.aggregatedForDisplay(
                 if (it.isEmpty()) null else it.average().toFloat()
             },
             modelCapeJKg = slotDiags.mapNotNull { it.modelCapeJKg }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
+            modelCinJKg = slotDiags.mapNotNull { it.modelCinJKg }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
+            liftedIndexC = slotDiags.mapNotNull { it.liftedIndexC }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
+            boundaryLayerHeightM = slotDiags.mapNotNull { it.boundaryLayerHeightM }.let {
                 if (it.isEmpty()) null else it.average().toFloat()
             },
             computedCapeJKg = slotDiags.map { it.computedCapeJKg }.average().toFloat(),
@@ -288,14 +376,16 @@ internal fun ThermicForecastChartUiModel.aggregatedForDisplay(
         cells = aggregatedCells,
         cloudMarkers = aggregatedCloudMarkers,
         slotDiagnostics = aggregatedDiagnostics,
+        pressureLevelAltitudesKm = pressureLevelAltitudesKm,
     )
 }
 
-private fun List<ThermicForecastCellUiModel>.weightedAverageStrength(
+private fun List<ThermicForecastCellUiModel>.weightedAverageValue(
     bucketStartAltitudeKm: Float,
     bucketEndAltitudeKm: Float,
+    selector: (ThermicForecastCellUiModel) -> Float,
 ): Float {
-    var weightedStrengthSum = 0f
+    var weightedValueSum = 0f
     var weightSum = 0f
 
     forEach { cell ->
@@ -304,7 +394,7 @@ private fun List<ThermicForecastCellUiModel>.weightedAverageStrength(
         val overlapHeight = (overlapEnd - overlapStart).coerceAtLeast(0f)
 
         if (overlapHeight > THERMIC_EPSILON) {
-            weightedStrengthSum += cell.strengthMps * overlapHeight
+            weightedValueSum += selector(cell) * overlapHeight
             weightSum += overlapHeight
         }
     }
@@ -312,8 +402,16 @@ private fun List<ThermicForecastCellUiModel>.weightedAverageStrength(
     return if (weightSum <= THERMIC_EPSILON) {
         0f
     } else {
-        weightedStrengthSum / weightSum
+        weightedValueSum / weightSum
     }
+}
+
+private fun List<ThermicForecastCellUiModel>.lowestCellConfidence(): ThermalForecastConfidence {
+    return maxByOrNull { it.confidence.ordinal }?.confidence ?: ThermalForecastConfidence.LOW
+}
+
+private fun List<ThermicSlotDiagnostics>.lowestDiagnosticConfidence(): ThermalForecastConfidence {
+    return maxByOrNull { it.confidence.ordinal }?.confidence ?: ThermalForecastConfidence.LOW
 }
 
 private fun intervalsOverlap(

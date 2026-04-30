@@ -89,7 +89,11 @@ class ThermicChartPressureLevelBoundariesTest {
                     windDirection10mDeg = 270.0,
                     capeJKg = 800.0,
                     freezingLevelHeightM = 3500.0,
+                    surfacePressureHpa = 955.0,
+                    shortwaveRadiationWm2 = 700.0,
+                    isDay = 1.0,
                     pressureLevels = pressureLevels,
+                    boundaryLayerHeightM = 1800.0,
                 ),
             ),
             dailyForecasts = listOf(
@@ -120,6 +124,11 @@ class ThermicChartPressureLevelBoundariesTest {
                 cell.endAltitudeKm <= maxHeightKm + 0.02f,
             )
         }
+        assertEquals(
+            "Pressure level ticks should use real pressure-level geopotential heights",
+            pressureLevels.map { (it.geopotentialHeightM!! / 1000.0).toFloat() },
+            chart.pressureLevelAltitudesKm,
+        )
 
         // Verify cells are non-overlapping and contiguous
         val cellsByTime = chart.cells.groupBy { it.startMinuteOfDayLocal }

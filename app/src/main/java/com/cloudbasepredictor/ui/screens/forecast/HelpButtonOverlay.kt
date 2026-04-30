@@ -285,8 +285,8 @@ private fun ThermicDiagnosticLineLegend() {
         )
         ThermicDiagnosticLineLegendRow(
             color = Color(0xFFE07020),
-            dashOnDp = 6f,
-            dashOffDp = 4f,
+            dashOnDp = 0f,
+            dashOffDp = 0f,
             label = stringResource(R.string.help_thermic_dry_top_line),
         )
         ThermicDiagnosticLineLegendRow(
@@ -326,9 +326,13 @@ private fun ThermicDiagnosticLineLegendRow(
                 end = Offset(size.width, size.height / 2f),
                 strokeWidth = 2.dp.toPx(),
                 cap = StrokeCap.Round,
-                pathEffect = PathEffect.dashPathEffect(
-                    floatArrayOf(dashOnDp.dp.toPx(), dashOffDp.dp.toPx()),
-                ),
+                pathEffect = if (dashOnDp > 0f && dashOffDp > 0f) {
+                    PathEffect.dashPathEffect(
+                        floatArrayOf(dashOnDp.dp.toPx(), dashOffDp.dp.toPx()),
+                    )
+                } else {
+                    null
+                },
             )
         }
         Text(
