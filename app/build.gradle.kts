@@ -7,6 +7,7 @@ plugins {
 }
 
 val requestedTasks = gradle.startParameter.taskNames
+val apkArchiveName = "CloudbasePredictor"
 
 android {
     namespace = "com.cloudbasepredictor"
@@ -77,6 +78,23 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        val output = variant.outputs.single()
+        val version = requireNotNull(output.versionName.orNull) {
+            "versionName must be set to name APK outputs"
+        }
+        val buildTypeName = requireNotNull(variant.buildType) {
+            "buildType must be set to name APK outputs"
+        }
+        val buildTypeSuffix = if (buildTypeName == "release") "" else "_$buildTypeName"
+
+        (output as com.android.build.api.variant.impl.VariantOutputImpl).outputFileName.set(
+            "${apkArchiveName}_v${version}${buildTypeSuffix}.apk"
+        )
     }
 }
 
