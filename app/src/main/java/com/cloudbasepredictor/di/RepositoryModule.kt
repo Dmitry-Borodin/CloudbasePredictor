@@ -14,6 +14,8 @@ import com.cloudbasepredictor.data.place.DefaultPlaceRepository
 import com.cloudbasepredictor.data.place.PlaceRepository
 import com.cloudbasepredictor.data.theme.InMemoryThemeRepository
 import com.cloudbasepredictor.data.theme.ThemeRepository
+import com.cloudbasepredictor.data.units.SharedPrefsUnitSettingsRepository
+import com.cloudbasepredictor.data.units.UnitSettingsRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -58,6 +60,12 @@ abstract class RepositoryModule {
     abstract fun bindThemeRepository(
         repository: InMemoryThemeRepository,
     ): ThemeRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindUnitSettingsRepository(
+        repository: SharedPrefsUnitSettingsRepository,
+    ): UnitSettingsRepository
 
     @Binds
     @Singleton

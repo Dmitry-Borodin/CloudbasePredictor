@@ -61,6 +61,9 @@ import com.cloudbasepredictor.ui.screens.forecast.buildRenderableParcelPressures
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cloudbasepredictor.data.units.DisplayUnits
+import com.cloudbasepredictor.data.units.formatAltitudeMeters
+import com.cloudbasepredictor.data.units.formatWindSpeed
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.DEFAULT_TOP_ALTITUDE_KM
@@ -160,6 +163,7 @@ internal fun StuveForecastView(
             SkewTDiagramCanvas(
                 chart = stuveChart,
                 visibleTopAltitudeKm = effectiveTopAltitudeKm,
+                displayUnits = uiState.displayUnits,
                 onVisibleTopAltitudeChange = { topAltitudeKm ->
                     effectiveTopAltitudeKm = topAltitudeKm
                     onVisibleTopAltitudeChange(topAltitudeKm)
@@ -265,6 +269,7 @@ private data class CursorReadout(
 private fun SkewTDiagramCanvas(
     chart: StuveForecastChartUiModel,
     visibleTopAltitudeKm: Float,
+    displayUnits: DisplayUnits,
     onVisibleTopAltitudeChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -911,7 +916,7 @@ private fun SkewTDiagramCanvas(
                         textAlign = Paint.Align.CENTER
                     }
                     canvas.nativeCanvas.drawText(
-                        "${barb.speedKmh.toInt()}",
+                        formatWindSpeed(barb.speedKmh, displayUnits, withUnit = false),
                         plotRight + rightAltitudeWidth + rightWindWidth / 2f,
                         y + with(density) { 22.dp.toPx() },
                         windLabelPaint,
@@ -925,7 +930,7 @@ private fun SkewTDiagramCanvas(
                     val heightMeters = interpolateProfileHeightMeters(chart.temperatureProfile, pressure)
                         ?: pressureToApproxHeightMeters(pressure).toFloat()
                     canvas.nativeCanvas.drawText(
-                        formatAxisHeight(heightMeters),
+                        formatAxisHeight(heightMeters, displayUnits),
                         plotRight + 4.dp.toPx(),
                         y + altitudeLabelPaint.textSize * 0.35f,
                         altitudeLabelPaint,
@@ -972,14 +977,14 @@ private fun SkewTDiagramCanvas(
                         plotBottom = plotBottom,
                         bottomPressure = chartBottomPressure,
                         rightWindCenterX = plotRight + rightAltitudeWidth + rightWindWidth / 2f,
+                        labelMinX = 0f,
+                        labelMaxX = size.width,
                         axisLabelPaint = axisLabelPaint,
                         altitudeLabelPaint = altitudeLabelPaint,
-                        temperatureAxisBaseline = temperatureAxisBaseline,
                         temperatureReadoutBaseline = temperatureReadoutBaseline,
                         temperatureReadoutLabelLeft = plotLeft,
                         temperatureReadoutLabelRight = temperatureReadoutLabelRight,
-                        temperatureAxisRange = tempAxisRange,
-                        temperatureAxisLabelPaint = tempLabelPaint,
+                        displayUnits = displayUnits,
                         density = density,
                         temperatureToX = ::temperatureToX,
                     )
@@ -1192,21 +1197,21 @@ private fun drawCursorInlineLabels(
     plotBottom: Float,
     bottomPressure: Float,
     rightWindCenterX: Float,
+    labelMinX: Float,
+    labelMaxX: Float,
     axisLabelPaint: Paint,
     altitudeLabelPaint: Paint,
-    temperatureAxisBaseline: Float,
     temperatureReadoutBaseline: Float,
     temperatureReadoutLabelLeft: Float,
     temperatureReadoutLabelRight: Float,
-    temperatureAxisRange: TempAxisRange,
-    temperatureAxisLabelPaint: Paint,
+    displayUnits: DisplayUnits,
     density: androidx.compose.ui.unit.Density,
     temperatureToX: (Float, Float) -> Float,
 ) {
     drawBadgeLabel(
         canvas = canvas,
         lines = listOf(
-            formatReadoutHeight(readout.altitudeMeters),
+            formatReadoutHeight(readout.altitudeMeters, displayUnits),
             "${readout.pressureHpa.roundToInt()} hPa",
         ),
         centerX = plotLeft - with(density) { 10.dp.toPx() },
@@ -1219,11 +1224,13 @@ private fun drawCursorInlineLabels(
         },
         backgroundColor = Color(0xFFF3F3F3),
         minWidth = with(density) { 46.dp.toPx() },
+        minX = labelMinX,
+        maxX = labelMaxX,
     )
 
     drawBadgeLabel(
         canvas = canvas,
-        lines = listOf(formatAxisHeight(readout.altitudeMeters.toFloat())),
+        lines = listOf(formatAxisHeight(readout.altitudeMeters.toFloat(), displayUnits)),
         centerX = plotRight + with(density) { 18.dp.toPx() },
         centerY = cursorY,
         density = density,
@@ -1234,6 +1241,8 @@ private fun drawCursorInlineLabels(
         },
         backgroundColor = Color(0xFFF3F3F3).copy(alpha = 0.92f),
         minWidth = with(density) { 34.dp.toPx() },
+        minX = labelMinX,
+        maxX = labelMaxX,
     )
 
     val pointLabelPaint = fun(color: Color): Paint {
@@ -1285,19 +1294,6 @@ private fun drawCursorInlineLabels(
         )
     }
 
-    val axisBottomLabels = listOf(
-        BottomAxisLabel(
-            text = "${temperatureAxisRange.minC.roundToInt()}°",
-            preferredX = plotLeft + temperatureAxisLabelPaint.measureText("${temperatureAxisRange.minC.roundToInt()}°") / 2f,
-            paint = Paint(temperatureAxisLabelPaint).apply { textAlign = Paint.Align.CENTER },
-        ),
-        BottomAxisLabel(
-            text = "${temperatureAxisRange.maxC.roundToInt()}°",
-            preferredX = plotRight - temperatureAxisLabelPaint.measureText("${temperatureAxisRange.maxC.roundToInt()}°") / 2f,
-            paint = Paint(temperatureAxisLabelPaint).apply { textAlign = Paint.Align.CENTER },
-        ),
-    )
-
     val readoutBottomLabels = buildList {
         readout.temperatureC?.let { temperature ->
             add(
@@ -1346,15 +1342,6 @@ private fun drawCursorInlineLabels(
 
     drawBottomAxisLabels(
         canvas = canvas,
-        labels = axisBottomLabels,
-        y = temperatureAxisBaseline,
-        plotLeft = plotLeft,
-        plotRight = plotRight,
-        minimumGapPx = with(density) { 10.dp.toPx() },
-    )
-
-    drawBottomAxisLabels(
-        canvas = canvas,
         labels = readoutBottomLabels,
         y = temperatureReadoutBaseline,
         plotLeft = temperatureReadoutLabelLeft,
@@ -1366,7 +1353,7 @@ private fun drawCursorInlineLabels(
         drawBadgeLabel(
             canvas = canvas,
             lines = listOf(
-                String.format(Locale.US, "%.0f km/h %03.0f°", readout.windSpeedKmh, readout.windDirectionDeg),
+                "${formatWindSpeed(readout.windSpeedKmh, displayUnits)} ${String.format(Locale.US, "%03.0f°", readout.windDirectionDeg)}",
             ),
             centerX = rightWindCenterX,
             centerY = (cursorY - with(density) { 10.dp.toPx() })
@@ -1377,6 +1364,8 @@ private fun drawCursorInlineLabels(
             },
             backgroundColor = Color(0xFFF3F3F3),
             minWidth = with(density) { 74.dp.toPx() },
+            minX = labelMinX,
+            maxX = labelMaxX,
         )
     }
 }
@@ -1390,6 +1379,8 @@ private fun drawBadgeLabel(
     textPaint: Paint,
     backgroundColor: Color,
     minWidth: Float = 0f,
+    minX: Float = Float.NEGATIVE_INFINITY,
+    maxX: Float = Float.POSITIVE_INFINITY,
 ) {
     if (lines.isEmpty()) return
 
@@ -1400,10 +1391,15 @@ private fun drawBadgeLabel(
     val maxTextWidth = lines.maxOf { textPaint.measureText(it) }
     val boxWidth = maxOf(minWidth, maxTextWidth + paddingHorizontal * 2f)
     val boxHeight = (lineHeight * lines.size) + lineSpacing * (lines.size - 1) + paddingVertical * 2f
+    val resolvedCenterX = if (minX.isFinite() && maxX.isFinite() && maxX > minX + boxWidth) {
+        centerX.coerceIn(minX + boxWidth / 2f, maxX - boxWidth / 2f)
+    } else {
+        centerX
+    }
     val rect = RectF(
-        centerX - boxWidth / 2f,
+        resolvedCenterX - boxWidth / 2f,
         centerY - boxHeight / 2f,
-        centerX + boxWidth / 2f,
+        resolvedCenterX + boxWidth / 2f,
         centerY + boxHeight / 2f,
     )
 
@@ -1421,7 +1417,7 @@ private fun drawBadgeLabel(
     lines.forEachIndexed { index, line ->
         canvas.nativeCanvas.drawText(
             line,
-            centerX,
+            resolvedCenterX,
             firstBaseline + index * (lineHeight + lineSpacing),
             textPaint,
         )
@@ -1964,29 +1960,15 @@ private fun DrawScope.drawWindBarb(
     )
 }
 
-private fun formatHeightSummary(heightMeters: Float): String {
-    return if (heightMeters >= 1000f) {
-        String.format(Locale.US, "%.1f km", heightMeters / 1000f)
-    } else {
-        "${heightMeters.roundToInt()} m"
-    }
-}
+private fun formatAxisHeight(
+    heightMeters: Float,
+    displayUnits: DisplayUnits,
+): String = formatAltitudeMeters(heightMeters, displayUnits, compact = true)
 
-private fun formatAxisHeight(heightMeters: Float): String {
-    return if (heightMeters >= 1000f) {
-        String.format(Locale.US, "%.1fk", heightMeters / 1000f)
-    } else {
-        "${heightMeters.roundToInt()}m"
-    }
-}
-
-private fun formatReadoutHeight(heightMeters: Int): String {
-    return if (heightMeters >= 1000) {
-        String.format(Locale.US, "%.1f km", heightMeters / 1000f)
-    } else {
-        "${heightMeters} m"
-    }
-}
+private fun formatReadoutHeight(
+    heightMeters: Int,
+    displayUnits: DisplayUnits,
+): String = formatAltitudeMeters(heightMeters.toFloat(), displayUnits)
 
 internal fun recommendedStuveTopAltitudeKm(chart: StuveForecastChartUiModel): Float {
     val topHeightMeters = chart.temperatureProfile.lastOrNull()?.heightMeters

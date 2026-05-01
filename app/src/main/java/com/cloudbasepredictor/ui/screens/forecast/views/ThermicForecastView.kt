@@ -38,6 +38,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.R
+import com.cloudbasepredictor.data.units.DisplayUnits
+import com.cloudbasepredictor.data.units.altitudeAxisUnitLabel
+import com.cloudbasepredictor.data.units.formatAltitudeAxisValue
+import com.cloudbasepredictor.data.units.formatAltitudeKm
+import com.cloudbasepredictor.data.units.formatAltitudeMeters
+import com.cloudbasepredictor.data.units.formatVerticalSpeedRange
 import com.cloudbasepredictor.domain.forecast.ThermalForecastConfidence
 import com.cloudbasepredictor.domain.forecast.ThermalLimitingReason
 import com.cloudbasepredictor.model.ForecastMode
@@ -72,6 +78,7 @@ internal fun ThermicForecastView(
                 chart = uiState.thermicChart,
                 visibleTopAltitudeKm = uiState.chartViewport.visibleTopAltitudeKm,
                 elevationKm = uiState.elevationKm,
+                displayUnits = uiState.displayUnits,
                 onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -89,6 +96,7 @@ private fun ThermicForecastGrid(
     chart: ThermicForecastChartUiModel,
     visibleTopAltitudeKm: Float,
     elevationKm: Float,
+    displayUnits: DisplayUnits,
     onVisibleTopAltitudeChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -496,7 +504,7 @@ private fun ThermicForecastGrid(
                     plotBottom = plotBottom,
                 )
                 canvas.nativeCanvas.drawText(
-                    formatAltitudeLabel(altitudeKm),
+                    formatAltitudeAxisValue(altitudeKm, displayUnits),
                     outerHorizontalPadding + 8.dp.toPx(),
                     y + (axisLabelPaint.textSize * 0.35f),
                     axisLabelPaint,
@@ -504,7 +512,7 @@ private fun ThermicForecastGrid(
             }
 
             canvas.nativeCanvas.drawText(
-                "km",
+                altitudeAxisUnitLabel(displayUnits),
                 outerHorizontalPadding + 8.dp.toPx(),
                 plotTop + unitLabelPaint.textSize + 4.dp.toPx(),
                 unitLabelPaint,
@@ -590,13 +598,14 @@ private fun ThermicForecastGrid(
 
             val diag = diagnosticsBySlot[timeSlot]
             val tooltipLines = mutableListOf<String>()
-            tooltipLines += "${formatTimeLabel(timeSlot)}  Alt ${formatAltitudeLabel(altKm)} km"
+            tooltipLines += "${formatTimeLabel(timeSlot)}  Alt ${formatAltitudeKm(altKm, displayUnits)}"
             if (cell != null) {
-                tooltipLines += "Air lift ${formatThermicRangeLabel(cell.updraftLowMps, cell.updraftHighMps)} m/s"
+                tooltipLines += "Air lift ${formatVerticalSpeedRange(cell.updraftLowMps, cell.updraftHighMps, displayUnits)}"
             }
             if (diag != null) {
-                tooltipLines += "Top ${formatAltitudeLabel(diag.topNominalKm)} km  " +
-                    "raw range ${formatAltitudeLabel(diag.topLowKm)}-${formatAltitudeLabel(diag.topHighKm)}"
+                tooltipLines += "Top ${formatAltitudeKm(diag.topNominalKm, displayUnits)}  " +
+                    "raw range ${formatAltitudeKm(diag.topLowKm, displayUnits)}-" +
+                    formatAltitudeKm(diag.topHighKm, displayUnits)
                 if (diag.topLowerPressureHpa != null && diag.topUpperPressureHpa != null) {
                     tooltipLines += "Raw levels ${diag.topLowerPressureHpa.toInt()}-${diag.topUpperPressureHpa.toInt()} hPa"
                 }
@@ -605,9 +614,10 @@ private fun ThermicForecastGrid(
                 diag.cloudBaseKm?.let { cloudBaseKm ->
                     val moistTopKm = diag.moistEquilibriumTopKm
                     tooltipLines += if (moistTopKm != null && moistTopKm > cloudBaseKm + 0.1f) {
-                        "Cloud layer ${formatAltitudeLabel(cloudBaseKm)}-${formatAltitudeLabel(moistTopKm)} km"
+                        "Cloud layer ${formatAltitudeKm(cloudBaseKm, displayUnits)}-" +
+                            formatAltitudeKm(moistTopKm, displayUnits)
                     } else {
-                        "Cloud base ${formatAltitudeLabel(cloudBaseKm)} km"
+                        "Cloud base ${formatAltitudeKm(cloudBaseKm, displayUnits)}"
                     }
                 }
                 val convectionDiagnostics = buildList {
@@ -619,7 +629,7 @@ private fun ThermicForecastGrid(
                     tooltipLines += "Diag ${convectionDiagnostics.joinToString("  ")}"
                 }
                 diag.boundaryLayerHeightM?.let {
-                    tooltipLines += "PBL ${it.toInt()} m"
+                    tooltipLines += "PBL ${formatAltitudeMeters(it, displayUnits)}"
                 }
             }
 
@@ -803,18 +813,6 @@ private fun DrawScope.drawHatchedVerticalBand(
     }
 }
 
-private fun formatThermicStrengthLabel(value: Float): String {
-    return String.format(Locale.US, "%.1f", value)
-}
-
-private fun formatThermicRangeLabel(low: Float, high: Float): String {
-    return if (kotlin.math.abs(high - low) < 0.05f) {
-        formatThermicStrengthLabel(high)
-    } else {
-        "${formatThermicStrengthLabel(low)}-${formatThermicStrengthLabel(high)}"
-    }
-}
-
 private fun formatConfidenceLabel(confidence: ThermalForecastConfidence): String {
     return when (confidence) {
         ThermalForecastConfidence.HIGH -> "HIGH"
@@ -838,10 +836,6 @@ private fun formatLimitingReasonLabel(reason: ThermalLimitingReason): String {
 
 private fun formatSignedValue(value: Float): String {
     return String.format(Locale.US, "%+.1f", value)
-}
-
-private fun formatAltitudeLabel(altitudeKm: Float): String {
-    return String.format(Locale.US, "%.1f", altitudeKm)
 }
 
 private fun formatTimeLabel(startMinuteOfDayLocal: Int): String {

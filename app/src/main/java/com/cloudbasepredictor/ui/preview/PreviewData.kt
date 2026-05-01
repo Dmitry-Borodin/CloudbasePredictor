@@ -5,6 +5,9 @@ import com.cloudbasepredictor.model.ForecastSnapshot
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.model.ForecastModel
 import com.cloudbasepredictor.model.SavedPlace
+import com.cloudbasepredictor.data.datasource.DataSourcePreference
+import com.cloudbasepredictor.data.theme.ThemePreference
+import com.cloudbasepredictor.data.units.UnitPreset
 import com.cloudbasepredictor.ui.screens.forecast.ForecastChartViewport
 import com.cloudbasepredictor.ui.screens.forecast.ForecastDayChipUiModel
 import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
@@ -18,6 +21,14 @@ import java.util.Calendar
 import java.util.Locale
 
 object PreviewData {
+    val settingsFakeDataSource = DataSourcePreference.FAKE
+    val settingsRealDataSource = DataSourcePreference.REAL
+    val settingsAutoTheme = ThemePreference.AUTO
+    val settingsDarkTheme = ThemePreference.DARK
+    val settingsMetricMpsUnits = UnitPreset.METRIC_MPS
+    val settingsImperialUnits = UnitPreset.IMPERIAL
+    val settingsAviationUnits = UnitPreset.AVIATION
+
     val savedPlace = SavedPlace(
         id = "place:46.5582:7.8354",
         name = "Interlaken",

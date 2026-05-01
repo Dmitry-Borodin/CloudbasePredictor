@@ -1,6 +1,7 @@
 package com.cloudbasepredictor.data.place
 
 import android.content.SharedPreferences
+import com.cloudbasepredictor.data.units.UnitPreset
 import com.cloudbasepredictor.model.SavedPlace
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -36,7 +37,7 @@ class FavoritePlacesBackupStoreTest {
         )
 
         val payload = prefs.getString("payload", null).orEmpty()
-        assertTrue(payload.contains("\"schemaVersion\":1"))
+        assertTrue(payload.contains("\"schemaVersion\":2"))
         assertTrue(payload.contains("\"name\":\"Interlaken\""))
         assertTrue(payload.contains("\"latitude\":46.6863"))
         assertTrue(payload.contains("\"longitude\":7.8632"))
@@ -75,6 +76,114 @@ class FavoritePlacesBackupStoreTest {
     }
 
     @Test
+    fun readUnitPreset_returnsSavedUnitPreset() {
+        prefs.edit()
+            .putString(
+                "payload",
+                """
+                    {
+                      "schemaVersion": 2,
+                      "places": [],
+                      "unitPreset": "IMPERIAL"
+                    }
+                """.trimIndent(),
+            )
+            .apply()
+
+        assertEquals(UnitPreset.IMPERIAL, store.readUnitPreset())
+    }
+
+    @Test
+    fun readUnitPreset_missingOrUnknownValue_returnsNullWithoutBreakingFavorites() {
+        prefs.edit()
+            .putString(
+                "payload",
+                """
+                    {
+                      "schemaVersion": 2,
+                      "places": [
+                        {
+                          "name": "Interlaken",
+                          "latitude": 46.68634,
+                          "longitude": 7.86321
+                        }
+                      ],
+                      "unitPreset": "POTATOES_PER_MINUTE"
+                    }
+                """.trimIndent(),
+            )
+            .apply()
+
+        assertEquals(null, store.readUnitPreset())
+        assertEquals("Interlaken", store.readFavoritePlaces().single().name)
+    }
+
+    @Test
+    fun readUnitPreset_malformedValue_returnsNullWithoutBreakingFavorites() {
+        prefs.edit()
+            .putString(
+                "payload",
+                """
+                    {
+                      "schemaVersion": 2,
+                      "places": [
+                        {
+                          "name": "Interlaken",
+                          "latitude": 46.68634,
+                          "longitude": 7.86321
+                        }
+                      ],
+                      "unitPreset": { "value": "IMPERIAL" }
+                    }
+                """.trimIndent(),
+            )
+            .apply()
+
+        assertEquals(null, store.readUnitPreset())
+        assertEquals("Interlaken", store.readFavoritePlaces().single().name)
+    }
+
+    @Test
+    fun saveFavoritePlaces_preservesExistingUnitPreset() {
+        store.saveUnitPreset(UnitPreset.AVIATION)
+
+        store.saveFavoritePlaces(
+            listOf(
+                SavedPlace(
+                    id = "custom-id",
+                    name = "Interlaken",
+                    latitude = 46.6863,
+                    longitude = 7.8632,
+                    isFavorite = true,
+                ),
+            ),
+        )
+
+        assertEquals(UnitPreset.AVIATION, store.readUnitPreset())
+        assertTrue(prefs.getString("payload", null).orEmpty().contains("\"unitPreset\":\"AVIATION\""))
+    }
+
+    @Test
+    fun saveUnitPreset_preservesExistingFavoritePlaces() {
+        store.saveFavoritePlaces(
+            listOf(
+                SavedPlace(
+                    id = "custom-id",
+                    name = "Interlaken",
+                    latitude = 46.6863,
+                    longitude = 7.8632,
+                    isFavorite = true,
+                ),
+            ),
+        )
+
+        store.saveUnitPreset(UnitPreset.METRIC_MPS)
+
+        assertEquals(UnitPreset.METRIC_MPS, store.readUnitPreset())
+        assertEquals("Interlaken", store.readFavoritePlaces().single().name)
+    }
+
+    @Test
     fun backupPreferencesFileName_isStableForRestoringExistingBackups() {
         // Do not change this file name: Google Auto Backup restores data by file path,
         // so renaming it would strand favorites saved by older app versions.
@@ -91,6 +200,7 @@ class FavoritePlacesBackupStoreTest {
         prefs.edit().putString("payload", "not-json").apply()
 
         assertEquals(emptyList<SavedPlace>(), store.readFavoritePlaces())
+        assertEquals(null, store.readUnitPreset())
     }
 
     private fun assertBackupRulesReferenceStableFileName(path: String) {

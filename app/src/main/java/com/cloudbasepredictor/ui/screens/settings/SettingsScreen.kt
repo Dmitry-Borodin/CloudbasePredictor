@@ -10,10 +10,11 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +42,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.data.datasource.DataSourcePreference
 import com.cloudbasepredictor.data.theme.ThemePreference
+import com.cloudbasepredictor.data.units.UnitPreset
+import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 
 @Composable
@@ -51,12 +54,15 @@ fun SettingsRoute(
 ) {
     val dataSource by viewModel.dataSourcePreference.collectAsStateWithLifecycle()
     val theme by viewModel.themePreference.collectAsStateWithLifecycle()
+    val unitPreset by viewModel.unitPreset.collectAsStateWithLifecycle()
 
     SettingsScreen(
         dataSource = dataSource,
         onDataSourceChanged = viewModel::setDataSource,
         theme = theme,
         onThemeChanged = viewModel::setTheme,
+        unitPreset = unitPreset,
+        onUnitPresetChanged = viewModel::setUnitPreset,
         onBack = onBack,
         onOpenAbout = onOpenAbout,
     )
@@ -69,6 +75,8 @@ fun SettingsScreen(
     onDataSourceChanged: (DataSourcePreference) -> Unit,
     theme: ThemePreference,
     onThemeChanged: (ThemePreference) -> Unit,
+    unitPreset: UnitPreset,
+    onUnitPresetChanged: (UnitPreset) -> Unit,
     onBack: () -> Unit,
     onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier,
@@ -77,137 +85,181 @@ fun SettingsScreen(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp,
+        Column(
+            modifier = Modifier.fillMaxSize(),
         ) {
-            Row(
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 2.dp,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                        .padding(horizontal = 4.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.cd_back),
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.title_settings),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                }
+            }
+
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(horizontal = 4.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .weight(1f)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.cd_back),
+                // Data source dropdown
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_data_source),
+                        style = MaterialTheme.typography.titleMedium,
                     )
-                }
-                Text(
-                    text = stringResource(R.string.title_settings),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            // Data source dropdown
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_data_source),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                val dataSourceLabels = mapOf(
-                    DataSourcePreference.REAL to "Real",
-                    DataSourcePreference.SIMULATED to "Simulated",
-                    DataSourcePreference.FAKE to "Fake",
-                )
-                var expanded by remember { mutableStateOf(false) }
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = it },
-                ) {
-                    OutlinedTextField(
-                        value = dataSourceLabels[dataSource] ?: dataSource.name,
-                        onValueChange = {},
-                        readOnly = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier
-                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                            .fillMaxWidth(),
+                    val dataSourceLabels = mapOf(
+                        DataSourcePreference.REAL to "Real",
+                        DataSourcePreference.SIMULATED to "Simulated",
+                        DataSourcePreference.FAKE to "Fake",
                     )
-                    ExposedDropdownMenu(
+                    var expanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
                         expanded = expanded,
-                        onDismissRequest = { expanded = false },
+                        onExpandedChange = { expanded = it },
                     ) {
-                        DataSourcePreference.entries.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(text = dataSourceLabels[option] ?: option.name) },
-                                onClick = {
-                                    onDataSourceChanged(option)
-                                    expanded = false
-                                },
-                            )
+                        OutlinedTextField(
+                            value = dataSourceLabels[dataSource] ?: dataSource.name,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            modifier = Modifier
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth(),
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                        ) {
+                            DataSourcePreference.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(text = dataSourceLabels[option] ?: option.name) },
+                                    onClick = {
+                                        onDataSourceChanged(option)
+                                        expanded = false
+                                    },
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            // Theme dropdown
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Theme",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                val themeLabels = mapOf(
-                    ThemePreference.AUTO to "Auto (system)",
-                    ThemePreference.LIGHT to "Light",
-                    ThemePreference.DARK to "Dark",
-                )
-                var themeExpanded by remember { mutableStateOf(false) }
-                ExposedDropdownMenuBox(
-                    expanded = themeExpanded,
-                    onExpandedChange = { themeExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value = themeLabels[theme] ?: theme.name,
-                        onValueChange = {},
-                        readOnly = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
-                        modifier = Modifier
-                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                            .fillMaxWidth(),
+                // Theme dropdown
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Theme",
+                        style = MaterialTheme.typography.titleMedium,
                     )
-                    ExposedDropdownMenu(
+                    val themeLabels = mapOf(
+                        ThemePreference.AUTO to "Auto (system)",
+                        ThemePreference.LIGHT to "Light",
+                        ThemePreference.DARK to "Dark",
+                    )
+                    var themeExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
                         expanded = themeExpanded,
-                        onDismissRequest = { themeExpanded = false },
+                        onExpandedChange = { themeExpanded = it },
                     ) {
-                        ThemePreference.entries.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(text = themeLabels[option] ?: option.name) },
-                                onClick = {
-                                    onThemeChanged(option)
-                                    themeExpanded = false
-                                },
-                            )
+                        OutlinedTextField(
+                            value = themeLabels[theme] ?: theme.name,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
+                            modifier = Modifier
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth(),
+                        )
+                        ExposedDropdownMenu(
+                            expanded = themeExpanded,
+                            onDismissRequest = { themeExpanded = false },
+                        ) {
+                            ThemePreference.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(text = themeLabels[option] ?: option.name) },
+                                    onClick = {
+                                        onThemeChanged(option)
+                                        themeExpanded = false
+                                    },
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            // About button
-            OutlinedButton(onClick = onOpenAbout) {
-                Icon(
-                    imageVector = Icons.Outlined.Info,
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = 8.dp),
-                )
-                Text(text = stringResource(R.string.action_about))
+                // Units dropdown
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_units),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    val unitLabels = mapOf(
+                        UnitPreset.METRIC_KMH to "Metric (km/h)",
+                        UnitPreset.METRIC_MPS to "Metric (m/s)",
+                        UnitPreset.IMPERIAL to "Imperial (mph, ft)",
+                        UnitPreset.AVIATION to "Aviation (kt, ft)",
+                    )
+                    var unitExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = unitExpanded,
+                        onExpandedChange = { unitExpanded = it },
+                    ) {
+                        OutlinedTextField(
+                            value = unitLabels[unitPreset] ?: unitPreset.name,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = unitExpanded) },
+                            modifier = Modifier
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth(),
+                        )
+                        ExposedDropdownMenu(
+                            expanded = unitExpanded,
+                            onDismissRequest = { unitExpanded = false },
+                        ) {
+                            UnitPreset.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(text = unitLabels[option] ?: option.name) },
+                                    onClick = {
+                                        onUnitPresetChanged(option)
+                                        unitExpanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // About button
+                OutlinedButton(onClick = onOpenAbout) {
+                    Icon(
+                        imageVector = Icons.Outlined.Info,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    Text(text = stringResource(R.string.action_about))
+                }
             }
         }
-    }
     }
 }
 
@@ -216,10 +268,12 @@ fun SettingsScreen(
 private fun SettingsScreenPreview() {
     CloudbasePredictorTheme {
         SettingsScreen(
-            dataSource = DataSourcePreference.FAKE,
+            dataSource = PreviewData.settingsFakeDataSource,
             onDataSourceChanged = {},
-            theme = ThemePreference.AUTO,
+            theme = PreviewData.settingsAutoTheme,
             onThemeChanged = {},
+            unitPreset = PreviewData.settingsMetricMpsUnits,
+            onUnitPresetChanged = {},
             onBack = {},
             onOpenAbout = {},
         )
@@ -231,10 +285,12 @@ private fun SettingsScreenPreview() {
 private fun SettingsScreenRealPreview() {
     CloudbasePredictorTheme {
         SettingsScreen(
-            dataSource = DataSourcePreference.REAL,
+            dataSource = PreviewData.settingsRealDataSource,
             onDataSourceChanged = {},
-            theme = ThemePreference.DARK,
+            theme = PreviewData.settingsDarkTheme,
             onThemeChanged = {},
+            unitPreset = PreviewData.settingsImperialUnits,
+            onUnitPresetChanged = {},
             onBack = {},
             onOpenAbout = {},
         )
@@ -249,10 +305,12 @@ private fun SettingsScreenRealPreview() {
 private fun SettingsScreenDarkPreview() {
     CloudbasePredictorTheme(darkTheme = true) {
         SettingsScreen(
-            dataSource = DataSourcePreference.REAL,
+            dataSource = PreviewData.settingsRealDataSource,
             onDataSourceChanged = {},
-            theme = ThemePreference.DARK,
+            theme = PreviewData.settingsDarkTheme,
             onThemeChanged = {},
+            unitPreset = PreviewData.settingsAviationUnits,
+            onUnitPresetChanged = {},
             onBack = {},
             onOpenAbout = {},
         )

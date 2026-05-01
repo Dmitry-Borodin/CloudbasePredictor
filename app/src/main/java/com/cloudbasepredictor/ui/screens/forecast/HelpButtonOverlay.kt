@@ -43,6 +43,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cloudbasepredictor.R
+import com.cloudbasepredictor.data.units.DisplayUnits
+import com.cloudbasepredictor.data.units.formatVerticalSpeed
+import com.cloudbasepredictor.data.units.formatWindSpeed
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.model.ForecastModel
 import com.cloudbasepredictor.ui.preview.PreviewData
@@ -96,7 +99,7 @@ internal fun HelpButtonOverlay(
                                 text = helpContent.summary,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                            ThermicStrengthLegend()
+                            ThermicStrengthLegend(displayUnits = uiState.displayUnits)
                             ThermicDiagnosticLineLegend()
                             Text(
                                 text = stringResource(R.string.help_thermic_model_blocks_info),
@@ -132,7 +135,7 @@ internal fun HelpButtonOverlay(
                                 text = helpContent.summary,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                            WindSpeedLegend()
+                            WindSpeedLegend(displayUnits = uiState.displayUnits)
                             Spacer(modifier = Modifier.height(4.dp))
                             WindMoistureLegend()
                         }
@@ -209,7 +212,8 @@ private fun rememberForecastHelpContent(uiState: ForecastUiState): ForecastHelpC
     return when (uiState.selectedForecastMode) {
         ForecastMode.THERMIC -> ForecastHelpContent(
             title = stringResource(R.string.help_thermic_title),
-            summary = stringResource(R.string.help_thermic_summary),
+            summary = stringResource(R.string.help_thermic_summary)
+                .replace("m/s", uiState.displayUnits.verticalSpeed.label),
             statusMessage = forecastStatusMessage(uiState),
             tips = emptyList(),
         )
@@ -225,7 +229,8 @@ private fun rememberForecastHelpContent(uiState: ForecastUiState): ForecastHelpC
         )
         ForecastMode.WIND -> ForecastHelpContent(
             title = stringResource(R.string.help_wind_title),
-            summary = stringResource(R.string.help_wind_summary),
+            summary = stringResource(R.string.help_wind_summary)
+                .replace("km/h", uiState.displayUnits.windSpeed.label),
             statusMessage = forecastStatusMessage(uiState),
             tips = emptyList(),
         )
@@ -355,8 +360,11 @@ private fun ThermicDiagnosticLineLegendRow(
 }
 
 @Composable
-private fun ThermicStrengthLegend() {
-    val steps = listOf("0", "1", "2", "3", "4", "5+")
+private fun ThermicStrengthLegend(displayUnits: DisplayUnits) {
+    val steps = listOf(0f, 1f, 2f, 3f, 4f, 5f).map { speedMps ->
+        val label = formatVerticalSpeed(speedMps, displayUnits, withUnit = false)
+        if (speedMps >= THERMIC_LEGEND_MAX_STRENGTH_MPS) "$label+" else label
+    }
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -439,7 +447,7 @@ private fun WindCclLegendRow() {
 }
 
 @Composable
-private fun WindSpeedLegend() {
+private fun WindSpeedLegend(displayUnits: DisplayUnits) {
     val steps = listOf(0, 5, 10, 15, 20, 30, 40, 50, 60)
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(
@@ -448,7 +456,7 @@ private fun WindSpeedLegend() {
         ) {
             steps.forEach { value ->
                 Text(
-                    text = "$value",
+                    text = formatWindSpeed(value.toFloat(), displayUnits, withUnit = false),
                     style = MaterialTheme.typography.labelSmall,
                 )
             }

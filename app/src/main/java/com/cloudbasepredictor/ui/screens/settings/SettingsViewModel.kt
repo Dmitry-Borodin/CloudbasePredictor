@@ -7,6 +7,8 @@ import com.cloudbasepredictor.data.datasource.DataSourceRepository
 import com.cloudbasepredictor.data.forecast.ForecastRepository
 import com.cloudbasepredictor.data.theme.ThemePreference
 import com.cloudbasepredictor.data.theme.ThemeRepository
+import com.cloudbasepredictor.data.units.UnitPreset
+import com.cloudbasepredictor.data.units.UnitSettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.StateFlow
@@ -16,10 +18,12 @@ import kotlinx.coroutines.launch
 class SettingsViewModel @Inject constructor(
     private val dataSourceRepository: DataSourceRepository,
     private val themeRepository: ThemeRepository,
+    private val unitSettingsRepository: UnitSettingsRepository,
     private val forecastRepository: ForecastRepository,
 ) : ViewModel() {
     val dataSourcePreference: StateFlow<DataSourcePreference> = dataSourceRepository.preference
     val themePreference: StateFlow<ThemePreference> = themeRepository.preference
+    val unitPreset: StateFlow<UnitPreset> = unitSettingsRepository.unitPreset
 
     fun setDataSource(preference: DataSourcePreference) {
         val previousPreference = dataSourceRepository.preference.value
@@ -33,5 +37,9 @@ class SettingsViewModel @Inject constructor(
 
     fun setTheme(preference: ThemePreference) {
         themeRepository.setPreference(preference)
+    }
+
+    fun setUnitPreset(unitPreset: UnitPreset) {
+        unitSettingsRepository.setUnitPreset(unitPreset)
     }
 }

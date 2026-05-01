@@ -11,6 +11,10 @@ import com.cloudbasepredictor.data.forecast.ForecastRepository
 import com.cloudbasepredictor.data.forecast.exposedForecastDayCount
 import com.cloudbasepredictor.data.forecast.requestedForecastDaysForDayIndex
 import com.cloudbasepredictor.data.place.PlaceRepository
+import com.cloudbasepredictor.data.units.DisplayUnits
+import com.cloudbasepredictor.data.units.UnitPreset
+import com.cloudbasepredictor.data.units.UnitSettingsRepository
+import com.cloudbasepredictor.data.units.resolveDisplayUnits
 import com.cloudbasepredictor.model.DailyForecast
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.model.ForecastModel
@@ -89,6 +93,10 @@ data class ForecastUiState(
     val elevationKm: Float = 0f,
     /** Favorite places to show on the forecast map panel. */
     val favoritePlaces: List<SavedPlace> = emptyList(),
+    /** Unit preset selected in Settings. */
+    val unitPreset: UnitPreset = UnitPreset.METRIC_KMH,
+    /** Resolved display units for the active preset. */
+    val displayUnits: DisplayUnits = UnitPreset.METRIC_KMH.resolveDisplayUnits(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -99,6 +107,7 @@ class ForecastViewModel @Inject constructor(
     private val forecastModeRepository: ForecastModeRepository,
     private val forecastModelRepository: ForecastModelRepository,
     private val forecastViewportRepository: ForecastViewportRepository,
+    private val unitSettingsRepository: UnitSettingsRepository,
 ) : ViewModel() {
     private val selectedDayIndex = MutableStateFlow(0)
     private val chartViewport = MutableStateFlow(
@@ -170,7 +179,9 @@ class ForecastViewModel @Inject constructor(
         uiInputs,
         forecastModelRepository.selectedModel,
         placeRepository.observeFavoritePlaces(),
-    ) { inputs, currentModel, favorites ->
+        unitSettingsRepository.unitPreset,
+        unitSettingsRepository.displayUnits,
+    ) { inputs, currentModel, favorites, unitPreset, displayUnits ->
         val place = inputs.place
         val snapshot = inputs.snapshot
         val currentChartContext = inputs.chartContext
@@ -233,6 +244,8 @@ class ForecastViewModel @Inject constructor(
             modelGeneratedAtMillis = snapshot?.modelGeneratedAtMillis,
             elevationKm = (snapshot?.hourlyData?.elevation ?: 0.0).toFloat() / 1000f,
             favoritePlaces = favorites,
+            unitPreset = unitPreset,
+            displayUnits = displayUnits,
         )
     }.stateIn(
         scope = viewModelScope,

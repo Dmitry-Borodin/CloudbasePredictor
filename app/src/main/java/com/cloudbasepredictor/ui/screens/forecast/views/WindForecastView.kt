@@ -39,6 +39,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cloudbasepredictor.data.units.DisplayUnits
+import com.cloudbasepredictor.data.units.altitudeAxisUnitLabel
+import com.cloudbasepredictor.data.units.formatAltitudeAxisValue
+import com.cloudbasepredictor.data.units.formatAltitudeKm
+import com.cloudbasepredictor.data.units.formatWindSpeed
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_TIME_AXIS
@@ -71,6 +76,7 @@ internal fun WindForecastView(
             chart = uiState.windChart,
             visibleTopAltitudeKm = uiState.chartViewport.visibleTopAltitudeKm,
             elevationKm = uiState.elevationKm,
+            displayUnits = uiState.displayUnits,
             onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
             modifier = Modifier.fillMaxSize(),
         )
@@ -99,6 +105,7 @@ private fun WindChartCanvas(
     chart: WindForecastChartUiModel,
     visibleTopAltitudeKm: Float,
     elevationKm: Float,
+    displayUnits: DisplayUnits,
     onVisibleTopAltitudeChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -407,7 +414,7 @@ private fun WindChartCanvas(
                     altKm, minAltitudeKm, effectiveTopAltitudeKm, plotTop, plotBottom,
                 )
                 canvas.nativeCanvas.drawText(
-                    String.format(Locale.US, "%.1f", altKm),
+                    formatAltitudeAxisValue(altKm, displayUnits),
                     8.dp.toPx(),
                     y + axisLabelPaint.textSize * 0.35f,
                     axisLabelPaint,
@@ -415,7 +422,7 @@ private fun WindChartCanvas(
             }
 
             canvas.nativeCanvas.drawText(
-                "km",
+                altitudeAxisUnitLabel(displayUnits),
                 8.dp.toPx(),
                 plotTop + unitLabelPaint.textSize + 4.dp.toPx(),
                 unitLabelPaint,
@@ -442,14 +449,14 @@ private fun WindChartCanvas(
                     cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
                 )
                 canvas.nativeCanvas.drawText(
-                    "${speedKmh.toInt()}",
+                    formatWindSpeed(speedKmh, displayUnits, withUnit = false),
                     lx + legendItemWidth / 2f,
                     legendY + swatchH + legendLabelPaint.textSize + 1.dp.toPx(),
                     legendLabelPaint,
                 )
             }
             canvas.nativeCanvas.drawText(
-                "km/h",
+                displayUnits.windSpeed.label,
                 plotLeft - 20.dp.toPx(),
                 legendY + swatchH + legendLabelPaint.textSize + 1.dp.toPx(),
                 legendLabelPaint,
@@ -506,7 +513,7 @@ private fun WindChartCanvas(
                     val labelBaseline = cellCenterY + arrowDrawSize / 2f + speedLabelPaint.textSize + 1.dp.toPx()
                     if (labelBaseline > plotBottom - 2.dp.toPx()) return@clusteredAltLabel
                     canvas.nativeCanvas.drawText(
-                        "${avgSpeed.toInt()}",
+                        formatWindSpeed(avgSpeed, displayUnits, withUnit = false),
                         cellCenterX,
                         labelBaseline,
                         speedLabelPaint,
@@ -609,9 +616,9 @@ private fun WindChartCanvas(
                 .minByOrNull { kotlin.math.abs(it.altitudeKm - altKm) }
 
             val tooltipLines = mutableListOf<String>()
-            tooltipLines += String.format(Locale.US, "%02dh  %.1f km", hour, altKm)
+            tooltipLines += String.format(Locale.US, "%02dh  %s", hour, formatAltitudeKm(altKm, displayUnits))
             if (cell != null) {
-                tooltipLines += "${cell.speedKmh.toInt()} km/h  ${cell.directionDeg.toInt()}°"
+                tooltipLines += "${formatWindSpeed(cell.speedKmh, displayUnits)}  ${cell.directionDeg.toInt()}°"
             }
 
             val lineH = tooltipPaint.textSize * 1.3f

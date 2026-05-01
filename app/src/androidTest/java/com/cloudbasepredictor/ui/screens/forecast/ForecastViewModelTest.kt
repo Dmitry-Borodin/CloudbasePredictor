@@ -10,6 +10,10 @@ import com.cloudbasepredictor.data.forecast.ForecastModelRepository
 import com.cloudbasepredictor.data.forecast.ForecastRepository
 import com.cloudbasepredictor.data.forecast.ForecastViewportRepository
 import com.cloudbasepredictor.data.place.PlaceRepository
+import com.cloudbasepredictor.data.units.DisplayUnits
+import com.cloudbasepredictor.data.units.UnitPreset
+import com.cloudbasepredictor.data.units.UnitSettingsRepository
+import com.cloudbasepredictor.data.units.resolveDisplayUnits
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.model.ForecastModel
 import com.cloudbasepredictor.model.ForecastSnapshot
@@ -98,6 +102,7 @@ class ForecastViewModelTest {
                     forecastModeRepository = FakeForecastModeRepository(),
                     forecastModelRepository = FakeForecastModelRepository(ForecastModel.ICON_SEAMLESS),
                     forecastViewportRepository = FakeForecastViewportRepository(),
+                    unitSettingsRepository = FakeUnitSettingsRepository(),
                 ) as T
             }
         }
@@ -197,5 +202,20 @@ private class FakeForecastViewportRepository : ForecastViewportRepository {
 
     override fun setVisibleTopAltitudeKm(value: Float) {
         mutableVisibleTopAltitudeKm.value = value
+    }
+}
+
+private class FakeUnitSettingsRepository : UnitSettingsRepository {
+    private val mutableUnitPreset = MutableStateFlow(UnitPreset.METRIC_KMH)
+    private val mutableDisplayUnits = MutableStateFlow(
+        UnitPreset.METRIC_KMH.resolveDisplayUnits(),
+    )
+
+    override val unitPreset: StateFlow<UnitPreset> = mutableUnitPreset.asStateFlow()
+    override val displayUnits: StateFlow<DisplayUnits> = mutableDisplayUnits.asStateFlow()
+
+    override fun setUnitPreset(unitPreset: UnitPreset) {
+        mutableUnitPreset.value = unitPreset
+        mutableDisplayUnits.value = unitPreset.resolveDisplayUnits()
     }
 }
