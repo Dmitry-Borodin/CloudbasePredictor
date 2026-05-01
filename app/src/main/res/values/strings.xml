@@ -89,15 +89,15 @@
     <string name="help_stuve_title">Skew-T log-P diagram</string>
     <string name="help_stuve_summary">The Skew-T diagram shows temperature (red) and dewpoint (blue) soundings on a skewed coordinate grid. Tilted isotherms, dry adiabats (green), moist adiabats (dashed teal), and mixing ratio lines (dotted blue) help assess atmospheric stability.</string>
     <string name="help_stuve_tip_1">Where the temperature line is to the right of the parcel path (dashed), the atmosphere is stable; to the left means instability and convection potential.</string>
-    <string name="help_stuve_tip_2">The gap between temperature and dewpoint indicates moisture. Where they meet, clouds form (LCL).</string>
+    <string name="help_stuve_tip_2">The temperature-dewpoint gap indicates moisture. CCL marks an approximate cumulus base only when surface heating reaches convective temperature.</string>
     <string name="help_stuve_tip_3">Dots on the sounding lines mark actual model data levels. Use the time slider to view different hours.</string>
-    <string name="help_stuve_moisture_strip_info">The pale strip on the right marks layers with elevated relative humidity. It starts around 55% RH; stronger shading means higher RH. It is a moisture cue, not cloud base. Use LCL/CCL for cloud-base estimates.</string>
+    <string name="help_stuve_moisture_strip_info">The pale strip on the right marks layers with elevated relative humidity. It starts around 55% RH; stronger shading means higher RH. It is a moisture cue, not cloud base. Use CCL with convective temperature for cumulus-base estimates.</string>
 
     <!-- Help dialog - Wind -->
     <string name="help_wind_title">Wind forecast help</string>
     <string name="help_wind_summary">Wind speed legend (km/h):</string>
     <string name="help_wind_moisture_title">Moisture cues:</string>
-    <string name="help_wind_ccl_line">Orange CCL line - estimated thermal cloud-base level.</string>
+    <string name="help_wind_ccl_line">Orange CCL line - approximate cumulus-base level when heating is sufficient.</string>
 
     <!-- Help dialog - Cloud -->
     <string name="help_cloud_title">Cloud forecast help</string>

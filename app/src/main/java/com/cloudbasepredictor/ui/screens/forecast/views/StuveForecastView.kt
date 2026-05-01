@@ -752,17 +752,6 @@ private fun SkewTDiagramCanvas(
                 }
             }
 
-            chart.lclPressureHpa?.let { pressure ->
-                val y = pressureToY(pressure)
-                drawLine(
-                    color = onSurfaceColor.copy(alpha = 0.35f),
-                    start = Offset(plotLeft, y),
-                    end = Offset(plotRight, y),
-                    strokeWidth = 1.4f.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 5.dp.toPx())),
-                )
-            }
-
             chart.cclPressureHpa?.let { pressure ->
                 val y = pressureToY(pressure)
                 drawLine(
@@ -772,22 +761,6 @@ private fun SkewTDiagramCanvas(
                     strokeWidth = 1.5f.dp.toPx(),
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 4.dp.toPx())),
                 )
-            }
-
-            val lclPressure = chart.lclPressureHpa
-            val cclPressure = chart.cclPressureHpa
-            if (lclPressure != null && cclPressure != null) {
-                val topBandPressure = minOf(lclPressure, cclPressure)
-                val bottomBandPressure = maxOf(lclPressure, cclPressure)
-                val topBandY = pressureToY(topBandPressure).coerceIn(plotTop, plotBottom)
-                val bottomBandY = pressureToY(bottomBandPressure).coerceIn(plotTop, plotBottom)
-                if (bottomBandY > topBandY + 1f) {
-                    drawRect(
-                        color = Color(0xFFE9B267).copy(alpha = 0.10f),
-                        topLeft = Offset(plotLeft, topBandY),
-                        size = Size(plotWidth, bottomBandY - topBandY),
-                    )
-                }
             }
 
             val activeCursor = cursorState
@@ -916,17 +889,6 @@ private fun SkewTDiagramCanvas(
                 }
             }
 
-            chart.lclPressureHpa?.let { pressure ->
-                drawMarkerLabel(
-                    canvas = canvas,
-                    text = "LCL",
-                    y = pressureToY(pressure),
-                    x = plotLeft + 4.dp.toPx(),
-                    color = axisLabelColor,
-                    density = density,
-                    yOffsetPx = -with(density) { 6.dp.toPx() },
-                )
-            }
             chart.cclPressureHpa?.let { pressure ->
                 drawMarkerLabel(
                     canvas = canvas,

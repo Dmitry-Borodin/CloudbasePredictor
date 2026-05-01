@@ -1,13 +1,18 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
 import com.cloudbasepredictor.data.remote.HourlyForecastData
+import com.cloudbasepredictor.data.remote.HourlyPoint
+import com.cloudbasepredictor.domain.forecast.CclHourlyInput
+import com.cloudbasepredictor.domain.forecast.CclHourlyResult
+import com.cloudbasepredictor.domain.forecast.CclPressureLevel
 import com.cloudbasepredictor.domain.forecast.ProfileLevel
 import com.cloudbasepredictor.domain.forecast.SurfaceHeatingInput
 import com.cloudbasepredictor.domain.forecast.ThermalForecastEngine
 import com.cloudbasepredictor.domain.forecast.ThermalForecastInput
-import com.cloudbasepredictor.domain.forecast.analyzeParcel
+import com.cloudbasepredictor.domain.forecast.analyzeCclHourly
+import com.cloudbasepredictor.domain.forecast.estimateSurfaceHeating
 import com.cloudbasepredictor.domain.forecast.estimateSurfacePressure
-import com.cloudbasepredictor.domain.forecast.satMixingRatioGKg
+import com.cloudbasepredictor.domain.forecast.primaryCclResult
 
 /**
  * Builds chart UI models from real [HourlyForecastData] returned by the backend.
@@ -129,15 +134,9 @@ internal fun buildStuveChartFromData(
         precipitationMm = hourPoint.precipitationMm?.toFloat(),
         isDay = hourPoint.isDay?.let { it > 0.5 },
     )
-    val analysis = analyzeParcel(
-        profile = profileLevels,
-        surfaceTemperatureC = surfaceTemperatureC,
-        surfaceDewPointC = surfaceDewPointC,
-        surfacePressureHpa = surfacePressure,
-        elevationKm = surfaceHeightMeters / 1000f,
-        heatingInput = heatingInput,
-        modelCapeJKg = hourPoint.capeJKg?.toFloat(),
-    ) ?: return buildPlaceholderStuveChart(hour, dayIndex)
+    val surfaceHeatingC = estimateSurfaceHeating(heatingInput)
+    val cclResults = hourPoint.analyzeCclForForecast(surfaceHeightMeters)
+    val primaryCcl = cclResults.primaryCclResult()
 
     val parcelPath = buildParcelAscentPath(
         pressures = buildRenderableParcelPressures(
@@ -148,7 +147,7 @@ internal fun buildStuveChartFromData(
         surfaceTemperatureC = surfaceTemperatureC,
         surfaceDewPointC = surfaceDewPointC,
         surfacePressureHpa = surfacePressure,
-        surfaceHeatingC = analysis.surfaceHeatingC,
+        surfaceHeatingC = surfaceHeatingC,
     )
 
     val windBarbs = pressureLevels.mapNotNull { pl ->
@@ -167,9 +166,9 @@ internal fun buildStuveChartFromData(
         dewpointProfile = dewpointProfile,
         parcelAscentPath = parcelPath,
         windBarbs = windBarbs,
-        lclPressureHpa = analysis.lclPressureHpa,
-        cclPressureHpa = analysis.cclPressureHpa,
-        tconC = analysis.tconC,
+        cclPressureHpa = primaryCcl?.cclPressureHpa,
+        tconC = primaryCcl?.convectiveTemperatureC,
+        cclResults = cclResults,
         moistureBands = buildMoistureBands(temperatureProfile, dewpointProfile),
         selectedHour = hour,
         surfacePressureHpa = surfacePressure,
@@ -429,25 +428,17 @@ internal fun buildWindChartFromData(
         WindLevelMarker(hour = hp.hour, altitudeKm = flAslKm)
     }
 
-    // CCL (Convective Condensation Level) — where surface mixing ratio meets env. temp, ASL
+    val cclResultsByHour = daytimePoints.associate { hp ->
+        hp.hour to hp.analyzeCclForForecast(elevation.toFloat())
+    }
     val cclMarkers = daytimePoints.mapNotNull { hp ->
-        val surfacePressure = hp.surfacePressureHpa?.toFloat()
-            ?: estimateSurfacePressure(elevation)
-        val surfDew = hp.dewPoint2mC?.toFloat() ?: return@mapNotNull null
-        val surfMr = satMixingRatioGKg(surfDew, surfacePressure)
-        val pls = hp.pressureLevels
-            .filter { it.pressureHpa.toFloat() < surfacePressure }
-            .sortedByDescending { it.pressureHpa }
-        for (pl in pls) {
-            val satMr = satMixingRatioGKg(pl.temperatureC.toFloat(), pl.pressureHpa.toFloat())
-            if (satMr <= surfMr) {
-                val heightAsl = (pl.geopotentialHeightM ?: continue).toFloat() / 1000f
-                if (heightAsl > elevationKm) {
-                    return@mapNotNull WindLevelMarker(hour = hp.hour, altitudeKm = heightAsl)
-                }
-            }
-        }
-        null
+        val primaryCcl = cclResultsByHour[hp.hour].orEmpty().primaryCclResult()
+            ?: return@mapNotNull null
+        val cclMslM = primaryCcl.cclHeightMslM ?: return@mapNotNull null
+        if (!primaryCcl.reachable) return@mapNotNull null
+        val cclMslKm = cclMslM / 1000f
+        if (cclMslKm < elevationKm) return@mapNotNull null
+        WindLevelMarker(hour = hp.hour, altitudeKm = cclMslKm)
     }
 
     // Compute altitude bands: each data level extends halfway to its neighbors
@@ -469,6 +460,7 @@ internal fun buildWindChartFromData(
         cells = cellList,
         freezingLevelKm = freezingLevelMarkers,
         cclKm = cclMarkers,
+        cclResults = cclResultsByHour.values.flatten(),
     )
 }
 
@@ -479,6 +471,35 @@ private data class WindPressureSample(
     val speedKmh: Float,
     val directionDeg: Float,
 )
+
+private fun HourlyPoint.analyzeCclForForecast(
+    elevationM: Float,
+): List<CclHourlyResult> {
+    val surfaceTemperatureC = temperature2mC?.toFloat() ?: return emptyList()
+    val surfaceDewPointC = dewPoint2mC?.toFloat() ?: return emptyList()
+    val surfacePressureHpa = surfacePressureHpa?.toFloat()
+        ?: estimateSurfacePressure(elevationM.toDouble())
+
+    return analyzeCclHourly(
+        CclHourlyInput(
+            time = String.format(java.util.Locale.US, "%sT%02d:00", date, hour),
+            surfaceTemperatureC = surfaceTemperatureC,
+            surfaceDewPointC = surfaceDewPointC,
+            surfacePressureHpa = surfacePressureHpa,
+            surfaceElevationM = elevationM,
+            pressureLevels = pressureLevels.map { level ->
+                CclPressureLevel(
+                    pressureHpa = level.pressureHpa.toFloat(),
+                    temperatureC = level.temperatureC.toFloat(),
+                    dewPointC = level.dewPointC?.toFloat(),
+                    heightMslM = level.geopotentialHeightM?.toFloat(),
+                    isSynthetic = level.isSynthetic,
+                )
+            },
+            takeoffElevationM = null,
+        ),
+    )
+}
 
 // --- Cloud chart from real data ---
 

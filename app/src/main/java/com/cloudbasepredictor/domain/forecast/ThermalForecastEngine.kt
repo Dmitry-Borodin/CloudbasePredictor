@@ -53,7 +53,7 @@ data class ThermalForecastResult(
     val lowerSourceLevel: ThermalSourceLevel?,
     val upperSourceLevel: ThermalSourceLevel?,
     val lclKm: Float,
-    val cclKm: Float,
+    val cclKm: Float?,
     val cloudBaseKm: Float?,
     val moistEquilibriumTopKm: Float?,
     val thermalEnergyJKg: Float,
@@ -103,20 +103,27 @@ object ThermalForecastEngine {
         )
         val surfaceMixingRatio = satMixingRatioGKg(input.surfaceDewPointC, input.surfacePressureHpa)
         val lcl = findThermalLcl(nominalThetaK, surfaceMixingRatio, profile, input.elevationKm)
-        val ccl = findThermalCcl(surfaceMixingRatio, profile, input.elevationKm)
-        val rawCloudBaseKm = max(lcl.heightKm, ccl.heightKm)
-        val cloudBaseKm = if (nominalTop.topKm >= rawCloudBaseKm - CLOUD_BASE_REACH_TOLERANCE_KM) {
-            rawCloudBaseKm
+        val cclResults = analyzeCclHourly(input.toCclInput(profile))
+        val primaryCcl = cclResults.primaryCclResult()
+        val cclKm = primaryCcl?.takeIf { it.reachable }?.cclHeightMslM?.div(1000f)
+        val cloudBaseKm = if (
+            primaryCcl?.reachable == true &&
+            cclKm != null &&
+            nominalTop.topKm >= cclKm - CLOUD_BASE_REACH_TOLERANCE_KM
+        ) {
+            cclKm
         } else {
             null
         }
-        val moistTopKm = cloudBaseKm?.let {
+        val moistTopKm = if (cloudBaseKm != null && primaryCcl != null) {
             findMoistTop(
-                lclTemperatureC = dryAdiabatTempC(nominalThetaK, lcl.pressureHpa),
-                lclPressureHpa = lcl.pressureHpa,
+                saturationPointTemperatureC = primaryCcl.cclTemperatureC ?: dryAdiabatTempC(nominalThetaK, lcl.pressureHpa),
+                saturationPointPressureHpa = primaryCcl.cclPressureHpa ?: lcl.pressureHpa,
                 profile = profile,
-                cloudBaseKm = it,
+                cloudBaseKm = cloudBaseKm,
             )
+        } else {
+            null
         }
 
         val damping = dampingFactor(input, profile, nominalTop.topKm)
@@ -159,7 +166,7 @@ object ThermalForecastEngine {
             lowerSourceLevel = nominalTop.bracketLower?.toSourceLevel(),
             upperSourceLevel = nominalTop.bracketUpper?.toSourceLevel(),
             lclKm = lcl.heightKm,
-            cclKm = ccl.heightKm,
+            cclKm = cclKm,
             cloudBaseKm = cloudBaseKm,
             moistEquilibriumTopKm = moistTopKm,
             thermalEnergyJKg = computeDryThermalEnergy(nominalThetaK, profile, nominalTop.topKm),
@@ -194,6 +201,30 @@ object ThermalForecastEngine {
             .filter { it.pressureHpa <= input.surfacePressureHpa + SURFACE_PRESSURE_TOLERANCE_HPA }
             .distinctBy { (it.pressureHpa * 10f).toInt() }
             .sortedByDescending(ProfileLevel::pressureHpa)
+    }
+
+    private fun ThermalForecastInput.toCclInput(profile: List<ProfileLevel>): CclHourlyInput {
+        return CclHourlyInput(
+            time = "",
+            surfaceTemperatureC = surfaceTemperatureC,
+            surfaceDewPointC = surfaceDewPointC,
+            surfacePressureHpa = surfacePressureHpa,
+            surfaceElevationM = elevationKm * 1000f,
+            pressureLevels = profile
+                .filter { level ->
+                    abs(level.pressureHpa - surfacePressureHpa) > SURFACE_PRESSURE_TOLERANCE_HPA ||
+                        abs(level.heightKm - elevationKm) > SURFACE_MATCH_TOLERANCE_KM
+                }
+                .map { level ->
+                    CclPressureLevel(
+                        pressureHpa = level.pressureHpa,
+                        temperatureC = level.temperatureC,
+                        dewPointC = level.dewPointC,
+                        heightMslM = level.heightKm * 1000f,
+                        isSynthetic = level.isSynthetic,
+                    )
+                },
+        )
     }
 
     private fun analyzeTopScenario(
@@ -625,40 +656,9 @@ object ThermalForecastEngine {
         return PressureHeight(top.pressureHpa, top.heightKm)
     }
 
-    private fun findThermalCcl(
-        surfaceMixingRatio: Float,
-        profile: List<ProfileLevel>,
-        elevationKm: Float,
-    ): PressureHeight {
-        var previous: ProfileLevel? = null
-        for (level in profile) {
-            val envSaturationMixingRatio = satMixingRatioGKg(level.temperatureC, level.pressureHpa)
-            if (envSaturationMixingRatio <= surfaceMixingRatio) {
-                previous?.let { prev ->
-                    val prevMixingRatio = satMixingRatioGKg(prev.temperatureC, prev.pressureHpa)
-                    val fraction = (if (prevMixingRatio - envSaturationMixingRatio > 0.001f) {
-                        (prevMixingRatio - surfaceMixingRatio) /
-                            (prevMixingRatio - envSaturationMixingRatio)
-                    } else {
-                        0.5f
-                    }).coerceIn(0f, 1f)
-                    return PressureHeight(
-                        pressureHpa = prev.pressureHpa + fraction * (level.pressureHpa - prev.pressureHpa),
-                        heightKm = (prev.heightKm + fraction * (level.heightKm - prev.heightKm))
-                            .coerceAtLeast(elevationKm),
-                    )
-                }
-                return PressureHeight(level.pressureHpa, level.heightKm.coerceAtLeast(elevationKm))
-            }
-            previous = level
-        }
-        val top = profile.last()
-        return PressureHeight(top.pressureHpa, top.heightKm)
-    }
-
     private fun findMoistTop(
-        lclTemperatureC: Float,
-        lclPressureHpa: Float,
+        saturationPointTemperatureC: Float,
+        saturationPointPressureHpa: Float,
         profile: List<ProfileLevel>,
         cloudBaseKm: Float,
     ): Float? {
@@ -667,14 +667,18 @@ object ThermalForecastEngine {
         var foundBuoyancy = false
         var previous: ProfileLevel? = null
         for (level in aboveCloud) {
-            val moistTemp = moistAdiabatTempFromPointC(lclTemperatureC, lclPressureHpa, level.pressureHpa)
+            val moistTemp = moistAdiabatTempFromPointC(
+                saturationPointTemperatureC,
+                saturationPointPressureHpa,
+                level.pressureHpa,
+            )
             if (moistTemp > level.temperatureC) {
                 foundBuoyancy = true
             } else if (foundBuoyancy) {
                 previous?.let { prev ->
                     val previousMoistTemp = moistAdiabatTempFromPointC(
-                        lclTemperatureC,
-                        lclPressureHpa,
+                        saturationPointTemperatureC,
+                        saturationPointPressureHpa,
                         prev.pressureHpa,
                     )
                     val prevDiff = previousMoistTemp - prev.temperatureC

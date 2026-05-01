@@ -65,7 +65,7 @@ class ThermicChartDiagnosticsTest {
         val diag = chart.slotDiagnostics.first()
         assertTrue("Nominal top should be > elevation", diag.topNominalKm > 0.5f)
         assertTrue("LCL should be > elevation", diag.lclKm > 0.5f)
-        assertTrue("CCL should be > elevation", diag.cclKm > 0.5f)
+        assertTrue("CCL should be null or > elevation", diag.cclKm == null || diag.cclKm > 0.5f)
         assertNotNull("Model CAPE should be present", diag.modelCapeJKg)
         assertNotNull("Model CIN should be present", diag.modelCinJKg)
         assertNotNull("Model lifted index should be present", diag.liftedIndexC)

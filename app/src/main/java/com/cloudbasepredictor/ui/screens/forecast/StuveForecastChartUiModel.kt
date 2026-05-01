@@ -1,15 +1,20 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import com.cloudbasepredictor.domain.forecast.CclHourlyInput
+import com.cloudbasepredictor.domain.forecast.CclHourlyResult
+import com.cloudbasepredictor.domain.forecast.CclPressureLevel
 import com.cloudbasepredictor.domain.forecast.ProfileLevel
 import com.cloudbasepredictor.domain.forecast.SurfaceHeatingInput
-import com.cloudbasepredictor.domain.forecast.analyzeParcel
+import com.cloudbasepredictor.domain.forecast.analyzeCclHourly
 import com.cloudbasepredictor.domain.forecast.dryAdiabatTempC
 import com.cloudbasepredictor.domain.forecast.estimateSurfaceHeating
 import com.cloudbasepredictor.domain.forecast.interpolateHeightKmAtPressure
 import com.cloudbasepredictor.domain.forecast.moistAdiabatTempFromPointC
 import com.cloudbasepredictor.domain.forecast.potentialTemperatureK
+import com.cloudbasepredictor.domain.forecast.primaryCclResult
 import com.cloudbasepredictor.domain.forecast.relativeHumidityFraction
 import com.cloudbasepredictor.domain.forecast.satMixingRatioGKg
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.sin
 
@@ -30,12 +35,12 @@ data class StuveForecastChartUiModel(
     val parcelAscentPath: List<StuveProfilePoint>,
     /** Wind barbs drawn along the right side of the diagram. */
     val windBarbs: List<StuveWindBarb>,
-    /** Lifting Condensation Level pressure, hPa; null if not computed. */
-    val lclPressureHpa: Float?,
     /** Convective Condensation Level pressure, hPa; null if not computed. */
     val cclPressureHpa: Float?,
     /** Convective temperature at the surface required to reach the CCL, °C. */
     val tconC: Float?,
+    /** Hourly CCL results for surface, mixed-layer 50 hPa, and mixed-layer 100 hPa methods. */
+    val cclResults: List<CclHourlyResult> = emptyList(),
     /** Moisture cue bands derived from temperature and dewpoint profiles. */
     val moistureBands: List<StuveMoistureBand> = emptyList(),
     /** Currently displayed hour of the day (local time, 6–22). */
@@ -165,14 +170,26 @@ internal fun buildPlaceholderStuveChart(
         precipitationMm = 0f,
         isDay = hour in 6..20,
     )
-    val analysis = analyzeParcel(
-        profile = profileLevels,
-        surfaceTemperatureC = temperatureProfile.first().temperatureC,
-        surfaceDewPointC = dewpointProfile.first().temperatureC,
-        surfacePressureHpa = surfacePressure,
-        elevationKm = surfaceHeightKm,
-        heatingInput = heatingInput,
+    val surfaceHeatingC = estimateSurfaceHeating(heatingInput)
+    val cclResults = analyzeCclHourly(
+        CclHourlyInput(
+            time = String.format(Locale.US, "placeholderT%02d:00", hour),
+            surfaceTemperatureC = temperatureProfile.first().temperatureC,
+            surfaceDewPointC = dewpointProfile.first().temperatureC,
+            surfacePressureHpa = surfacePressure,
+            surfaceElevationM = surfaceHeightKm * 1000f,
+            pressureLevels = profileLevels.drop(1).map { level ->
+                CclPressureLevel(
+                    pressureHpa = level.pressureHpa,
+                    temperatureC = level.temperatureC,
+                    dewPointC = level.dewPointC,
+                    heightMslM = level.heightKm * 1000f,
+                    isSynthetic = level.isSynthetic,
+                )
+            },
+        ),
     )
+    val primaryCcl = cclResults.primaryCclResult()
 
     val parcelPressures = buildRenderableParcelPressures(
         surfacePressureHpa = surfacePressure,
@@ -184,7 +201,7 @@ internal fun buildPlaceholderStuveChart(
         surfaceTemperatureC = temperatureProfile.first().temperatureC,
         surfaceDewPointC = dewpointProfile.first().temperatureC,
         surfacePressureHpa = surfacePressure,
-        surfaceHeatingC = analysis?.surfaceHeatingC ?: estimateSurfaceHeating(heatingInput),
+        surfaceHeatingC = surfaceHeatingC,
     )
 
     val windBarbs = availablePressures
@@ -204,9 +221,9 @@ internal fun buildPlaceholderStuveChart(
         dewpointProfile = dewpointProfile,
         parcelAscentPath = parcelPath,
         windBarbs = windBarbs,
-        lclPressureHpa = analysis?.lclPressureHpa,
-        cclPressureHpa = analysis?.cclPressureHpa,
-        tconC = analysis?.tconC,
+        cclPressureHpa = primaryCcl?.cclPressureHpa,
+        tconC = primaryCcl?.convectiveTemperatureC,
+        cclResults = cclResults,
         moistureBands = buildMoistureBands(temperatureProfile, dewpointProfile),
         selectedHour = hour,
         surfacePressureHpa = surfacePressure,

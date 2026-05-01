@@ -3,6 +3,7 @@ package com.cloudbasepredictor.ui.screens.forecast
 import com.cloudbasepredictor.data.remote.HourlyForecastData
 import com.cloudbasepredictor.data.remote.HourlyPoint
 import com.cloudbasepredictor.data.remote.PressureLevelPoint
+import com.cloudbasepredictor.domain.forecast.CclMethod
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,6 +30,62 @@ class ForecastChartBuildersWindTest {
                 hourAltitudes,
             )
         }
+        assertTrue(
+            "Wind chart should keep shared CCL diagnostics for all displayed hours",
+            chart.cclResults.any { it.method == CclMethod.ML50 },
+        )
+    }
+
+    @Test
+    fun buildWindChartFromData_cclIgnoresPressureLevelsBelowTerrain() {
+        val elevationM = 1500.0
+        val chart = buildWindChartFromData(
+            hourlyData = HourlyForecastData(
+                latitude = 46.0,
+                longitude = 11.0,
+                elevation = elevationM,
+                hourlyPoints = listOf(
+                    HourlyPoint(
+                        date = "2026-04-28",
+                        hour = 12,
+                        temperature2mC = 18.0,
+                        dewPoint2mC = 8.0,
+                        cloudCoverLowPercent = 0.0,
+                        cloudCoverMidPercent = 0.0,
+                        cloudCoverHighPercent = 0.0,
+                        precipitationMm = 0.0,
+                        precipitationProbabilityPercent = 0.0,
+                        windSpeed10mKmh = 8.0,
+                        windDirection10mDeg = 220.0,
+                        capeJKg = 0.0,
+                        freezingLevelHeightM = 3200.0,
+                        surfacePressureHpa = 850.0,
+                        shortwaveRadiationWm2 = 700.0,
+                        sunshineDurationS = 3600.0,
+                        isDay = 1.0,
+                        pressureLevels = listOf(
+                            level(1000, -30.0, 5.0, 10.0, 220.0, 100.0),
+                            level(975, -25.0, 4.0, 12.0, 220.0, 300.0),
+                            level(950, -20.0, 3.0, 14.0, 220.0, 600.0),
+                            level(925, -16.0, 2.0, 16.0, 220.0, 900.0),
+                            level(900, -12.0, 1.0, 18.0, 220.0, 1200.0),
+                            level(800, 10.0, 0.0, 20.0, 220.0, 2000.0),
+                            level(750, 3.0, -5.0, 24.0, 220.0, 2600.0),
+                            level(700, -3.0, -10.0, 30.0, 220.0, 3200.0),
+                        ),
+                    ),
+                ),
+                dailyForecasts = emptyList(),
+            ),
+            dayIndex = 0,
+            maxAltitudeKm = 4.5f,
+        )
+
+        val ml50 = chart.cclResults.first { it.method == CclMethod.ML50 }
+        assertTrue(
+            "CCL intersections must not come from pressure levels below terrain",
+            ml50.intersections.all { it.heightMslM > elevationM.toFloat() },
+        )
     }
 
     private fun openMeteoFozaIconSeamlessWindData(): HourlyForecastData {

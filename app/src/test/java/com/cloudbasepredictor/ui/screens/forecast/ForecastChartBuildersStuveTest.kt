@@ -3,6 +3,7 @@ package com.cloudbasepredictor.ui.screens.forecast
 import com.cloudbasepredictor.data.remote.HourlyForecastData
 import com.cloudbasepredictor.data.remote.HourlyPoint
 import com.cloudbasepredictor.data.remote.PressureLevelPoint
+import com.cloudbasepredictor.domain.forecast.CclMethod
 import com.cloudbasepredictor.domain.forecast.ProfileLevel
 import com.cloudbasepredictor.domain.forecast.dryAdiabatTempC
 import com.cloudbasepredictor.domain.forecast.moistAdiabatTempFromPointC
@@ -79,9 +80,17 @@ class ForecastChartBuildersStuveTest {
             chart.parcelAscentPath.first().temperatureC >= chart.temperatureProfile.first().temperatureC,
         )
         assertFalse(chart.moistureBands.isEmpty())
-        assertNotNull(chart.lclPressureHpa)
         assertNotNull(chart.cclPressureHpa)
         assertNotNull(chart.tconC)
+        assertEquals(
+            setOf(CclMethod.SURFACE, CclMethod.ML50, CclMethod.ML100),
+            chart.cclResults.map { it.method }.toSet(),
+        )
+        assertEquals(
+            "Stuve should expose the shared ML50 CCL as the primary marker",
+            chart.cclResults.first { it.method == CclMethod.ML50 }.cclPressureHpa,
+            chart.cclPressureHpa,
+        )
     }
 
     @Test

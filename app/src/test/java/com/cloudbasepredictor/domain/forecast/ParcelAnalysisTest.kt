@@ -235,9 +235,11 @@ class ParcelAnalysisTest {
         assertTrue("Should have thermal cells", result.thermalCells.isNotEmpty())
         assertTrue("Dry top should be above elevation", result.dryThermalTopKm > 0.58f)
         assertTrue("LCL should be above elevation", result.lclKm > 0.58f)
-        assertTrue("CCL should be above elevation", result.cclKm > 0.58f)
+        assertNotNull("CCL should be available", result.cclKm)
+        assertTrue("CCL should be above elevation", result.cclKm!! > 0.58f)
         assertTrue("LCL pressure should be below the surface", result.lclPressureHpa < 955f)
-        assertTrue("CCL pressure should be below the surface", result.cclPressureHpa < 955f)
+        assertNotNull("CCL pressure should be available", result.cclPressureHpa)
+        assertTrue("CCL pressure should be below the surface", result.cclPressureHpa!! < 955f)
         assertNotNull("TCON should be available for the standard profile", result.tconC)
     }
 
@@ -413,7 +415,7 @@ class ParcelAnalysisTest {
     }
 
     @Test
-    fun parcelAnalysis_cloudBaseKm_isMaxOfLclAndCcl() {
+    fun parcelAnalysis_cloudBaseKm_usesReachableCcl() {
         val result = analyzeParcel(
             profile = standardProfile,
             surfaceTemperatureC = 22f,
@@ -428,13 +430,10 @@ class ParcelAnalysisTest {
 
         val cloudBase = result.cloudBaseKm
         if (cloudBase != null) {
+            assertNotNull("Cloud base should be tied to an available CCL", result.cclKm)
             assertTrue(
-                "Cloud base should be >= LCL",
-                cloudBase >= result.lclKm - 0.05f,
-            )
-            assertTrue(
-                "Cloud base should be >= CCL",
-                cloudBase >= result.cclKm - 0.05f,
+                "Cloud base should come from the reachable CCL",
+                kotlin.math.abs(cloudBase - result.cclKm!!) <= 0.05f,
             )
         }
     }

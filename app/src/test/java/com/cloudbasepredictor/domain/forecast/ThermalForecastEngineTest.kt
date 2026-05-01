@@ -193,6 +193,26 @@ class ThermalForecastEngineTest {
         assertTrue("Missing raw humidity/cloud/PBL fields should lower confidence", result.confidence.ordinal > 0)
     }
 
+    @Test
+    fun analyze_unreachableSharedCclDoesNotCreateCloudBase() {
+        val result = analyze(
+            profile = listOf(
+                level(900f, 17f, 6f, 1.00f),
+                level(850f, 4f, -2f, 1.50f),
+                level(800f, -2f, -8f, 2.00f),
+            ),
+            surfaceTemperatureC = 9f,
+            surfaceDewPointC = 7f,
+            surfacePressureHpa = 955f,
+            elevationKm = ELEVATION_KM,
+        )
+
+        assertNotNull(result)
+        result!!
+        assertEquals("Unreachable CCL should not be exposed as thermic CCL", null, result.cclKm)
+        assertEquals("Unreachable CCL should not create cloud base", null, result.cloudBaseKm)
+    }
+
     private fun analyze(
         profile: List<ProfileLevel>,
         heatingInput: SurfaceHeatingInput = this.heatingInput,

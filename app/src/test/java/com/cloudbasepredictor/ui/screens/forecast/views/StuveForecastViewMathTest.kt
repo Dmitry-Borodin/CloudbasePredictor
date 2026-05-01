@@ -192,7 +192,6 @@ class StuveForecastViewMathTest {
         dewpointProfile = dewpointPoints,
         parcelAscentPath = temperaturePoints.map { it.copy(temperatureC = it.temperatureC + 1.5f) },
         windBarbs = emptyList(),
-        lclPressureHpa = 720f,
         cclPressureHpa = 760f,
         tconC = 18f,
         selectedHour = 12,

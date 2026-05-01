@@ -132,7 +132,8 @@ class ForecastAppFlowInstrumentedTest {
         composeRule.onNodeWithTag(HELP_BUTTON).performClick()
         composeRule.onNodeWithText("Wind forecast help").assertIsDisplayed()
         composeRule.onNodeWithText("Moisture cues:").assertIsDisplayed()
-        composeRule.onNodeWithText("Orange CCL line - estimated thermal cloud-base level.").assertIsDisplayed()
+        composeRule.onNodeWithText("Orange CCL line - approximate cumulus-base level when heating is sufficient.")
+            .assertIsDisplayed()
         composeRule.onNodeWithText("Close").performClick()
 
         composeRule.onNodeWithTag(CLOUD_MODE_TAB).performClick()

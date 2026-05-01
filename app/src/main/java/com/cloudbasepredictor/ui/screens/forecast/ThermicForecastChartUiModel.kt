@@ -75,8 +75,8 @@ data class ThermicSlotDiagnostics(
     val computedCinJKg: Float,
     /** LCL altitude, km ASL. */
     val lclKm: Float,
-    /** CCL altitude, km ASL. */
-    val cclKm: Float,
+    /** CCL altitude, km ASL. Null if unavailable or not reachable. */
+    val cclKm: Float?,
 )
 
 data class ThermicForecastCellUiModel(
@@ -371,7 +371,7 @@ internal fun ThermicForecastChartUiModel.aggregatedForDisplay(
             computedCapeJKg = slotDiags.map { it.computedCapeJKg }.average().toFloat(),
             computedCinJKg = slotDiags.map { it.computedCinJKg }.average().toFloat(),
             lclKm = slotDiags.map { it.lclKm }.average().toFloat(),
-            cclKm = slotDiags.map { it.cclKm }.average().toFloat(),
+            cclKm = slotDiags.mapNotNull { it.cclKm }.takeIf { it.isNotEmpty() }?.average()?.toFloat(),
         )
     }
 

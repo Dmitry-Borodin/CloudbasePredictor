@@ -21,17 +21,13 @@ data class ParcelAnalysisResult(
     val lclKm: Float,
     /** Lifting Condensation Level pressure, hPa. */
     val lclPressureHpa: Float,
-    /** Convective Condensation Level: where surface mixing ratio meets env. temperature, km ASL. */
-    val cclKm: Float,
+    /** Convective Condensation Level: approximate cumulus base if heating is sufficient, km ASL. */
+    val cclKm: Float?,
     /** Convective Condensation Level pressure, hPa. */
-    val cclPressureHpa: Float,
+    val cclPressureHpa: Float?,
     /** Convective temperature at the surface required to reach the CCL, °C. */
     val tconC: Float?,
-    /**
-     * Cloud base altitude for cumulus formation, km ASL.
-     * Equals max(LCL, CCL) only if the parcel can actually reach it (dry top >= cloud base).
-     * Null if cumulus formation is not expected.
-     */
+    /** Cloud base altitude for cumulus formation, km ASL. Null if CCL is unavailable or unreachable. */
     val cloudBaseKm: Float?,
     /** Equilibrium level of the moist (saturated) parcel, km ASL. Null if no moist convection. */
     val moistEquilibriumTopKm: Float?,
@@ -176,28 +172,51 @@ fun analyzeParcel(
     // ── Find LCL: where dry adiabat parcel reaches saturation ──
     val lclResult = findLcl(parcelThetaK, surfaceMixingRatio, surfacePressureHpa, aboveSurface, elevationKm)
 
-    // ── Find CCL: where surface mixing ratio meets environmental temperature ──
-    val cclResult = findCcl(surfaceMixingRatio, aboveSurface, elevationKm)
-
-    val tconC = interpolateTemperatureCAtPressure(aboveSurface, cclResult.pressureHpa)?.let { envTempAtCcl ->
-        val thetaAtCcl = potentialTemperatureK(envTempAtCcl, cclResult.pressureHpa)
-        dryAdiabatTempC(thetaAtCcl, surfacePressureHpa)
-    }
+    val cclPrimary = analyzeCclHourly(
+        CclHourlyInput(
+            time = "",
+            surfaceTemperatureC = surfaceTemperatureC,
+            surfaceDewPointC = surfaceDewPointC,
+            surfacePressureHpa = surfacePressureHpa,
+            surfaceElevationM = elevationKm * 1000f,
+            pressureLevels = aboveSurface
+                .filter { abs(it.pressureHpa - surfacePressureHpa) > 1f || abs(it.heightKm - elevationKm) > 0.03f }
+                .map { level ->
+                    CclPressureLevel(
+                        pressureHpa = level.pressureHpa,
+                        temperatureC = level.temperatureC,
+                        dewPointC = level.dewPointC,
+                        heightMslM = level.heightKm * 1000f,
+                        isSynthetic = level.isSynthetic,
+                    )
+                },
+        ),
+    ).primaryCclResult()
+    val cclKm = cclPrimary?.cclHeightMslM?.div(1000f)
+    val cclPressureHpa = cclPrimary?.cclPressureHpa
+    val tconC = cclPrimary?.convectiveTemperatureC
 
     // ── Find dry thermal top: where dry adiabat parcel T < environment T ──
     val dryTopKm = findDryThermalTop(parcelThetaK, aboveSurface, elevationKm)
     val lclTemperatureC = dryAdiabatTempC(parcelThetaK, lclResult.pressureHpa)
 
     // ── Cloud base determination ──
-    val rawCloudBaseKm = maxOf(lclResult.heightKm, cclResult.heightKm)
-    val cloudBaseKm = if (dryTopKm >= rawCloudBaseKm - 0.05f) rawCloudBaseKm else null
+    val cloudBaseKm = if (
+        cclPrimary?.reachable == true &&
+        cclKm != null &&
+        dryTopKm >= cclKm - 0.05f
+    ) {
+        cclKm
+    } else {
+        null
+    }
 
-    // ── Moist ascent above LCL / cloud base ──
+    // ── Moist ascent above cloud base ──
     var moistEquilibriumTopKm: Float? = null
-    if (cloudBaseKm != null) {
+    if (cloudBaseKm != null && cclPrimary != null) {
         moistEquilibriumTopKm = findMoistEquilibriumTop(
-            lclTemperatureC = lclTemperatureC,
-            lclPressureHpa = lclResult.pressureHpa,
+            saturationPointTemperatureC = cclPrimary.cclTemperatureC ?: lclTemperatureC,
+            saturationPointPressureHpa = cclPrimary.cclPressureHpa ?: lclResult.pressureHpa,
             profile = aboveSurface,
             cloudBaseKm = cloudBaseKm,
         )
@@ -227,8 +246,8 @@ fun analyzeParcel(
         dryThermalTopKm = dryTopKm,
         lclKm = lclResult.heightKm,
         lclPressureHpa = lclResult.pressureHpa,
-        cclKm = cclResult.heightKm,
-        cclPressureHpa = cclResult.pressureHpa,
+        cclKm = cclKm,
+        cclPressureHpa = cclPressureHpa,
         tconC = tconC,
         cloudBaseKm = cloudBaseKm,
         moistEquilibriumTopKm = moistEquilibriumTopKm,
@@ -488,44 +507,6 @@ private fun findLcl(
 }
 
 /**
- * Finds the Convective Condensation Level: the altitude where the surface
- * mixing ratio line intersects the environmental temperature profile.
- */
-private fun findCcl(
-    surfaceMixingRatio: Float,
-    profile: List<ProfileLevel>,
-    elevationKm: Float,
-): PressureHeightResult {
-    var prevLevel: ProfileLevel? = null
-    for (level in profile) {
-        val envSatMr = satMixingRatioGKg(level.temperatureC, level.pressureHpa)
-        if (envSatMr <= surfaceMixingRatio) {
-            if (prevLevel != null) {
-                val prevEnvSatMr = satMixingRatioGKg(prevLevel.temperatureC, prevLevel.pressureHpa)
-                val frac = if ((prevEnvSatMr - envSatMr) > 0.001f) {
-                    (prevEnvSatMr - surfaceMixingRatio) / (prevEnvSatMr - envSatMr)
-                } else 0.5f
-                return PressureHeightResult(
-                    pressureHpa = prevLevel.pressureHpa + frac * (level.pressureHpa - prevLevel.pressureHpa),
-                    heightKm = (prevLevel.heightKm + frac * (level.heightKm - prevLevel.heightKm))
-                        .coerceAtLeast(elevationKm),
-                )
-            }
-            return PressureHeightResult(
-                pressureHpa = level.pressureHpa,
-                heightKm = level.heightKm.coerceAtLeast(elevationKm),
-            )
-        }
-        prevLevel = level
-    }
-    val top = profile.lastOrNull()
-    return PressureHeightResult(
-        pressureHpa = top?.pressureHpa ?: 0f,
-        heightKm = top?.heightKm ?: elevationKm,
-    )
-}
-
-/**
  * Finds the dry thermal top: the altitude where the dry-adiabat parcel
  * temperature falls below the environmental temperature.
  */
@@ -561,8 +542,8 @@ private fun findDryThermalTop(
  * falls below the environmental temperature above cloud base.
  */
 private fun findMoistEquilibriumTop(
-    lclTemperatureC: Float,
-    lclPressureHpa: Float,
+    saturationPointTemperatureC: Float,
+    saturationPointPressureHpa: Float,
     profile: List<ProfileLevel>,
     cloudBaseKm: Float,
 ): Float? {
@@ -572,15 +553,19 @@ private fun findMoistEquilibriumTop(
     var foundBuoyant = false
     var prevLevel: ProfileLevel? = null
     for (level in aboveCloudBase) {
-        val moistTemp = moistAdiabatTempFromPointC(lclTemperatureC, lclPressureHpa, level.pressureHpa)
+        val moistTemp = moistAdiabatTempFromPointC(
+            saturationPointTemperatureC,
+            saturationPointPressureHpa,
+            level.pressureHpa,
+        )
         if (moistTemp > level.temperatureC) {
             foundBuoyant = true
         } else if (foundBuoyant) {
             // Equilibrium level found
             if (prevLevel != null) {
                 val prevMoistTemp = moistAdiabatTempFromPointC(
-                    lclTemperatureC,
-                    lclPressureHpa,
+                    saturationPointTemperatureC,
+                    saturationPointPressureHpa,
                     prevLevel.pressureHpa,
                 )
                 val prevDiff = prevMoistTemp - prevLevel.temperatureC

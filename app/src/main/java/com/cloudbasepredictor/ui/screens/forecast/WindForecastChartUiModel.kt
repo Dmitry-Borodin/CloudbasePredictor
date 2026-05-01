@@ -1,5 +1,6 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import com.cloudbasepredictor.domain.forecast.CclHourlyResult
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin
@@ -24,6 +25,8 @@ data class WindForecastChartUiModel(
     val freezingLevelKm: List<WindLevelMarker> = emptyList(),
     /** Convective Condensation Level per hour, km ASL. */
     val cclKm: List<WindLevelMarker> = emptyList(),
+    /** Hourly CCL results for all available methods and hours. */
+    val cclResults: List<CclHourlyResult> = emptyList(),
 )
 
 /** Band boundaries around a data level for wind chart display. */

@@ -1,5 +1,6 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
+import android.util.Log
 import com.cloudbasepredictor.data.forecast.ForecastModeRepository
 import com.cloudbasepredictor.data.forecast.ForecastModelRepository
 import com.cloudbasepredictor.data.forecast.INITIAL_FORECAST_DAYS
@@ -370,6 +371,10 @@ class ForecastViewModel @Inject constructor(
         forecastLoadJob?.cancel()
         forecastLoadJob = viewModelScope.launch {
             isLoading.value = true
+            Log.i(
+                FORECAST_LOG_TAG,
+                "Loading forecast: place=${place.name} model=${model.apiName} days=$forecastDays forceRefresh=$forceRefresh",
+            )
             try {
                 loadForecastWindow(
                     place = place,
@@ -377,6 +382,16 @@ class ForecastViewModel @Inject constructor(
                     forecastDays = forecastDays,
                     forceRefresh = forceRefresh,
                 )
+                Log.i(
+                    FORECAST_LOG_TAG,
+                    "Forecast load finished: place=${place.name} model=${model.apiName} days=$forecastDays",
+                )
+            } catch (throwable: CancellationException) {
+                Log.i(
+                    FORECAST_LOG_TAG,
+                    "Forecast load cancelled: place=${place.name} model=${model.apiName}",
+                )
+                throw throwable
             } finally {
                 if (generation == forecastLoadGeneration) {
                     isLoading.value = false
@@ -410,11 +425,18 @@ class ForecastViewModel @Inject constructor(
                 throw throwable
             }
             val msg = throwable.message ?: "Unable to load forecast right now."
+            Log.e(
+                FORECAST_LOG_TAG,
+                "Forecast load failed; screen error=\"$msg\" place=${place.name} model=${model.apiName} days=$forecastDays forceRefresh=$forceRefresh",
+                throwable,
+            )
             errorMessage.value = msg
             _networkErrorEvent.tryEmit(msg)
         }
     }
 }
+
+private const val FORECAST_LOG_TAG = "ForecastViewModel"
 
 private data class ForecastChartContext(
     val selectedForecastMode: ForecastMode,
