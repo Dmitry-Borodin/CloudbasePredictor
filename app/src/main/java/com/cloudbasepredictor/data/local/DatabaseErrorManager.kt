@@ -2,12 +2,12 @@ package com.cloudbasepredictor.data.local
 
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import timber.log.Timber
 
 @Singleton
 class DatabaseErrorManager @Inject constructor(
@@ -17,7 +17,7 @@ class DatabaseErrorManager @Inject constructor(
     val showError: StateFlow<Boolean> = _showError
 
     fun reportError(error: Throwable) {
-        Log.e("DatabaseErrorManager", "Database error reported", error)
+        Timber.e(error, "Database error reported")
         _showError.value = true
     }
 

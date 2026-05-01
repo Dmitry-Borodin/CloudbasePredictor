@@ -121,6 +121,7 @@ dependencies {
     implementation(libs.okhttp.logging.interceptor)
     implementation(libs.retrofit.core)
     implementation(libs.retrofit.converter.kotlinx.serialization)
+    implementation(libs.timber)
 
     testImplementation(libs.junit)
 

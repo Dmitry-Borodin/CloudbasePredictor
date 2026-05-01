@@ -24,6 +24,35 @@
 # Keep domain models
 -keep class com.cloudbasepredictor.model.** { *; }
 
+# Strip release logging calls from accidental direct Log or Timber usage.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+    public static int w(...);
+    public static int e(...);
+    public static int wtf(...);
+    public static int println(...);
+}
+
+-assumenosideeffects class timber.log.Timber {
+    public static *** v(...);
+    public static *** d(...);
+    public static *** i(...);
+    public static *** w(...);
+    public static *** e(...);
+    public static *** wtf(...);
+}
+
+-assumenosideeffects class timber.log.Timber$Tree {
+    public *** v(...);
+    public *** d(...);
+    public *** i(...);
+    public *** w(...);
+    public *** e(...);
+    public *** wtf(...);
+}
+
 # Preserve line number information for debugging stack traces
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile

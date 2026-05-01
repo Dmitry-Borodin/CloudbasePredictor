@@ -1,6 +1,5 @@
 package com.cloudbasepredictor.data.forecast
 
-import android.util.Log
 import com.cloudbasepredictor.data.datasource.DataSourcePreference
 import com.cloudbasepredictor.data.datasource.DataSourceRepository
 import com.cloudbasepredictor.data.datasource.SimulatedForecastDataSource
@@ -26,6 +25,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import timber.log.Timber
 
 interface ForecastRepository {
     fun observeForecast(placeId: String, model: ForecastModel): Flow<ForecastSnapshot?>
@@ -169,10 +169,10 @@ class InMemoryForecastRepository @Inject constructor(
         try {
             val deleted = forecastCacheDao.deleteOlderThan(cutoffMillis)
             if (deleted > 0) {
-                Log.d("ForecastRepository", "Cleaned up $deleted old cached forecasts")
+                Timber.d("Cleaned up %d old cached forecasts", deleted)
             }
         } catch (e: Exception) {
-            Log.e("ForecastRepository", "Failed to clean up old forecasts", e)
+            Timber.e(e, "Failed to clean up old forecasts")
             handleDbError(e)
         }
     }
@@ -182,7 +182,7 @@ class InMemoryForecastRepository @Inject constructor(
         try {
             forecastCacheDao.deleteAll()
         } catch (e: Exception) {
-            Log.e("ForecastRepository", "Failed to clear forecast cache", e)
+            Timber.e(e, "Failed to clear forecast cache")
             handleDbError(e)
         }
     }
@@ -212,7 +212,7 @@ class InMemoryForecastRepository @Inject constructor(
                 modelGeneratedAtMillis = estimateModelRunTime(entity.fetchedAtMillis, resolvedModel),
             )
         } catch (e: Exception) {
-            Log.e("ForecastRepository", "Failed to load from DB cache", e)
+            Timber.e(e, "Failed to load from DB cache")
             handleDbError(e)
             null
         }
@@ -240,7 +240,7 @@ class InMemoryForecastRepository @Inject constructor(
             )
             forecastCacheDao.upsertForecast(entity)
         } catch (e: Exception) {
-            Log.e("ForecastRepository", "Failed to save to DB cache", e)
+            Timber.e(e, "Failed to save to DB cache")
             handleDbError(e)
         }
     }

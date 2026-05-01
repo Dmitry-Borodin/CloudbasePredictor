@@ -1,6 +1,5 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
-import android.util.Log
 import com.cloudbasepredictor.data.forecast.ForecastModeRepository
 import com.cloudbasepredictor.data.forecast.ForecastModelRepository
 import com.cloudbasepredictor.data.forecast.INITIAL_FORECAST_DAYS
@@ -38,6 +37,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 data class ForecastDayChipUiModel(
     val title: String,
@@ -371,9 +371,11 @@ class ForecastViewModel @Inject constructor(
         forecastLoadJob?.cancel()
         forecastLoadJob = viewModelScope.launch {
             isLoading.value = true
-            Log.i(
-                FORECAST_LOG_TAG,
-                "Loading forecast: place=${place.name} model=${model.apiName} days=$forecastDays forceRefresh=$forceRefresh",
+            Timber.i(
+                "Loading forecast: model=%s days=%d forceRefresh=%b",
+                model.apiName,
+                forecastDays,
+                forceRefresh,
             )
             try {
                 loadForecastWindow(
@@ -382,15 +384,13 @@ class ForecastViewModel @Inject constructor(
                     forecastDays = forecastDays,
                     forceRefresh = forceRefresh,
                 )
-                Log.i(
-                    FORECAST_LOG_TAG,
-                    "Forecast load finished: place=${place.name} model=${model.apiName} days=$forecastDays",
+                Timber.i(
+                    "Forecast load finished: model=%s days=%d",
+                    model.apiName,
+                    forecastDays,
                 )
             } catch (throwable: CancellationException) {
-                Log.i(
-                    FORECAST_LOG_TAG,
-                    "Forecast load cancelled: place=${place.name} model=${model.apiName}",
-                )
+                Timber.i("Forecast load cancelled: model=%s", model.apiName)
                 throw throwable
             } finally {
                 if (generation == forecastLoadGeneration) {
@@ -425,18 +425,18 @@ class ForecastViewModel @Inject constructor(
                 throw throwable
             }
             val msg = throwable.message ?: "Unable to load forecast right now."
-            Log.e(
-                FORECAST_LOG_TAG,
-                "Forecast load failed; screen error=\"$msg\" place=${place.name} model=${model.apiName} days=$forecastDays forceRefresh=$forceRefresh",
+            Timber.e(
                 throwable,
+                "Forecast load failed: model=%s days=%d forceRefresh=%b",
+                model.apiName,
+                forecastDays,
+                forceRefresh,
             )
             errorMessage.value = msg
             _networkErrorEvent.tryEmit(msg)
         }
     }
 }
-
-private const val FORECAST_LOG_TAG = "ForecastViewModel"
 
 private data class ForecastChartContext(
     val selectedForecastMode: ForecastMode,
