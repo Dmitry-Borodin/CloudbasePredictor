@@ -53,26 +53,32 @@ class ThermicForecastChartUiModelTest {
     }
 
     @Test
-    fun aggregatedForDisplay_keepsRawPressureLevelBoundaries() {
+    fun aggregatedForDisplay_pressureGridIgnoresTinyFinalPartialWhenChoosingStep() {
         val rawCells = listOf(
             ThermicForecastCellUiModel(
                 startMinuteOfDayLocal = 720,
-                startAltitudeKm = 0.45f,
-                endAltitudeKm = 0.82f,
+                startAltitudeKm = 0.50f,
+                endAltitudeKm = 0.75f,
                 strengthMps = 1.2f,
             ),
             ThermicForecastCellUiModel(
                 startMinuteOfDayLocal = 720,
-                startAltitudeKm = 0.82f,
-                endAltitudeKm = 1.46f,
+                startAltitudeKm = 0.75f,
+                endAltitudeKm = 1.00f,
                 strengthMps = 1.8f,
+            ),
+            ThermicForecastCellUiModel(
+                startMinuteOfDayLocal = 720,
+                startAltitudeKm = 1.00f,
+                endAltitudeKm = 1.03f,
+                strengthMps = 0.8f,
             ),
         )
         val chart = ThermicForecastChartUiModel(
             timeSlots = listOf(720),
             cells = rawCells,
             cloudMarkers = emptyList(),
-            pressureLevelAltitudesKm = listOf(0.82f, 1.46f),
+            pressureLevelAltitudesKm = listOf(0.75f, 1.00f),
         )
 
         val aggregated = chart.aggregatedForDisplay(

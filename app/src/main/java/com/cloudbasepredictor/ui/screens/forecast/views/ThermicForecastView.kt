@@ -611,6 +611,9 @@ private fun ThermicForecastGrid(
                 }
                 tooltipLines += "Conf ${formatConfidenceLabel(diag.confidence)}  limit " +
                     formatLimitingReasonLabel(diag.limitingReason)
+                if (diag.triggerExcessC > 0f || diag.dryTopExcessC > 0f) {
+                    tooltipLines += "Heat trigger ${formatSignedValue(diag.triggerExcessC)} dry ${formatSignedValue(diag.dryTopExcessC)}"
+                }
                 diag.cloudBaseKm?.let { cloudBaseKm ->
                     val moistTopKm = diag.moistEquilibriumTopKm
                     tooltipLines += if (moistTopKm != null && moistTopKm > cloudBaseKm + 0.1f) {
@@ -622,7 +625,7 @@ private fun ThermicForecastGrid(
                 }
                 val convectionDiagnostics = buildList {
                     diag.modelCapeJKg?.let { add("CAPE ${it.toInt()}") }
-                    diag.modelCinJKg?.let { add("CIN ${it.toInt()}") }
+                    diag.normalizedCinJKg?.let { add("CIN ${it.toInt()}") }
                     diag.liftedIndexC?.let { add("LI ${formatSignedValue(it)}") }
                 }
                 if (convectionDiagnostics.isNotEmpty()) {
@@ -757,24 +760,26 @@ private fun yToAltitude(
 
 private fun thermicStrengthColor(strengthMps: Float): Color {
     val clampedStrength = strengthMps.coerceIn(0f, MAX_THERMIC_STRENGTH_MPS)
-    val normalized = clampedStrength / MAX_THERMIC_STRENGTH_MPS
     val colorStops = listOf(
-        0f to Color(0xFFFCE0AE),
-        0.20f to Color(0xFFFFFF00),
-        0.40f to Color(0xFF00F6B2),
-        0.60f to Color(0xFF19C8E0),
-        0.80f to Color(0xFF6A95E6),
-        1f to Color(0xFF2015F3),
+        0.0f to Color(0xFFF5E8C8),
+        0.4f to Color(0xFFF8D05D),
+        0.8f to Color(0xFFEFA12F),
+        1.2f to Color(0xFFC9C939),
+        1.6f to Color(0xFF62C956),
+        2.0f to Color(0xFF00BFA5),
+        3.0f to Color(0xFF19C8E0),
+        4.0f to Color(0xFF6A95E6),
+        5.0f to Color(0xFF2015F3),
     )
 
-    val lowerStop = colorStops.lastOrNull { it.first <= normalized } ?: colorStops.first()
-    val upperStop = colorStops.firstOrNull { it.first >= normalized } ?: colorStops.last()
+    val lowerStop = colorStops.lastOrNull { it.first <= clampedStrength } ?: colorStops.first()
+    val upperStop = colorStops.firstOrNull { it.first >= clampedStrength } ?: colorStops.last()
 
     if (lowerStop.first == upperStop.first) {
         return lowerStop.second
     }
 
-    val fraction = (normalized - lowerStop.first) / (upperStop.first - lowerStop.first)
+    val fraction = (clampedStrength - lowerStop.first) / (upperStop.first - lowerStop.first)
     return lerp(lowerStop.second, upperStop.second, fraction)
 }
 

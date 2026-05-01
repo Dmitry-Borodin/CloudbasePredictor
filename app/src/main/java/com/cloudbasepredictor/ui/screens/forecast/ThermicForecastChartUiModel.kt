@@ -1,7 +1,11 @@
 package com.cloudbasepredictor.ui.screens.forecast
 
 import com.cloudbasepredictor.domain.forecast.ThermalForecastConfidence
+import com.cloudbasepredictor.domain.forecast.ThermalCloudBaseStatus
+import com.cloudbasepredictor.domain.forecast.ThermalForecastWarning
+import com.cloudbasepredictor.domain.forecast.ThermalLayerSourceQuality
 import com.cloudbasepredictor.domain.forecast.ThermalLimitingReason
+import com.cloudbasepredictor.domain.forecast.ThermalSourceLevel
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -65,10 +69,28 @@ data class ThermicSlotDiagnostics(
     val modelCapeJKg: Float?,
     /** Model-supplied convective inhibition, J/kg. */
     val modelCinJKg: Float? = null,
+    /** Model CIN normalized to positive inhibition, J/kg. */
+    val normalizedCinJKg: Float? = null,
     /** Model-supplied lifted index, °C. */
     val liftedIndexC: Float? = null,
     /** Model-supplied boundary-layer height, metres above ground. */
     val boundaryLayerHeightM: Float? = null,
+    /** Local thermal-bubble trigger excess above T2m, °C. */
+    val triggerExcessC: Float = 0f,
+    /** Nominal mixed-layer excess used for dry thermal top, °C. */
+    val dryTopExcessC: Float = 0f,
+    /** Time-smoothed shortwave radiation used for heating, W/m². */
+    val effectiveRadiationWm2: Float? = null,
+    /** Surface 2 m temperature used by the thermal forecast, °C. */
+    val surfaceTemperatureC: Float? = null,
+    /** Surface pressure used by the thermal forecast, hPa. */
+    val surfacePressureHpa: Float? = null,
+    /** Launch elevation, km ASL. */
+    val elevationKm: Float? = null,
+    /** Nominal dry-top parcel start temperature, °C. */
+    val parcelStartTemperatureC: Float? = null,
+    /** Nominal dry thermal top above launch elevation, metres AGL. */
+    val dryTopAglM: Float? = null,
     /** Legacy computed-energy field retained for compatibility; not used as model CAPE or a strength multiplier. */
     val computedCapeJKg: Float,
     /** Computed CIN from parcel analysis, J/kg. */
@@ -77,6 +99,12 @@ data class ThermicSlotDiagnostics(
     val lclKm: Float,
     /** CCL altitude, km ASL. Null if unavailable or not reachable. */
     val cclKm: Float?,
+    /** Cloud-base reachability and data availability status. */
+    val cloudBaseStatus: ThermalCloudBaseStatus = ThermalCloudBaseStatus.NO_CCL,
+    /** Forecast warnings affecting confidence or display clipping. */
+    val warnings: List<ThermalForecastWarning> = emptyList(),
+    /** Validated profile levels used by the thermal engine, including the local surface anchor. */
+    val usedPressureLevels: List<ThermalSourceLevel> = emptyList(),
 )
 
 data class ThermicForecastCellUiModel(
@@ -96,6 +124,18 @@ data class ThermicForecastCellUiModel(
     val updraftHighMps: Float = strengthMps,
     /** Confidence for this altitude band. */
     val confidence: ThermalForecastConfidence = ThermalForecastConfidence.MEDIUM,
+    /** Visual cell height in metres. */
+    val visualDepthM: Float = ((endAltitudeKm - startAltitudeKm) * 1000f).coerceAtLeast(0f),
+    /** Physical/evaluation depth used for updraft calculation in metres. */
+    val effectiveDepthM: Float = visualDepthM.coerceAtMost(280f),
+    /** Interpolated pressure at the visual bottom of this cell, hPa. */
+    val pressureBottomHpa: Float? = null,
+    /** Interpolated pressure at the visual top of this cell, hPa. */
+    val pressureTopHpa: Float? = null,
+    /** Data quality for profile interpolation used by this cell. */
+    val sourceQuality: ThermalLayerSourceQuality = ThermalLayerSourceQuality.REAL,
+    /** Cell-local warnings affecting interpretation. */
+    val warnings: List<ThermalForecastWarning> = emptyList(),
 )
 
 data class ThermicForecastCloudMarkerUiModel(
@@ -242,20 +282,18 @@ internal fun ThermicForecastChartUiModel.aggregatedForDisplay(
     if (timeSlots.isEmpty()) {
         return this
     }
-    // Real forecast data is already bounded by model pressure levels; keep those raw boundaries visible.
-    if (pressureLevelAltitudesKm.isNotEmpty()) {
-        return this
-    }
 
     val slotCount = timeBucketSlotCount.coerceAtLeast(1)
-    val baseAltitudeStepKm = cells.minOfOrNull { it.endAltitudeKm - it.startAltitudeKm }
-        ?.coerceAtLeast(THERMIC_ALTITUDE_STEP_KM)
-        ?: THERMIC_ALTITUDE_STEP_KM
+    val baseAltitudeStepKm = cells.representativeAltitudeStepKm()
     val altitudeStepMultiplier = maxOf(
         1,
         ceil(altitudeBucketStepKm / baseAltitudeStepKm).toInt(),
     )
-    val resolvedAltitudeBucketStepKm = baseAltitudeStepKm * altitudeStepMultiplier
+    val resolvedAltitudeBucketStepKm = if (pressureLevelAltitudesKm.isEmpty()) {
+        baseAltitudeStepKm * altitudeStepMultiplier
+    } else {
+        baseAltitudeStepKm
+    }
 
     if (slotCount == 1 && resolvedAltitudeBucketStepKm <= baseAltitudeStepKm + THERMIC_EPSILON) {
         return this
@@ -314,6 +352,20 @@ internal fun ThermicForecastChartUiModel.aggregatedForDisplay(
                             ),
                         ),
                         confidence = overlappingCells.lowestCellConfidence(),
+                        visualDepthM = ((nextAltitudeKm - currentAltitudeKm) * 1000f).coerceAtLeast(0f),
+                        effectiveDepthM = if (pressureLevelAltitudesKm.isEmpty()) {
+                            ((nextAltitudeKm - currentAltitudeKm) * 1000f).coerceAtLeast(0f)
+                        } else {
+                            overlappingCells.minOf { it.effectiveDepthM }
+                        },
+                        pressureBottomHpa = overlappingCells
+                            .minByOrNull(ThermicForecastCellUiModel::startAltitudeKm)
+                            ?.pressureBottomHpa,
+                        pressureTopHpa = overlappingCells
+                            .maxByOrNull(ThermicForecastCellUiModel::endAltitudeKm)
+                            ?.pressureTopHpa,
+                        sourceQuality = overlappingCells.lowestSourceQuality(),
+                        warnings = overlappingCells.flatMap { it.warnings }.distinct(),
                     )
                 }
 
@@ -362,16 +414,45 @@ internal fun ThermicForecastChartUiModel.aggregatedForDisplay(
             modelCinJKg = slotDiags.mapNotNull { it.modelCinJKg }.let {
                 if (it.isEmpty()) null else it.average().toFloat()
             },
+            normalizedCinJKg = slotDiags.mapNotNull { it.normalizedCinJKg }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
             liftedIndexC = slotDiags.mapNotNull { it.liftedIndexC }.let {
                 if (it.isEmpty()) null else it.average().toFloat()
             },
             boundaryLayerHeightM = slotDiags.mapNotNull { it.boundaryLayerHeightM }.let {
                 if (it.isEmpty()) null else it.average().toFloat()
             },
+            triggerExcessC = slotDiags.map { it.triggerExcessC }.average().toFloat(),
+            dryTopExcessC = slotDiags.map { it.dryTopExcessC }.average().toFloat(),
+            effectiveRadiationWm2 = slotDiags.mapNotNull { it.effectiveRadiationWm2 }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
+            surfaceTemperatureC = slotDiags.mapNotNull { it.surfaceTemperatureC }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
+            surfacePressureHpa = slotDiags.mapNotNull { it.surfacePressureHpa }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
+            elevationKm = slotDiags.mapNotNull { it.elevationKm }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
+            parcelStartTemperatureC = slotDiags.mapNotNull { it.parcelStartTemperatureC }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
+            dryTopAglM = slotDiags.mapNotNull { it.dryTopAglM }.let {
+                if (it.isEmpty()) null else it.average().toFloat()
+            },
             computedCapeJKg = slotDiags.map { it.computedCapeJKg }.average().toFloat(),
             computedCinJKg = slotDiags.map { it.computedCinJKg }.average().toFloat(),
             lclKm = slotDiags.map { it.lclKm }.average().toFloat(),
             cclKm = slotDiags.mapNotNull { it.cclKm }.takeIf { it.isNotEmpty() }?.average()?.toFloat(),
+            cloudBaseStatus = slotDiags.maxByOrNull { it.cloudBaseStatus.ordinal }?.cloudBaseStatus
+                ?: ThermalCloudBaseStatus.NO_CCL,
+            warnings = slotDiags.flatMap { it.warnings }.distinct(),
+            usedPressureLevels = slotDiags.firstOrNull { it.usedPressureLevels.isNotEmpty() }
+                ?.usedPressureLevels
+                ?: emptyList(),
         )
     }
 
@@ -410,8 +491,21 @@ private fun List<ThermicForecastCellUiModel>.weightedAverageValue(
     }
 }
 
+private fun List<ThermicForecastCellUiModel>.representativeAltitudeStepKm(): Float {
+    val steps = map { (it.endAltitudeKm - it.startAltitudeKm).coerceAtLeast(0f) }
+        .filter { it > THERMIC_EPSILON }
+    if (steps.isEmpty()) return THERMIC_ALTITUDE_STEP_KM
+    val nonPartialSteps = steps.filter { it >= THERMIC_DISPLAY_MIN_FULL_BIN_KM }
+    return (nonPartialSteps.minOrNull() ?: steps.maxOrNull() ?: THERMIC_ALTITUDE_STEP_KM)
+        .coerceAtLeast(THERMIC_ALTITUDE_STEP_KM)
+}
+
 private fun List<ThermicForecastCellUiModel>.lowestCellConfidence(): ThermalForecastConfidence {
     return maxByOrNull { it.confidence.ordinal }?.confidence ?: ThermalForecastConfidence.LOW
+}
+
+private fun List<ThermicForecastCellUiModel>.lowestSourceQuality(): ThermalLayerSourceQuality {
+    return maxByOrNull { it.sourceQuality.ordinal }?.sourceQuality ?: ThermalLayerSourceQuality.REAL
 }
 
 private fun List<ThermicSlotDiagnostics>.lowestDiagnosticConfidence(): ThermalForecastConfidence {
@@ -434,6 +528,7 @@ private fun roundDisplayedStrength(value: Float): Float {
 private const val FORECAST_TIME_SLOT_STEP_MINUTES = 15
 private const val MINUTES_PER_HOUR = 60
 private const val THERMIC_ALTITUDE_STEP_KM = 0.05f
+private const val THERMIC_DISPLAY_MIN_FULL_BIN_KM = 0.10f
 private const val THERMIC_CLOUD_BASE_CLEARANCE_KM = 0.05f
 private const val MAX_THERMIC_STRENGTH_MPS = 10f
 private const val THERMIC_EPSILON = 0.0001f

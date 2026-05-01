@@ -77,11 +77,23 @@ data class ProfileLevel(
 data class SurfaceHeatingInput(
     val hourOfDay: Int,
     val shortwaveRadiationWm2: Float?,
+    val previousShortwaveRadiationWm2: Float? = null,
     val cloudCoverLowPercent: Float?,
     val cloudCoverMidPercent: Float?,
     val cloudCoverHighPercent: Float?,
     val precipitationMm: Float?,
     val isDay: Boolean?,
+)
+
+/**
+ * Separates local trigger heating from the smaller excess that should be transported aloft.
+ */
+data class SurfaceHeatingEstimate(
+    val triggerExcessC: Float,
+    val conservativeDryTopExcessC: Float,
+    val nominalDryTopExcessC: Float,
+    val optimisticDryTopExcessC: Float,
+    val effectiveRadiationWm2: Float?,
 )
 
 // ────────────────────────────────────────────────────────────────────
@@ -309,6 +321,38 @@ fun estimateSurfaceHeating(input: SurfaceHeatingInput): Float {
 
     val heating = baseHeating * (1f - cloudPenalty) * (1f - precipPenalty)
     return heating.coerceIn(MIN_DAYTIME_SURFACE_HEATING_C, MAX_SURFACE_HEATING_C)
+}
+
+/**
+ * Estimates thermal-trigger excess and the smaller entrainment-aware excess used for dry-top.
+ *
+ * Open-Meteo shortwave radiation is an hourly mean for the preceding hour. Blend the current
+ * and previous values lightly so a single timestamp is not treated as an instantaneous flux.
+ */
+fun estimateThermalHeatingEstimate(input: SurfaceHeatingInput): SurfaceHeatingEstimate {
+    val effectiveRadiation = when {
+        input.shortwaveRadiationWm2 != null && input.previousShortwaveRadiationWm2 != null ->
+            (input.shortwaveRadiationWm2 * 0.65f) + (input.previousShortwaveRadiationWm2 * 0.35f)
+        else -> input.shortwaveRadiationWm2
+    }
+    val triggerExcess = estimateSurfaceHeating(
+        input.copy(shortwaveRadiationWm2 = effectiveRadiation),
+    )
+    val precipitation = input.precipitationMm ?: 0f
+    val lowCloud = input.cloudCoverLowPercent ?: 100f
+    val optimisticAllowed = precipitation <= 0.1f && lowCloud < 40f
+    val optimisticExcess = if (optimisticAllowed) {
+        (triggerExcess * 0.80f).coerceAtMost(5f)
+    } else {
+        (triggerExcess * 0.55f).coerceAtMost(3f)
+    }
+    return SurfaceHeatingEstimate(
+        triggerExcessC = triggerExcess,
+        conservativeDryTopExcessC = (triggerExcess * 0.35f).coerceAtMost(2f),
+        nominalDryTopExcessC = (triggerExcess * 0.55f).coerceAtMost(3f),
+        optimisticDryTopExcessC = optimisticExcess,
+        effectiveRadiationWm2 = effectiveRadiation,
+    )
 }
 
 /** Simple solar elevation factor peaking at 13:00 local. */

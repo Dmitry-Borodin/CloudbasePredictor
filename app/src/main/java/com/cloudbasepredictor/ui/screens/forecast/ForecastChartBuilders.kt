@@ -128,6 +128,10 @@ internal fun buildStuveChartFromData(
     val heatingInput = SurfaceHeatingInput(
         hourOfDay = hourPoint.hour,
         shortwaveRadiationWm2 = hourPoint.shortwaveRadiationWm2?.toFloat(),
+        previousShortwaveRadiationWm2 = dayPoints
+            .firstOrNull { it.hour == hourPoint.hour - 1 }
+            ?.shortwaveRadiationWm2
+            ?.toFloat(),
         cloudCoverLowPercent = hourPoint.cloudCoverLowPercent?.toFloat(),
         cloudCoverMidPercent = hourPoint.cloudCoverMidPercent?.toFloat(),
         cloudCoverHighPercent = hourPoint.cloudCoverHighPercent?.toFloat(),
@@ -199,6 +203,7 @@ internal fun buildThermicChartFromData(
     val cloudMarkers = mutableListOf<ThermicForecastCloudMarkerUiModel>()
     val diagnostics = mutableListOf<ThermicSlotDiagnostics>()
     val pressureLevelAltitudesKm = sortedSetOf<Float>()
+    val dayPointsByHour = dayPoints.associateBy { it.hour }
 
     daytimePoints.forEach { hp ->
         val startMinute = hp.hour * 60
@@ -209,9 +214,9 @@ internal fun buildThermicChartFromData(
         val surfacePressure = hp.surfacePressureHpa?.toFloat()
             ?: estimateSurfacePressure(elevation)
 
-        // Build the thermic profile from the real model pressure-level boundaries plus an explicit surface level.
+        // Build the thermic profile from model pressure levels plus an explicit local surface anchor.
         val pressureProfile = hp.pressureLevels
-            .filter { it.geopotentialHeightM != null && !it.isSynthetic }
+            .filter { it.geopotentialHeightM != null }
             .map { pl ->
                 ProfileLevel(
                     pressureHpa = pl.pressureHpa.toFloat(),
@@ -242,12 +247,15 @@ internal fun buildThermicChartFromData(
 
         if (profile.size < 2) return@forEach
         pressureProfile
-            .filter { it.heightKm >= elevationKm - 0.01f }
+            .filter { it.heightKm >= elevationKm - 0.01f && !it.isSynthetic }
             .forEach { pressureLevelAltitudesKm += it.heightKm }
 
         val heatingInput = SurfaceHeatingInput(
             hourOfDay = hp.hour,
             shortwaveRadiationWm2 = hp.shortwaveRadiationWm2?.toFloat(),
+            previousShortwaveRadiationWm2 = dayPointsByHour[hp.hour - 1]
+                ?.shortwaveRadiationWm2
+                ?.toFloat(),
             cloudCoverLowPercent = hp.cloudCoverLowPercent?.toFloat(),
             cloudCoverMidPercent = hp.cloudCoverMidPercent?.toFloat(),
             cloudCoverHighPercent = hp.cloudCoverHighPercent?.toFloat(),
@@ -285,6 +293,12 @@ internal fun buildThermicChartFromData(
                 updraftNominalMps = layer.updraftNominalMps,
                 updraftHighMps = layer.updraftHighMps,
                 confidence = confidence,
+                visualDepthM = layer.visualDepthM,
+                effectiveDepthM = layer.effectiveDepthM,
+                pressureBottomHpa = layer.pressureBottomHpa,
+                pressureTopHpa = layer.pressureTopHpa,
+                sourceQuality = layer.sourceQuality,
+                warnings = layer.warnings,
             )
         }
 
@@ -305,12 +319,24 @@ internal fun buildThermicChartFromData(
             moistEquilibriumTopKm = forecast.moistEquilibriumTopKm,
             modelCapeJKg = forecast.modelCapeJKg,
             modelCinJKg = forecast.modelCinJKg,
+            normalizedCinJKg = forecast.normalizedCinJKg,
             liftedIndexC = forecast.liftedIndexC,
             boundaryLayerHeightM = forecast.boundaryLayerHeightM,
+            triggerExcessC = forecast.triggerExcessC,
+            dryTopExcessC = forecast.dryTopExcessC,
+            effectiveRadiationWm2 = forecast.effectiveRadiationWm2,
+            surfaceTemperatureC = forecast.surfaceTemperatureC,
+            surfacePressureHpa = forecast.surfacePressureHpa,
+            elevationKm = forecast.elevationKm,
+            parcelStartTemperatureC = forecast.parcelStartTemperatureC,
+            dryTopAglM = forecast.dryTopAglM,
             computedCapeJKg = forecast.thermalEnergyJKg,
-            computedCinJKg = 0f,
+            computedCinJKg = forecast.computedCinJKg,
             lclKm = forecast.lclKm,
             cclKm = forecast.cclKm,
+            cloudBaseStatus = forecast.cloudBaseStatus,
+            warnings = forecast.warnings,
+            usedPressureLevels = forecast.usedPressureLevels,
         )
     }
 

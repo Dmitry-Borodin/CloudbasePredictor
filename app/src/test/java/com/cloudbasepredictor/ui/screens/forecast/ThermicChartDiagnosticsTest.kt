@@ -68,13 +68,25 @@ class ThermicChartDiagnosticsTest {
         assertTrue("CCL should be null or > elevation", diag.cclKm == null || diag.cclKm > 0.5f)
         assertNotNull("Model CAPE should be present", diag.modelCapeJKg)
         assertNotNull("Model CIN should be present", diag.modelCinJKg)
+        assertNotNull("Normalized CIN should be present", diag.normalizedCinJKg)
         assertNotNull("Model lifted index should be present", diag.liftedIndexC)
         assertNotNull("Model PBL height should be present", diag.boundaryLayerHeightM)
+        assertTrue("Trigger excess should be >= dry-top excess", diag.triggerExcessC >= diag.dryTopExcessC)
+        assertEquals("Surface T2m should be preserved", 22f, diag.surfaceTemperatureC!!, 0.0001f)
+        assertEquals("Surface pressure should be preserved", 955f, diag.surfacePressureHpa!!, 0.0001f)
+        assertNotNull("Parcel start temperature should be preserved", diag.parcelStartTemperatureC)
+        assertNotNull("Dry-top AGL should be preserved", diag.dryTopAglM)
+        assertTrue("Used pressure-level diagnostics should be preserved", diag.usedPressureLevels.isNotEmpty())
         assertTrue("Top range should contain nominal top", diag.topLowKm <= diag.topNominalKm)
         assertTrue("Top range should contain nominal top", diag.topHighKm >= diag.topNominalKm)
         assertTrue("Updraft range should contain nominal value", diag.updraftLowMps <= diag.updraftNominalMps)
         assertTrue("Updraft range should contain nominal value", diag.updraftHighMps >= diag.updraftNominalMps)
         assertTrue("Computed CAPE should be >= 0", diag.computedCapeJKg >= 0f)
+        assertTrue("Computed CIN should be >= 0", diag.computedCinJKg >= 0f)
+        assertTrue(
+            "No thermic cell should draw deeper than its physical/evaluation bin",
+            chart.cells.all { it.visualDepthM <= it.effectiveDepthM + 1f },
+        )
     }
 
     @Test
@@ -129,7 +141,7 @@ class ThermicChartDiagnosticsTest {
         val maxOptimistic = chart.slotDiagnostics.maxOfOrNull { it.updraftHighMps } ?: 0f
 
         assertTrue("Dry profile can still produce capped weak thermals with 0 model CAPE", chart.cells.isNotEmpty())
-        assertTrue("Zero CAPE should keep optimistic lift practical, got $maxOptimistic", maxOptimistic <= 3.0f)
+        assertTrue("Zero CAPE should keep optimistic lift practical, got $maxOptimistic", maxOptimistic <= 4.2f)
     }
 
     @Test

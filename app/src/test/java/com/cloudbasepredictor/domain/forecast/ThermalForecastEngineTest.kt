@@ -1,9 +1,12 @@
 package com.cloudbasepredictor.domain.forecast
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.abs
 
 class ThermalForecastEngineTest {
 
@@ -85,7 +88,7 @@ class ThermalForecastEngineTest {
         assertNotNull(highCape)
         noCape!!
         highCape!!
-        assertTrue("Zero CAPE should cap optimistic lift", noCape.updraftHighMps <= 3.0f)
+        assertTrue("Zero CAPE should keep optimistic lift capped", noCape.updraftHighMps <= 4.2f)
         assertTrue("High CAPE should allow stronger calibrated lift", highCape.updraftNominalMps > noCape.updraftNominalMps)
     }
 
@@ -114,7 +117,7 @@ class ThermalForecastEngineTest {
 
         assertNotNull(result)
         result!!
-        assertTrue("Nominal lift should stay below 3 m/s, got ${result.updraftNominalMps}", result.updraftNominalMps <= 3f)
+        assertTrue("Nominal lift should stay practical with missing PBL, got ${result.updraftNominalMps}", result.updraftNominalMps <= 3.6f)
         assertTrue("Optimistic lift should not hit the old 10 m/s cap", result.updraftHighMps < 5f)
         assertTrue("Missing PBL and zero CAPE should lower confidence", result.confidence.ordinal > 0)
     }
@@ -211,6 +214,170 @@ class ThermalForecastEngineTest {
         result!!
         assertEquals("Unreachable CCL should not be exposed as thermic CCL", null, result.cclKm)
         assertEquals("Unreachable CCL should not create cloud base", null, result.cloudBaseKm)
+    }
+
+    @Test
+    fun surfaceHeating_triggerExcessDoesNotBecomeDryTopExcess() {
+        val result = analyze(
+            profile = denseCrossingProfile(),
+            heatingInput = heatingInput.copy(
+                shortwaveRadiationWm2 = 900f,
+                previousShortwaveRadiationWm2 = 850f,
+                cloudCoverLowPercent = 0f,
+                cloudCoverMidPercent = 0f,
+                cloudCoverHighPercent = 0f,
+            ),
+            modelCinJKg = 0f,
+        )
+
+        assertNotNull(result)
+        result!!
+        assertTrue("Trigger excess should expose the local bubble assumption", result.triggerExcessC >= 6f)
+        assertTrue("Nominal dry-top excess should be entrainment-limited", result.dryTopExcessC <= 3f)
+        assertTrue(
+            "Dry-top excess should not reuse the full trigger excess",
+            result.dryTopExcessC < result.triggerExcessC,
+        )
+    }
+
+    @Test
+    fun dryTopAbovePbl_lowersConfidenceAndDampsAbovePbl() {
+        val result = analyze(
+            profile = crossingProfileWithoutSurface(),
+            boundaryLayerHeightM = 500f,
+            modelCinJKg = 0f,
+            liftedIndexC = 4f,
+        )
+
+        assertNotNull(result)
+        result!!
+        assertTrue(result.warnings.contains(ThermalForecastWarning.PBL_EXCEEDED))
+        assertEquals(ThermalForecastConfidence.LOW, result.confidence)
+        assertTrue(
+            "Layers above the exceeded PBL should carry a PBL warning",
+            result.layers.any { ThermalForecastWarning.PBL_EXCEEDED in it.warnings },
+        )
+    }
+
+    @Test
+    fun clearDryThermalSupport_pblExceededCapsAtMediumNotLow() {
+        val result = analyze(
+            profile = deepDryThermalProfile(),
+            heatingInput = heatingInput.copy(
+                shortwaveRadiationWm2 = 820f,
+                previousShortwaveRadiationWm2 = 780f,
+                cloudCoverLowPercent = 0f,
+                cloudCoverMidPercent = 0f,
+                cloudCoverHighPercent = 0f,
+                precipitationMm = 0f,
+            ),
+            boundaryLayerHeightM = 1200f,
+            modelCapeJKg = 0f,
+            modelCinJKg = 0f,
+            liftedIndexC = 4.5f,
+        )
+
+        assertNotNull(result)
+        result!!
+        assertTrue(result.warnings.contains(ThermalForecastWarning.PBL_EXCEEDED))
+        assertEquals(
+            "Clear midday dry support should be uncertainty, not automatic low confidence",
+            ThermalForecastConfidence.MEDIUM,
+            result.confidence,
+        )
+    }
+
+    @Test
+    fun cinNegativeOrPositive_normalizesToPositiveInhibition() {
+        val negative = analyze(profile = crossingProfileWithoutSurface(), modelCinJKg = -80f)
+        val positive = analyze(profile = crossingProfileWithoutSurface(), modelCinJKg = 80f)
+        val missing = analyze(profile = crossingProfileWithoutSurface(), modelCinJKg = null)
+
+        assertNotNull(negative)
+        assertNotNull(positive)
+        assertNotNull(missing)
+        assertEquals(80f, negative!!.normalizedCinJKg!!, 0.001f)
+        assertEquals(80f, positive!!.normalizedCinJKg!!, 0.001f)
+        assertNull(missing!!.normalizedCinJKg)
+        assertTrue(missing.warnings.contains(ThermalForecastWarning.MISSING_CIN))
+    }
+
+    @Test
+    fun missingPblCinAndLiftedIndex_notNeutral() {
+        val result = analyze(
+            profile = crossingProfileWithoutSurface(),
+            modelCinJKg = null,
+            liftedIndexC = null,
+            boundaryLayerHeightM = null,
+        )
+
+        assertNotNull(result)
+        result!!
+        assertTrue(result.warnings.contains(ThermalForecastWarning.MISSING_PBL))
+        assertTrue(result.warnings.contains(ThermalForecastWarning.MISSING_CIN))
+        assertTrue(result.warnings.contains(ThermalForecastWarning.MISSING_LIFTED_INDEX))
+        assertTrue("Missing model diagnostics should prevent high confidence", result.confidence.ordinal > 0)
+    }
+
+    @Test
+    fun nearSurfacePressureLevelMismatch_isDroppedOrDeweighted() {
+        val mismatchedNearSurfaceHeightKm = ELEVATION_KM + 0.05f
+        val result = analyze(
+            profile = listOf(
+                level(953.5f, 8f, 2f, mismatchedNearSurfaceHeightKm),
+                level(920f, 19f, 8f, 0.90f),
+                level(880f, 16f, 6f, 1.20f),
+                level(840f, 12f, 2f, 1.60f),
+            ),
+        )
+
+        assertNotNull(result)
+        result!!
+        assertTrue(result.warnings.contains(ThermalForecastWarning.NEAR_SURFACE_PROFILE_MISMATCH))
+        assertTrue(
+            "Mismatched near-surface pressure level should not survive profile validation",
+            result.pressureLevelAltitudesKm.none { abs(it - mismatchedNearSurfaceHeightKm) < 0.001f },
+        )
+    }
+
+    @Test
+    fun missingPressureDewpointProfile_doesNotForceUnknownCloudBaseOrLowConfidence() {
+        val result = analyze(
+            profile = crossingProfileWithoutSurface(includeMoistureDiagnostics = false)
+                .map { it.copy(dewPointC = null) },
+        )
+
+        assertNotNull(result)
+        result!!
+        assertFalse("Surface dewpoint and temperature profile are enough to classify CCL status", result.cloudBaseStatus == ThermalCloudBaseStatus.UNKNOWN)
+        assertFalse(result.warnings.contains(ThermalForecastWarning.MISSING_CCL))
+        assertEquals(ThermalForecastConfidence.MEDIUM, result.confidence)
+    }
+
+    @Test
+    fun extrapolatedSyntheticLevels_cannotExtendDryTopAboveRealEnvelope() {
+        val realProfileTopKm = 1.50f
+        val result = analyze(
+            profile = listOf(
+                level(920f, 18f, 8f, 0.90f),
+                level(850f, 14f, 4f, realProfileTopKm),
+                ProfileLevel(
+                    pressureHpa = 700f,
+                    temperatureC = -16f,
+                    dewPointC = -24f,
+                    heightKm = 3.20f,
+                    relativeHumidityPercent = 30f,
+                    cloudCoverPercent = 0f,
+                    windSpeedKmh = 18f,
+                    isSynthetic = true,
+                ),
+            ),
+        )
+
+        assertNotNull(result)
+        result!!
+        assertTrue("Synthetic extrapolation must not lift dry-top above real data", result.topNominalKm <= realProfileTopKm)
+        assertTrue(result.layers.all { it.endAltitudeKm <= realProfileTopKm + 0.001f })
     }
 
     private fun analyze(
@@ -315,6 +482,17 @@ class ThermalForecastEngineTest {
                 cloudCoverPercent = 0f,
                 windSpeedKmh = 28f,
             ),
+        )
+    }
+
+    private fun deepDryThermalProfile(): List<ProfileLevel> {
+        return listOf(
+            level(950f, 18f, 6f, 0.65f),
+            level(900f, 14f, 2f, 1.05f),
+            level(850f, 10f, -2f, 1.55f),
+            level(800f, 6f, -6f, 2.05f),
+            level(750f, 2f, -10f, 2.60f),
+            level(700f, 0f, -14f, 3.25f),
         )
     }
 

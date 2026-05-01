@@ -11,11 +11,11 @@ import org.junit.Test
 class ThermicChartPressureLevelBoundariesTest {
 
     /**
-     * The thermic chart builder should use actual pressure-level geopotential heights
-     * as cell boundaries, not fixed-step altitudes.
+     * The thermic chart builder should expose pressure-level heights as diagnostic grid lines,
+     * while thermal cells use uniform AGL bins so coarse pressure bands do not overdraw lift.
      */
     @Test
-    fun cellBoundaries_matchPressureLevelHeights() {
+    fun thermalCells_useUniformAglBinsAndPressureLevelsRemainGridLines() {
         val elevationM = 500.0
 
         // Pressure levels with known geopotential heights
@@ -122,6 +122,14 @@ class ThermicChartPressureLevelBoundariesTest {
             assertTrue(
                 "Cell end ${cell.endAltitudeKm} should be <= max profile height $maxHeightKm",
                 cell.endAltitudeKm <= maxHeightKm + 0.02f,
+            )
+            assertTrue(
+                "Cell visual depth ${cell.visualDepthM}m should stay within one thermic bin",
+                cell.visualDepthM <= 251f,
+            )
+            assertTrue(
+                "Cell visual depth ${cell.visualDepthM}m should not exceed effective depth ${cell.effectiveDepthM}m",
+                cell.visualDepthM <= cell.effectiveDepthM + 1f,
             )
         }
         assertEquals(
