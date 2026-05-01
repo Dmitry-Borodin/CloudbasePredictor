@@ -8,6 +8,34 @@ plugins {
 
 val requestedTasks = gradle.startParameter.taskNames
 val apkArchiveName = "CloudbasePredictor"
+val buildAbiSplitApks = requestedTasks.none { it.contains("bundle", ignoreCase = true) }
+val abiVersionCodeOffsets = linkedMapOf(
+    "armeabi-v7a" to 1,
+    "arm64-v8a" to 2,
+    "x86" to 3,
+    "x86_64" to 4,
+)
+val requestedAbiFilters = providers.gradleProperty("ABI_FILTERS")
+    .orNull
+    ?.split(",")
+    ?.map { it.trim() }
+    ?.filter { it.isNotEmpty() }
+    .orEmpty()
+val activeAbiVersionCodeOffsets = if (requestedAbiFilters.isEmpty()) {
+    abiVersionCodeOffsets
+} else {
+    linkedMapOf<String, Int>().apply {
+        requestedAbiFilters.forEach { abi ->
+            put(
+                abi,
+                requireNotNull(abiVersionCodeOffsets[abi]) {
+                    "Unsupported ABI_FILTERS value: $abi"
+                }
+            )
+        }
+    }
+}
+val universalVersionCodeOffset = 9
 
 android {
     namespace = "com.cloudbasepredictor"
@@ -21,8 +49,8 @@ android {
         applicationId = "com.cloudbasepredictor"
         minSdk = 25
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.0.3"
+        versionCode = 4
+        versionName = "0.0.4"
 
         testInstrumentationRunner = "com.cloudbasepredictor.HiltTestRunner"
 
@@ -75,6 +103,15 @@ android {
         compose = true
     }
 
+    splits {
+        abi {
+            isEnable = buildAbiSplitApks
+            reset()
+            include(*activeAbiVersionCodeOffsets.keys.toTypedArray())
+            isUniversalApk = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -83,18 +120,37 @@ android {
 
 androidComponents {
     onVariants { variant ->
-        val output = variant.outputs.single()
-        val version = requireNotNull(output.versionName.orNull) {
-            "versionName must be set to name APK outputs"
-        }
-        val buildTypeName = requireNotNull(variant.buildType) {
-            "buildType must be set to name APK outputs"
-        }
-        val buildTypeSuffix = if (buildTypeName == "release") "" else "_$buildTypeName"
+        variant.outputs.forEach { output ->
+            val version = requireNotNull(output.versionName.orNull) {
+                "versionName must be set to name APK outputs"
+            }
+            val baseVersionCode = requireNotNull(output.versionCode.orNull) {
+                "versionCode must be set to assign APK output version codes"
+            }
+            val buildTypeName = requireNotNull(variant.buildType) {
+                "buildType must be set to name APK outputs"
+            }
+            val buildTypeSuffix = if (buildTypeName == "release") "" else "_$buildTypeName"
+            val abi = output.filters
+                .find {
+                    it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI
+                }
+                ?.identifier
+            val abiSuffix = abi?.let { "_$it" }.orEmpty()
 
-        (output as com.android.build.api.variant.impl.VariantOutputImpl).outputFileName.set(
-            "${apkArchiveName}_v${version}${buildTypeSuffix}.apk"
-        )
+            val versionCodeOffset = if (abi != null) {
+                requireNotNull(abiVersionCodeOffsets[abi]) {
+                    "Unsupported ABI split output: $abi"
+                }
+            } else {
+                universalVersionCodeOffset
+            }
+            output.versionCode.set(baseVersionCode * 10 + versionCodeOffset)
+
+            (output as com.android.build.api.variant.impl.VariantOutputImpl).outputFileName.set(
+                "${apkArchiveName}_v${version}${abiSuffix}${buildTypeSuffix}.apk"
+            )
+        }
     }
 }
 

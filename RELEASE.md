@@ -19,6 +19,11 @@ versionName = "0.0.1"  // Human-readable version string
 
 **Both** must be updated for every release. `versionCode` must always increase.
 
+Release APKs are split per ABI. The `versionCode` in `app/build.gradle.kts`
+is the base release code; generated ABI APKs use `versionCode * 10 + ABI offset`
+and the AAB/unfiltered artifact uses `versionCode * 10 + 9`. ABI splits are
+enabled for APK builds and disabled for app bundle builds.
+
 ## Prerequisites
 
 ### Signing Keystore
@@ -82,10 +87,11 @@ Edit `metadata/com.cloudbasepredictor.yml`:
 
 ```yaml
 CurrentVersion: 0.1.0
-CurrentVersionCode: 2
+CurrentVersionCode: 24  # highest generated ABI APK code when versionCode = 2
 ```
 
-Add a new build entry under `Builds:` matching the new version.
+Add new build entries under `Builds:` for each ABI APK: `armeabi-v7a`,
+`arm64-v8a`, `x86`, and `x86_64`.
 
 ### 3. Run tests locally
 
@@ -108,8 +114,8 @@ git push origin master --tags
 Pushing the tag triggers the **Release** workflow (`.github/workflows/release.yml`):
 
 1. Runs unit tests
-2. Builds signed APK and AAB
-3. Creates a GitHub Release with the APK and AAB attached
+2. Builds signed ABI APKs and AAB
+3. Creates a GitHub Release with the APKs and AAB attached
 4. Optionally publishes the AAB to Google Play internal track
 
 ### 6. Promote on Google Play
@@ -145,4 +151,4 @@ export KEY_PASSWORD=<password> # same as KEYSTORE_PASSWORD for the PKCS12 comman
 ./gradlew :app:assembleRelease
 ```
 
-The signed APK will be at `app/build/outputs/apk/release/app-release.apk`.
+The signed ABI APKs will be at `app/build/outputs/apk/release/`.
