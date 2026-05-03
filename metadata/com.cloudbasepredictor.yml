@@ -14,6 +14,14 @@ Repo: https://github.com/CloudbasePredictor/CloudbasePredictor.git
 
 Builds:
   - versionName: 0.0.4
+    versionCode: 40
+    commit: v0.0.4
+    subdir: app
+    output: build/outputs/apk/release/CloudbasePredictor_v0.0.4_universal.apk
+    gradle:
+      - yes
+
+  - versionName: 0.0.4
     versionCode: 41
     commit: v0.0.4
     subdir: app
@@ -56,6 +64,7 @@ Builds:
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v
 VercodeOperation:
+  - 10 * %c
   - 10 * %c + 1
   - 10 * %c + 2
   - 10 * %c + 3

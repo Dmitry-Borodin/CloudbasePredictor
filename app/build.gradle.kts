@@ -9,6 +9,7 @@ plugins {
 val requestedTasks = gradle.startParameter.taskNames
 val apkArchiveName = "CloudbasePredictor"
 val buildAbiSplitApks = requestedTasks.none { it.contains("bundle", ignoreCase = true) }
+val buildUniversalApk = buildAbiSplitApks && !providers.gradleProperty("ABI_FILTERS").isPresent
 val abiVersionCodeOffsets = linkedMapOf(
     "armeabi-v7a" to 1,
     "arm64-v8a" to 2,
@@ -35,7 +36,7 @@ val activeAbiVersionCodeOffsets = if (requestedAbiFilters.isEmpty()) {
         }
     }
 }
-val universalVersionCodeOffset = 9
+val universalVersionCodeOffset = 0
 
 android {
     namespace = "com.cloudbasepredictor"
@@ -108,7 +109,7 @@ android {
             isEnable = buildAbiSplitApks
             reset()
             include(*activeAbiVersionCodeOffsets.keys.toTypedArray())
-            isUniversalApk = false
+            isUniversalApk = buildUniversalApk
         }
     }
 
@@ -136,7 +137,7 @@ androidComponents {
                     it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI
                 }
                 ?.identifier
-            val abiSuffix = abi?.let { "_$it" }.orEmpty()
+            val outputSuffix = abi?.let { "_$it" } ?: "_universal"
 
             val versionCodeOffset = if (abi != null) {
                 requireNotNull(abiVersionCodeOffsets[abi]) {
@@ -148,7 +149,7 @@ androidComponents {
             output.versionCode.set(baseVersionCode * 10 + versionCodeOffset)
 
             (output as com.android.build.api.variant.impl.VariantOutputImpl).outputFileName.set(
-                "${apkArchiveName}_v${version}${abiSuffix}${buildTypeSuffix}.apk"
+                "${apkArchiveName}_v${version}${outputSuffix}${buildTypeSuffix}.apk"
             )
         }
     }

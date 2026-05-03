@@ -20,9 +20,11 @@ versionName = "0.0.1"  // Human-readable version string
 **Both** must be updated for every release. `versionCode` must always increase.
 
 Release APKs are split per ABI. The `versionCode` in `app/build.gradle.kts`
-is the base release code; generated ABI APKs use `versionCode * 10 + ABI offset`
-and the AAB/unfiltered artifact uses `versionCode * 10 + 9`. ABI splits are
-enabled for APK builds and disabled for app bundle builds.
+is the base release code. The universal APK uses `versionCode * 10`, and
+generated ABI APKs use `versionCode * 10 + ABI offset`. The universal APK code
+is intentionally lower than the ABI APK codes so stores prefer ABI-specific APKs
+when a device is compatible. ABI splits are enabled for APK builds and disabled
+for app bundle builds.
 
 ## Prerequisites
 
@@ -87,11 +89,11 @@ Edit `metadata/com.cloudbasepredictor.yml`:
 
 ```yaml
 CurrentVersion: 0.1.0
-CurrentVersionCode: 24  # highest generated ABI APK code when versionCode = 2
+CurrentVersionCode: 24  # highest generated APK code when versionCode = 2
 ```
 
-Add new build entries under `Builds:` for each ABI APK: `armeabi-v7a`,
-`arm64-v8a`, `x86`, and `x86_64`.
+Add new build entries under `Builds:` for the universal APK and each ABI APK:
+`armeabi-v7a`, `arm64-v8a`, `x86`, and `x86_64`.
 
 ### 3. Run tests locally
 
@@ -151,4 +153,4 @@ export KEY_PASSWORD=<password> # same as KEYSTORE_PASSWORD for the PKCS12 comman
 ./gradlew :app:assembleRelease
 ```
 
-The signed ABI APKs will be at `app/build/outputs/apk/release/`.
+The signed universal and ABI APKs will be at `app/build/outputs/apk/release/`.
