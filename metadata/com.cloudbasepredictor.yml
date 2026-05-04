@@ -14,20 +14,12 @@ Repo: https://github.com/CloudbasePredictor/CloudbasePredictor.git
 
 Builds:
   - versionName: 0.0.4
-    versionCode: 40
-    commit: v0.0.4
-    subdir: app
-    output: build/outputs/apk/release/CloudbasePredictor_v0.0.4_universal.apk
-    gradle:
-      - yes
-
-  - versionName: 0.0.4
     versionCode: 41
     commit: v0.0.4
     subdir: app
-    output: build/outputs/apk/release/CloudbasePredictor_v0.0.4_armeabi-v7a.apk
     gradle:
       - yes
+    output: build/outputs/apk/release/CloudbasePredictor_v$$VERSION$$_armeabi-v7a.apk
     gradleprops:
       - ABI_FILTERS=armeabi-v7a
 
@@ -35,9 +27,9 @@ Builds:
     versionCode: 42
     commit: v0.0.4
     subdir: app
-    output: build/outputs/apk/release/CloudbasePredictor_v0.0.4_arm64-v8a.apk
     gradle:
       - yes
+    output: build/outputs/apk/release/CloudbasePredictor_v$$VERSION$$_arm64-v8a.apk
     gradleprops:
       - ABI_FILTERS=arm64-v8a
 
@@ -45,9 +37,9 @@ Builds:
     versionCode: 43
     commit: v0.0.4
     subdir: app
-    output: build/outputs/apk/release/CloudbasePredictor_v0.0.4_x86.apk
     gradle:
       - yes
+    output: build/outputs/apk/release/CloudbasePredictor_v$$VERSION$$_x86.apk
     gradleprops:
       - ABI_FILTERS=x86
 
@@ -55,16 +47,15 @@ Builds:
     versionCode: 44
     commit: v0.0.4
     subdir: app
-    output: build/outputs/apk/release/CloudbasePredictor_v0.0.4_x86_64.apk
     gradle:
       - yes
+    output: build/outputs/apk/release/CloudbasePredictor_v$$VERSION$$_x86_64.apk
     gradleprops:
       - ABI_FILTERS=x86_64
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v
 VercodeOperation:
-  - 10 * %c
   - 10 * %c + 1
   - 10 * %c + 2
   - 10 * %c + 3

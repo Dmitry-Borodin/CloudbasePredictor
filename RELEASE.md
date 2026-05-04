@@ -89,11 +89,14 @@ Edit `metadata/com.cloudbasepredictor.yml`:
 
 ```yaml
 CurrentVersion: 0.1.0
-CurrentVersionCode: 24  # highest generated APK code when versionCode = 2
+CurrentVersionCode: 24  # highest F-Droid ABI APK code when versionCode = 2
 ```
 
-Add new build entries under `Builds:` for the universal APK and each ABI APK:
-`armeabi-v7a`, `arm64-v8a`, `x86`, and `x86_64`.
+Add new build entries under `Builds:` for each F-Droid ABI APK:
+`armeabi-v7a`, `arm64-v8a`, `x86`, and `x86_64`. Do not include the universal
+APK in F-Droid metadata; it is only published with the GitHub release. Use
+F-Droid's `$$VERSION$$` placeholder in `output` paths instead of hardcoding
+`versionName`.
 
 ### 3. Run tests locally
 
