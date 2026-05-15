@@ -175,6 +175,7 @@ fun ForecastScreen(
                 ForecastMapPanel(
                     currentPlace = uiState.selectedPlace,
                     favoritePlaces = uiState.favoritePlaces,
+                    mapLayer = uiState.mapLayer,
                     onLocationChanged = onMapLocationChanged,
                     initiallyExpanded = initiallyExpandedMap,
                     onPanelHeightChanged = { mapPanelHeightPx = it },

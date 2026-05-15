@@ -10,6 +10,8 @@ import androidx.lifecycle.viewModelScope
 import com.cloudbasepredictor.data.forecast.ForecastRepository
 import com.cloudbasepredictor.data.forecast.exposedForecastDayCount
 import com.cloudbasepredictor.data.forecast.requestedForecastDaysForDayIndex
+import com.cloudbasepredictor.data.map.MapLayerPreference
+import com.cloudbasepredictor.data.map.MapLayerRepository
 import com.cloudbasepredictor.data.place.PlaceRepository
 import com.cloudbasepredictor.data.units.DisplayUnits
 import com.cloudbasepredictor.data.units.UnitPreset
@@ -93,6 +95,8 @@ data class ForecastUiState(
     val elevationKm: Float = 0f,
     /** Favorite places to show on the forecast map panel. */
     val favoritePlaces: List<SavedPlace> = emptyList(),
+    /** Selected map base layer shared with the main map screen. */
+    val mapLayer: MapLayerPreference = MapLayerPreference.OPENFREEMAP,
     /** Unit preset selected in Settings. */
     val unitPreset: UnitPreset = UnitPreset.METRIC_KMH,
     /** Resolved display units for the active preset. */
@@ -107,6 +111,7 @@ class ForecastViewModel @Inject constructor(
     private val forecastModeRepository: ForecastModeRepository,
     private val forecastModelRepository: ForecastModelRepository,
     private val forecastViewportRepository: ForecastViewportRepository,
+    private val mapLayerRepository: MapLayerRepository,
     private val unitSettingsRepository: UnitSettingsRepository,
 ) : ViewModel() {
     private val selectedDayIndex = MutableStateFlow(0)
@@ -159,6 +164,18 @@ class ForecastViewModel @Inject constructor(
         )
     }
 
+    private val mapAndUnitPreferences = combine(
+        mapLayerRepository.selectedLayer,
+        unitSettingsRepository.unitPreset,
+        unitSettingsRepository.displayUnits,
+    ) { mapLayer, unitPreset, displayUnits ->
+        MapAndUnitPreferences(
+            mapLayer = mapLayer,
+            unitPreset = unitPreset,
+            displayUnits = displayUnits,
+        )
+    }
+
     private val uiInputs = combine(
         selectedPlace,
         selectedForecast,
@@ -179,9 +196,8 @@ class ForecastViewModel @Inject constructor(
         uiInputs,
         forecastModelRepository.selectedModel,
         placeRepository.observeFavoritePlaces(),
-        unitSettingsRepository.unitPreset,
-        unitSettingsRepository.displayUnits,
-    ) { inputs, currentModel, favorites, unitPreset, displayUnits ->
+        mapAndUnitPreferences,
+    ) { inputs, currentModel, favorites, preferences ->
         val place = inputs.place
         val snapshot = inputs.snapshot
         val currentChartContext = inputs.chartContext
@@ -244,8 +260,9 @@ class ForecastViewModel @Inject constructor(
             modelGeneratedAtMillis = snapshot?.modelGeneratedAtMillis,
             elevationKm = (snapshot?.hourlyData?.elevation ?: 0.0).toFloat() / 1000f,
             favoritePlaces = favorites,
-            unitPreset = unitPreset,
-            displayUnits = displayUnits,
+            mapLayer = preferences.mapLayer,
+            unitPreset = preferences.unitPreset,
+            displayUnits = preferences.displayUnits,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -464,6 +481,12 @@ private data class ForecastUiInputs(
     val chartContext: ForecastChartContext,
     val isLoading: Boolean,
     val errorMessage: String?,
+)
+
+private data class MapAndUnitPreferences(
+    val mapLayer: MapLayerPreference,
+    val unitPreset: UnitPreset,
+    val displayUnits: DisplayUnits,
 )
 
 private fun buildForecastText(

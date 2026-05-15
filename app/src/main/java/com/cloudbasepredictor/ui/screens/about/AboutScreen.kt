@@ -155,9 +155,27 @@ fun AboutScreen(
                         title = stringResource(R.string.about_openstreetmap),
                         url = "https://www.openstreetmap.org/copyright",
                     ),
+                    DataSourceLink(
+                        title = stringResource(R.string.about_nasa_gibs),
+                        url = "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api",
+                    ),
+                    DataSourceLink(
+                        title = stringResource(R.string.about_esri_world_imagery),
+                        url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+                    ),
+                    DataSourceLink(
+                        title = stringResource(R.string.about_esri_attribution),
+                        url = "https://developers.arcgis.com/documentation/esri-and-data-attribution/",
+                    ),
                 ),
                 linkColor = linkColor,
                 onOpenUrl = ::openUrl,
+            )
+
+            Text(
+                text = stringResource(R.string.map_attribution_esri_world_imagery_full),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             DataSourceLinkRow(

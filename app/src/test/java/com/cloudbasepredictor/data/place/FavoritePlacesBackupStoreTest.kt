@@ -1,6 +1,7 @@
 package com.cloudbasepredictor.data.place
 
 import android.content.SharedPreferences
+import com.cloudbasepredictor.data.map.MapLayerPreference
 import com.cloudbasepredictor.data.units.UnitPreset
 import com.cloudbasepredictor.model.SavedPlace
 import kotlinx.serialization.json.Json
@@ -37,7 +38,7 @@ class FavoritePlacesBackupStoreTest {
         )
 
         val payload = prefs.getString("payload", null).orEmpty()
-        assertTrue(payload.contains("\"schemaVersion\":2"))
+        assertTrue(payload.contains("\"schemaVersion\":3"))
         assertTrue(payload.contains("\"name\":\"Interlaken\""))
         assertTrue(payload.contains("\"latitude\":46.6863"))
         assertTrue(payload.contains("\"longitude\":7.8632"))
@@ -144,6 +145,49 @@ class FavoritePlacesBackupStoreTest {
     }
 
     @Test
+    fun readMapLayer_returnsSavedMapLayer() {
+        prefs.edit()
+            .putString(
+                "payload",
+                """
+                    {
+                      "schemaVersion": 3,
+                      "places": [],
+                      "mapLayer": "ESRI_WORLD_IMAGERY"
+                    }
+                """.trimIndent(),
+            )
+            .apply()
+
+        assertEquals(MapLayerPreference.ESRI_WORLD_IMAGERY, store.readMapLayer())
+    }
+
+    @Test
+    fun readMapLayer_missingOrUnknownValue_returnsNullWithoutBreakingFavorites() {
+        prefs.edit()
+            .putString(
+                "payload",
+                """
+                    {
+                      "schemaVersion": 3,
+                      "places": [
+                        {
+                          "name": "Interlaken",
+                          "latitude": 46.68634,
+                          "longitude": 7.86321
+                        }
+                      ],
+                      "mapLayer": "UNKNOWN_LAYER"
+                    }
+                """.trimIndent(),
+            )
+            .apply()
+
+        assertEquals(null, store.readMapLayer())
+        assertEquals("Interlaken", store.readFavoritePlaces().single().name)
+    }
+
+    @Test
     fun saveFavoritePlaces_preservesExistingUnitPreset() {
         store.saveUnitPreset(UnitPreset.AVIATION)
 
@@ -161,6 +205,26 @@ class FavoritePlacesBackupStoreTest {
 
         assertEquals(UnitPreset.AVIATION, store.readUnitPreset())
         assertTrue(prefs.getString("payload", null).orEmpty().contains("\"unitPreset\":\"AVIATION\""))
+    }
+
+    @Test
+    fun saveFavoritePlaces_preservesExistingMapLayer() {
+        store.saveMapLayer(MapLayerPreference.NASA_GIBS)
+
+        store.saveFavoritePlaces(
+            listOf(
+                SavedPlace(
+                    id = "custom-id",
+                    name = "Interlaken",
+                    latitude = 46.6863,
+                    longitude = 7.8632,
+                    isFavorite = true,
+                ),
+            ),
+        )
+
+        assertEquals(MapLayerPreference.NASA_GIBS, store.readMapLayer())
+        assertTrue(prefs.getString("payload", null).orEmpty().contains("\"mapLayer\":\"NASA_GIBS\""))
     }
 
     @Test
@@ -184,6 +248,38 @@ class FavoritePlacesBackupStoreTest {
     }
 
     @Test
+    fun saveUnitPreset_preservesExistingMapLayer() {
+        store.saveMapLayer(MapLayerPreference.NASA_GIBS)
+
+        store.saveUnitPreset(UnitPreset.METRIC_MPS)
+
+        assertEquals(UnitPreset.METRIC_MPS, store.readUnitPreset())
+        assertEquals(MapLayerPreference.NASA_GIBS, store.readMapLayer())
+    }
+
+    @Test
+    fun saveMapLayer_preservesExistingFavoritePlacesAndUnitPreset() {
+        store.saveFavoritePlaces(
+            listOf(
+                SavedPlace(
+                    id = "custom-id",
+                    name = "Interlaken",
+                    latitude = 46.6863,
+                    longitude = 7.8632,
+                    isFavorite = true,
+                ),
+            ),
+        )
+        store.saveUnitPreset(UnitPreset.AVIATION)
+
+        store.saveMapLayer(MapLayerPreference.NASA_GIBS)
+
+        assertEquals(MapLayerPreference.NASA_GIBS, store.readMapLayer())
+        assertEquals(UnitPreset.AVIATION, store.readUnitPreset())
+        assertEquals("Interlaken", store.readFavoritePlaces().single().name)
+    }
+
+    @Test
     fun backupPreferencesFileName_isStableForRestoringExistingBackups() {
         // Do not change this file name: Google Auto Backup restores data by file path,
         // so renaming it would strand favorites saved by older app versions.
@@ -201,6 +297,7 @@ class FavoritePlacesBackupStoreTest {
 
         assertEquals(emptyList<SavedPlace>(), store.readFavoritePlaces())
         assertEquals(null, store.readUnitPreset())
+        assertEquals(null, store.readMapLayer())
     }
 
     private fun assertBackupRulesReferenceStableFileName(path: String) {

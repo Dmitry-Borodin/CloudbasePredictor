@@ -18,6 +18,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -42,9 +43,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.BuildConfig
 import com.cloudbasepredictor.R
+import com.cloudbasepredictor.data.map.MapLayerPreference
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.components.MapAttributionOverlay
 import com.cloudbasepredictor.ui.components.MapFavoriteLabelsOverlay
+import com.cloudbasepredictor.ui.map.MapRasterBaseLayer
+import com.cloudbasepredictor.ui.map.mapBaseStyle
+import com.cloudbasepredictor.ui.map.mapLayerAttributionDetailRes
+import com.cloudbasepredictor.ui.map.mapLayerAttributionRes
 import com.cloudbasepredictor.ui.screens.forecast.views.ForecastInformationView
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import kotlinx.coroutines.flow.collectLatest
@@ -59,12 +65,10 @@ import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.OrnamentOptions
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
-import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.util.ClickResult
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.roundToInt
 
-private const val MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
 private const val DRAG_HANDLE_HEIGHT_DP = 24
 private const val MAP_INITIAL_ZOOM = 12.0
 private const val SNAP_THRESHOLD_FRACTION = 0.25f
@@ -80,6 +84,7 @@ private const val GEOJSON_PROPERTY_NAME = "name"
 fun ForecastMapPanel(
     currentPlace: SavedPlace?,
     favoritePlaces: List<SavedPlace>,
+    mapLayer: MapLayerPreference = MapLayerPreference.OPENFREEMAP,
     onLocationChanged: (latitude: Double, longitude: Double) -> Unit,
     modifier: Modifier = Modifier,
     maxFraction: Float = 1f / 3f,
@@ -136,6 +141,14 @@ fun ForecastMapPanel(
     var lastUpdateTimeMs by remember { mutableLongStateOf(0L) }
     var isRateLimited by remember { mutableStateOf(false) }
     var mapLoadError by rememberSaveable { mutableStateOf<String?>(null) }
+    val mapAttributionText = stringResource(mapLayerAttributionRes(mapLayer))
+    val mapAttributionDetailText = mapLayerAttributionDetailRes(mapLayer)?.let { detailRes ->
+        stringResource(detailRes)
+    }
+
+    LaunchedEffect(mapLayer) {
+        mapLoadError = null
+    }
 
     LaunchedEffect(mapLoadError) {
         val error = mapLoadError ?: return@LaunchedEffect
@@ -233,50 +246,54 @@ fun ForecastMapPanel(
                             .padding(top = DRAG_HANDLE_HEIGHT_DP.dp)
                             .fillMaxSize(),
                     ) {
-                        MaplibreMap(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)),
-                            baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
-                            cameraState = cameraState,
-                            options = MapOptions(
-                                ornamentOptions = OrnamentOptions.AllDisabled,
-                            ),
-                            onMapLoadFailed = { reason ->
-                                mapLoadError = reason?.takeIf { it.isNotBlank() } ?: mapUnavailableMessage
-                            },
-                            onMapLoadFinished = {
-                                mapLoadError = null
-                            },
-                            onMapClick = { _, _ -> ClickResult.Consume },
-                        ) {
-                            // Favorites markers (below selected marker)
-                            val favoritesData = buildFavoritesGeoJson(favoritePlaces)
-                            val favoritesSource = rememberGeoJsonSource(
-                                data = GeoJsonData.JsonString(favoritesData),
-                            )
-                            CircleLayer(
-                                id = "forecast-favorite-points",
-                                source = favoritesSource,
-                                color = const(Color(0xFFFFD700)),
-                                radius = const(6.dp),
-                                strokeColor = const(Color.White),
-                                strokeWidth = const(2.dp),
-                            )
+                        key(mapLayer) {
+                            MaplibreMap(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)),
+                                baseStyle = mapBaseStyle(mapLayer),
+                                cameraState = cameraState,
+                                options = MapOptions(
+                                    ornamentOptions = OrnamentOptions.AllDisabled,
+                                ),
+                                onMapLoadFailed = { reason ->
+                                    mapLoadError = reason?.takeIf { it.isNotBlank() } ?: mapUnavailableMessage
+                                },
+                                onMapLoadFinished = {
+                                    mapLoadError = null
+                                },
+                                onMapClick = { _, _ -> ClickResult.Consume },
+                            ) {
+                                MapRasterBaseLayer(mapLayer)
 
-                            // Selected place marker (on top)
-                            val markerData = currentPlace?.let(::buildPlaceGeoJson) ?: emptyGeoJson()
-                            val markerSource = rememberGeoJsonSource(
-                                data = GeoJsonData.JsonString(markerData),
-                            )
-                            CircleLayer(
-                                id = "forecast-selected-point",
-                                source = markerSource,
-                                color = const(Color(0xFFE64A5B)),
-                                radius = const(7.dp),
-                                strokeColor = const(Color.White),
-                                strokeWidth = const(2.dp),
-                            )
+                                // Favorites markers (below selected marker)
+                                val favoritesData = buildFavoritesGeoJson(favoritePlaces)
+                                val favoritesSource = rememberGeoJsonSource(
+                                    data = GeoJsonData.JsonString(favoritesData),
+                                )
+                                CircleLayer(
+                                    id = "forecast-favorite-points",
+                                    source = favoritesSource,
+                                    color = const(Color(0xFFFFD700)),
+                                    radius = const(6.dp),
+                                    strokeColor = const(Color.White),
+                                    strokeWidth = const(2.dp),
+                                )
+
+                                // Selected place marker (on top)
+                                val markerData = currentPlace?.let(::buildPlaceGeoJson) ?: emptyGeoJson()
+                                val markerSource = rememberGeoJsonSource(
+                                    data = GeoJsonData.JsonString(markerData),
+                                )
+                                CircleLayer(
+                                    id = "forecast-selected-point",
+                                    source = markerSource,
+                                    color = const(Color(0xFFE64A5B)),
+                                    radius = const(7.dp),
+                                    strokeColor = const(Color.White),
+                                    strokeWidth = const(2.dp),
+                                )
+                            }
                         }
 
                         MapFavoriteLabelsOverlay(
@@ -303,6 +320,8 @@ fun ForecastMapPanel(
                         )
 
                         MapAttributionOverlay(
+                            text = mapAttributionText,
+                            detailText = mapAttributionDetailText,
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
                                 .padding(end = 8.dp, bottom = 8.dp),

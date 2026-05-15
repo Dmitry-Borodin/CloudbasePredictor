@@ -16,14 +16,18 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -48,10 +52,15 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.BuildConfig
 import com.cloudbasepredictor.R
+import com.cloudbasepredictor.data.map.MapLayerPreference
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.components.FavoritesListDialog
 import com.cloudbasepredictor.ui.components.MapAttributionOverlay
 import com.cloudbasepredictor.ui.components.MapFavoriteLabelsOverlay
+import com.cloudbasepredictor.ui.map.MapRasterBaseLayer
+import com.cloudbasepredictor.ui.map.mapBaseStyle
+import com.cloudbasepredictor.ui.map.mapLayerAttributionDetailRes
+import com.cloudbasepredictor.ui.map.mapLayerAttributionRes
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import kotlinx.coroutines.flow.collectLatest
@@ -67,12 +76,10 @@ import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.OrnamentOptions
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
-import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.util.ClickResult
 import org.maplibre.spatialk.geojson.Feature
 import org.maplibre.spatialk.geojson.Position
 
-private const val MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
 private const val GEOJSON_PROPERTY_NAME = "name"
 private const val GEOJSON_PROPERTY_PLACE_ID = "placeId"
 private const val FAVORITE_POINTS_LAYER_ID = "favorite-points"
@@ -101,6 +108,7 @@ fun MapRoute(
         onFavoriteClick = viewModel::openForecastForPlace,
         onSaveCameraPosition = viewModel::saveCameraPosition,
         onOpenSettings = onOpenSettings,
+        onMapLayerSelected = viewModel::selectMapLayer,
     )
 }
 
@@ -113,6 +121,7 @@ fun MapScreen(
     onFavoriteClick: (SavedPlace) -> Unit,
     onSaveCameraPosition: (Double, Double, Double) -> Unit,
     onOpenSettings: () -> Unit = {},
+    onMapLayerSelected: (MapLayerPreference) -> Unit = {},
     autoOpenFavoritesOnStartup: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
@@ -160,6 +169,15 @@ fun MapScreen(
 
     var showFavoritesDialog by rememberSaveable { mutableStateOf(false) }
     var didAutoOpenFavoritesDialog by rememberSaveable { mutableStateOf(false) }
+    var showMapLayerMenu by rememberSaveable { mutableStateOf(false) }
+    val mapAttributionText = stringResource(mapLayerAttributionRes(uiState.mapLayer))
+    val mapAttributionDetailText = mapLayerAttributionDetailRes(uiState.mapLayer)?.let { detailRes ->
+        stringResource(detailRes)
+    }
+
+    LaunchedEffect(uiState.mapLayer) {
+        mapLoadError = null
+    }
 
     LaunchedEffect(autoOpenFavoritesOnStartup, uiState.favoritePlaces.size) {
         if (
@@ -176,10 +194,10 @@ fun MapScreen(
         modifier = modifier.fillMaxSize(),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            key(mapRetryKey) {
+            key(mapRetryKey, uiState.mapLayer) {
                 MaplibreMap(
                     modifier = Modifier.fillMaxSize(),
-                    baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
+                    baseStyle = mapBaseStyle(uiState.mapLayer),
                     cameraState = cameraState,
                     options = MapOptions(
                         ornamentOptions = OrnamentOptions.AllDisabled,
@@ -208,6 +226,8 @@ fun MapScreen(
                         ClickResult.Consume
                     },
                 ) {
+                    MapRasterBaseLayer(uiState.mapLayer)
+
                     val favoritesSource = rememberGeoJsonSource(
                         data = GeoJsonData.JsonString(favoritesData),
                     )
@@ -277,21 +297,66 @@ fun MapScreen(
             }
         }
 
-        FloatingActionButton(
-            onClick = onOpenSettings,
+        Column(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(end = 12.dp, top = 42.dp)
-                .size(40.dp),
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+                .padding(end = 12.dp, top = 42.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.End,
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Settings,
-                contentDescription = stringResource(R.string.cd_settings),
-            )
+            FloatingActionButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.size(40.dp),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = stringResource(R.string.cd_settings),
+                )
+            }
+
+            Box {
+                FloatingActionButton(
+                    onClick = { showMapLayerMenu = true },
+                    modifier = Modifier.size(40.dp),
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                    contentColor = if (uiState.mapLayer != MapLayerPreference.OPENFREEMAP) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Layers,
+                        contentDescription = stringResource(R.string.cd_map_layer),
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showMapLayerMenu,
+                    onDismissRequest = { showMapLayerMenu = false },
+                ) {
+                    MapLayerPreference.entries.forEach { layer ->
+                        DropdownMenuItem(
+                            text = { Text(text = stringResource(layer.labelRes())) },
+                            leadingIcon = {
+                                RadioButton(
+                                    selected = layer == uiState.mapLayer,
+                                    onClick = null,
+                                )
+                            },
+                            onClick = {
+                                onMapLayerSelected(layer)
+                                showMapLayerMenu = false
+                            },
+                        )
+                    }
+                }
+            }
         }
 
         val selectedPlace = uiState.selectedPlace
@@ -301,25 +366,26 @@ fun MapScreen(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 32.dp),
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                MapAttributionOverlay()
                 SelectedPointCard(
                     selectedPlace = selectedPlace,
                     onOpenForecast = onOpenForecast,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-        } else {
-            MapAttributionOverlay(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(end = 8.dp, bottom = 4.dp),
-            )
         }
+
+        MapAttributionOverlay(
+            text = mapAttributionText,
+            detailText = mapAttributionDetailText,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(end = 8.dp, bottom = 4.dp),
+        )
     }
 
     if (showFavoritesDialog) {
@@ -332,6 +398,14 @@ fun MapScreen(
 }
 
 private const val MIN_FAVORITES_FOR_STARTUP_DIALOG = 3
+
+private fun MapLayerPreference.labelRes(): Int {
+    return when (this) {
+        MapLayerPreference.OPENFREEMAP -> R.string.map_layer_openfreemap
+        MapLayerPreference.NASA_GIBS -> R.string.map_layer_nasa_gibs
+        MapLayerPreference.ESRI_WORLD_IMAGERY -> R.string.map_layer_esri_world_imagery
+    }
+}
 
 @Composable
 private fun MapUnavailableCard(

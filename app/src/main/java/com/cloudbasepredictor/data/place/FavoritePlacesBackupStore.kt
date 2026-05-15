@@ -1,6 +1,7 @@
 package com.cloudbasepredictor.data.place
 
 import android.content.SharedPreferences
+import com.cloudbasepredictor.data.map.MapLayerPreference
 import com.cloudbasepredictor.data.units.UnitPreset
 import com.cloudbasepredictor.di.FavoritePlacesBackupPreferences
 import com.cloudbasepredictor.model.SavedPlace
@@ -58,6 +59,7 @@ class FavoritePlacesBackupStore @Inject constructor(
                     )
                 },
             unitPreset = existingPayload?.unitPreset,
+            mapLayer = existingPayload?.mapLayer,
         )
         savePayload(payload)
     }
@@ -73,6 +75,23 @@ class FavoritePlacesBackupStore @Inject constructor(
             FavoritePlacesBackupPayload(
                 places = existingPayload?.places.orEmpty(),
                 unitPreset = JsonPrimitive(unitPreset.name),
+                mapLayer = existingPayload?.mapLayer,
+            ),
+        )
+    }
+
+    fun readMapLayer(): MapLayerPreference? {
+        val mapLayerName = (readPayload()?.mapLayer as? JsonPrimitive)?.contentOrNull ?: return null
+        return runCatching { MapLayerPreference.valueOf(mapLayerName) }.getOrNull()
+    }
+
+    fun saveMapLayer(mapLayer: MapLayerPreference) {
+        val existingPayload = readPayload()
+        savePayload(
+            FavoritePlacesBackupPayload(
+                places = existingPayload?.places.orEmpty(),
+                unitPreset = existingPayload?.unitPreset,
+                mapLayer = JsonPrimitive(mapLayer.name),
             ),
         )
     }
@@ -103,9 +122,10 @@ class FavoritePlacesBackupStore @Inject constructor(
 @OptIn(ExperimentalSerializationApi::class)
 private data class FavoritePlacesBackupPayload(
     @EncodeDefault
-    val schemaVersion: Int = 2,
+    val schemaVersion: Int = 3,
     val places: List<FavoritePlaceBackupEntry> = emptyList(),
     val unitPreset: JsonElement? = null,
+    val mapLayer: JsonElement? = null,
 )
 
 @Serializable

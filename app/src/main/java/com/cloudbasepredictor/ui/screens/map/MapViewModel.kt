@@ -3,6 +3,8 @@ package com.cloudbasepredictor.ui.screens.map
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cloudbasepredictor.data.map.MapLayerPreference
+import com.cloudbasepredictor.data.map.MapLayerRepository
 import com.cloudbasepredictor.data.place.PlaceRepository
 import com.cloudbasepredictor.model.SavedPlace
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,6 +29,7 @@ data class MapUiState(
     val selectedPlace: SavedPlace? = null,
     val favoritePlaces: List<SavedPlace> = emptyList(),
     val initialCamera: MapCameraData? = null,
+    val mapLayer: MapLayerPreference = MapLayerPreference.OPENFREEMAP,
 )
 
 sealed interface MapEvent {
@@ -36,6 +39,7 @@ sealed interface MapEvent {
 @HiltViewModel
 class MapViewModel @Inject constructor(
     private val placeRepository: PlaceRepository,
+    private val mapLayerRepository: MapLayerRepository,
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
     private val selectedPlaceDraft = MutableStateFlow<SavedPlace?>(null)
@@ -47,16 +51,21 @@ class MapViewModel @Inject constructor(
     val uiState: StateFlow<MapUiState> = combine(
         selectedPlaceDraft,
         placeRepository.observeFavoritePlaces(),
-    ) { selectedPlace, favorites ->
+        mapLayerRepository.selectedLayer,
+    ) { selectedPlace, favorites, mapLayer ->
         MapUiState(
             selectedPlace = selectedPlace,
             favoritePlaces = favorites,
             initialCamera = loadCameraPosition(),
+            mapLayer = mapLayer,
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = MapUiState(initialCamera = loadCameraPosition()),
+        initialValue = MapUiState(
+            initialCamera = loadCameraPosition(),
+            mapLayer = mapLayerRepository.selectedLayer.value,
+        ),
     )
 
     fun selectPoint(
@@ -99,6 +108,10 @@ class MapViewModel @Inject constructor(
             .putLong(KEY_ZOOM, zoom.toBits())
             .putBoolean(KEY_HAS_POSITION, true)
             .apply()
+    }
+
+    fun selectMapLayer(layer: MapLayerPreference) {
+        mapLayerRepository.selectLayer(layer)
     }
 
     private fun loadCameraPosition(): MapCameraData? {

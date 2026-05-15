@@ -9,6 +9,8 @@ import com.cloudbasepredictor.data.forecast.ForecastModeRepository
 import com.cloudbasepredictor.data.forecast.ForecastModelRepository
 import com.cloudbasepredictor.data.forecast.ForecastRepository
 import com.cloudbasepredictor.data.forecast.ForecastViewportRepository
+import com.cloudbasepredictor.data.map.MapLayerPreference
+import com.cloudbasepredictor.data.map.MapLayerRepository
 import com.cloudbasepredictor.data.place.PlaceRepository
 import com.cloudbasepredictor.data.units.DisplayUnits
 import com.cloudbasepredictor.data.units.UnitPreset
@@ -102,6 +104,7 @@ class ForecastViewModelTest {
                     forecastModeRepository = FakeForecastModeRepository(),
                     forecastModelRepository = FakeForecastModelRepository(ForecastModel.ICON_SEAMLESS),
                     forecastViewportRepository = FakeForecastViewportRepository(),
+                    mapLayerRepository = FakeMapLayerRepository(),
                     unitSettingsRepository = FakeUnitSettingsRepository(),
                 ) as T
             }
@@ -202,6 +205,16 @@ private class FakeForecastViewportRepository : ForecastViewportRepository {
 
     override fun setVisibleTopAltitudeKm(value: Float) {
         mutableVisibleTopAltitudeKm.value = value
+    }
+}
+
+private class FakeMapLayerRepository : MapLayerRepository {
+    private val mutableSelectedLayer = MutableStateFlow(MapLayerPreference.OPENFREEMAP)
+
+    override val selectedLayer: StateFlow<MapLayerPreference> = mutableSelectedLayer.asStateFlow()
+
+    override fun selectLayer(layer: MapLayerPreference) {
+        mutableSelectedLayer.value = layer
     }
 }
 
