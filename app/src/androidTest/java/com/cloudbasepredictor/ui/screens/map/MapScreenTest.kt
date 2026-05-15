@@ -2,8 +2,9 @@ package com.cloudbasepredictor.ui.screens.map
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import com.cloudbasepredictor.model.SavedPlace
+import com.cloudbasepredictor.ui.components.MapTestTags
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import org.junit.Rule
 import org.junit.Test
@@ -11,6 +12,25 @@ import org.junit.Test
 class MapScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun mapScreen_showsFavoritesButtonWhenNoFavoritesExist() {
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                MapScreen(
+                    uiState = MapUiState(),
+                    onMapTapped = { _, _ -> },
+                    onFavoriteTapped = {},
+                    onOpenForecast = {},
+                    onFavoriteClick = {},
+                    onSaveCameraPosition = { _, _, _ -> },
+                    autoOpenFavoritesOnStartup = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(MapTestTags.FAVORITES_BUTTON).assertIsDisplayed()
+    }
 
     @Test
     fun mapScreen_autoOpensFavoritesDialogWhenAtLeastTwoFavoritesExist() {
@@ -28,7 +48,7 @@ class MapScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Favorites").assertIsDisplayed()
+        composeRule.onNodeWithTag(MapTestTags.FAVORITES_DIALOG).assertIsDisplayed()
     }
 
     private companion object {

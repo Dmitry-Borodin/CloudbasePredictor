@@ -29,8 +29,10 @@ fun FavoritesListDialog(
     favorites: List<SavedPlace>,
     onPlaceClick: (SavedPlace) -> Unit,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     AlertDialog(
+        modifier = modifier,
         onDismissRequest = onDismiss,
         title = {
             Text(text = stringResource(R.string.dialog_title_favorites))

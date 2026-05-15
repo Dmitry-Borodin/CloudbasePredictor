@@ -43,7 +43,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -57,6 +59,7 @@ import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.components.FavoritesListDialog
 import com.cloudbasepredictor.ui.components.MapAttributionOverlay
 import com.cloudbasepredictor.ui.components.MapFavoriteLabelsOverlay
+import com.cloudbasepredictor.ui.components.MapTestTags
 import com.cloudbasepredictor.ui.map.MapRasterBaseLayer
 import com.cloudbasepredictor.ui.map.mapBaseStyle
 import com.cloudbasepredictor.ui.map.mapLayerAttributionDetailRes
@@ -281,18 +284,13 @@ fun MapScreen(
                 .padding(start = 12.dp, top = 42.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            FloatingActionButton(
+            MapChromeIconButton(
                 onClick = { showFavoritesDialog = true },
-                modifier = Modifier.size(40.dp),
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                imageVector = Icons.Filled.Star,
+                contentDescription = stringResource(R.string.cd_favorites),
+                modifier = Modifier.testTag(MapTestTags.FAVORITES_BUTTON),
                 contentColor = Color(0xFFFFD700),
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
-                    contentDescription = stringResource(R.string.cd_favorites),
-                )
-            }
+            )
         }
 
         Column(
@@ -303,36 +301,26 @@ fun MapScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.End,
         ) {
-            FloatingActionButton(
+            MapChromeIconButton(
                 onClick = onOpenSettings,
-                modifier = Modifier.size(40.dp),
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                imageVector = Icons.Outlined.Settings,
+                contentDescription = stringResource(R.string.cd_settings),
+                modifier = Modifier.testTag(MapTestTags.SETTINGS_BUTTON),
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = stringResource(R.string.cd_settings),
-                )
-            }
+            )
 
             Box {
-                FloatingActionButton(
+                MapChromeIconButton(
                     onClick = { showMapLayerMenu = true },
-                    modifier = Modifier.size(40.dp),
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                    imageVector = Icons.Outlined.Layers,
+                    contentDescription = stringResource(R.string.cd_map_layer),
+                    modifier = Modifier.testTag(MapTestTags.LAYER_BUTTON),
                     contentColor = if (uiState.mapLayer != MapLayerPreference.OPENFREEMAP) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Layers,
-                        contentDescription = stringResource(R.string.cd_map_layer),
-                    )
-                }
+                )
 
                 DropdownMenu(
                     expanded = showMapLayerMenu,
@@ -391,11 +379,34 @@ fun MapScreen(
             favorites = uiState.favoritePlaces,
             onPlaceClick = onFavoriteClick,
             onDismiss = { showFavoritesDialog = false },
+            modifier = Modifier.testTag(MapTestTags.FAVORITES_DIALOG),
         )
     }
 }
 
 private const val MIN_FAVORITES_FOR_STARTUP_DIALOG = 2
+
+@Composable
+private fun MapChromeIconButton(
+    imageVector: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    FloatingActionButton(
+        onClick = onClick,
+        modifier = modifier.size(40.dp),
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+        contentColor = contentColor,
+        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+        )
+    }
+}
 
 private fun MapLayerPreference.labelRes(): Int {
     return when (this) {
