@@ -21,7 +21,7 @@ import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.DEFAULT_TOP_ALTITUDE_KM
 import com.cloudbasepredictor.ui.screens.forecast.ForecastScreen
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_CHART_CANVAS
-import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.ForecastReadyUiState
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import org.junit.Rule
 import org.junit.Test
@@ -43,7 +43,7 @@ class ScreenshotCaptureTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private fun simulatedState(mode: ForecastMode): ForecastUiState {
+    private fun simulatedState(mode: ForecastMode): ForecastReadyUiState {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         return SimulatedTestData.forecastUiState(context, mode = mode)
     }

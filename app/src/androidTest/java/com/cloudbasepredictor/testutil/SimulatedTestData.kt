@@ -10,7 +10,7 @@ import com.cloudbasepredictor.model.ForecastModel
 import com.cloudbasepredictor.model.SavedPlace
 import com.cloudbasepredictor.ui.screens.forecast.ForecastChartViewport
 import com.cloudbasepredictor.ui.screens.forecast.ForecastDayChipUiModel
-import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.ForecastReadyUiState
 import com.cloudbasepredictor.ui.screens.forecast.buildCloudChartFromData
 import com.cloudbasepredictor.ui.screens.forecast.buildStuveChartFromData
 import com.cloudbasepredictor.ui.screens.forecast.buildThermicChartFromData
@@ -19,7 +19,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * Loads the simulated Brauneck ICON-Seamless forecast from app assets and builds
- * [ForecastUiState] with real chart data. Use in instrumentation and screenshot tests.
+ * [ForecastReadyUiState] with real chart data. Use in instrumentation and screenshot tests.
  */
 object SimulatedTestData {
 
@@ -45,7 +45,7 @@ object SimulatedTestData {
         mode: ForecastMode = ForecastMode.THERMIC,
         dayIndex: Int = 0,
         topAltitudeKm: Float = ForecastChartViewport().visibleTopAltitudeKm,
-    ): ForecastUiState {
+    ): ForecastReadyUiState {
         val hourlyData = loadHourlyData(context)
         val elevationKm = ((hourlyData.elevation ?: 0.0) / 1000.0).toFloat()
 
@@ -56,7 +56,7 @@ object SimulatedTestData {
             )
         }
 
-        return ForecastUiState(
+        return ForecastReadyUiState(
             selectedPlace = brauneckPlace,
             selectedForecastMode = mode,
             selectedDayIndex = dayIndex,
@@ -67,8 +67,6 @@ object SimulatedTestData {
             cloudChart = buildCloudChartFromData(hourlyData, dayIndex = dayIndex),
             dayChips = dayChips,
             forecastText = "Sat in Brauneck Süd. ICON Seamless simulated forecast.",
-            isLoading = false,
-            errorMessage = null,
             selectedModel = ForecastModel.ICON_SEAMLESS,
             resolvedModel = ForecastModel.ICON_SEAMLESS,
             forecastUpdatedAtMillis = System.currentTimeMillis(),

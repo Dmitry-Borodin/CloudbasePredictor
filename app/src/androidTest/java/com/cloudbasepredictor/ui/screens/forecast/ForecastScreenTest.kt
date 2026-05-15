@@ -3,6 +3,7 @@ package com.cloudbasepredictor.ui.screens.forecast
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -68,8 +69,9 @@ class ForecastScreenTest {
 
     @Test
     fun forecastScreen_clickingDayChipInvokesCallbackWithCorrectIndex() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
         var selectedIndex: Int? = null
-        val uiState = ForecastUiState(
+        val uiState = SimulatedTestData.forecastUiState(context).copy(
             selectedPlace = SimulatedTestData.brauneckPlace,
             selectedDayIndex = 0,
             dayChips = listOf(
@@ -77,8 +79,6 @@ class ForecastScreenTest {
                 ForecastDayChipUiModel(title = "Day 2", subtitle = "Next"),
             ),
             forecastText = "Forecast text",
-            isLoading = false,
-            errorMessage = null,
         )
 
         composeRule.setContent {
@@ -106,10 +106,7 @@ class ForecastScreenTest {
         composeRule.setContent {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = SimulatedTestData.forecastUiState(context).copy(
-                        isLoading = true,
-                        forecastText = expectedLoadingMessage,
-                    ),
+                    uiState = ForecastLoadingUiState(selectedPlace = SimulatedTestData.brauneckPlace),
                     onDateSelected = {},
                     onOpenMap = {},
                 )
@@ -117,18 +114,18 @@ class ForecastScreenTest {
         }
 
         composeRule.onNodeWithText(expectedLoadingMessage).assertIsDisplayed()
+        composeRule.onAllNodesWithTag(THERMIC_VIEW).assertCountEquals(0)
     }
 
     @Test
     fun forecastScreen_loadingStateShowsModelSelectorAndHandlesSelection() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
         var selectedModel: ForecastModel? = null
 
         composeRule.setContent {
             CloudbasePredictorTheme {
                 ForecastScreen(
-                    uiState = SimulatedTestData.forecastUiState(context).copy(
-                        isLoading = true,
+                    uiState = ForecastLoadingUiState(
+                        selectedPlace = SimulatedTestData.brauneckPlace,
                         selectedModel = ForecastModel.ICON_SEAMLESS,
                     ),
                     onDateSelected = {},

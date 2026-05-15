@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -48,7 +47,7 @@ import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_TIME_AXIS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.WIND_VIEW
-import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.ForecastReadyUiState
 import com.cloudbasepredictor.ui.screens.forecast.WindForecastCellUiModel
 import com.cloudbasepredictor.ui.screens.forecast.WindForecastChartUiModel
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
@@ -62,7 +61,7 @@ import kotlin.math.sin
 
 @Composable
 internal fun WindForecastView(
-    uiState: ForecastUiState,
+    uiState: ForecastReadyUiState,
     modifier: Modifier = Modifier,
     onVisibleTopAltitudeChange: (Float) -> Unit = {},
 ) {
@@ -88,15 +87,6 @@ internal fun WindForecastView(
                 .height(WIND_TIME_AXIS_HEIGHT)
                 .testTag(WIND_TIME_AXIS),
         )
-
-        if (uiState.isLoading) {
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .align(Alignment.TopCenter),
-            )
-        }
     }
 }
 
@@ -802,19 +792,6 @@ private fun WindForecastViewPreview() {
     CloudbasePredictorTheme {
         WindForecastView(
             uiState = PreviewData.forecastUiStateForMode(ForecastMode.WIND),
-        )
-    }
-}
-
-@Preview(name = "Wind Loading", showBackground = true, widthDp = 420, heightDp = 720)
-@Composable
-private fun WindForecastViewLoadingPreview() {
-    CloudbasePredictorTheme {
-        WindForecastView(
-            uiState = PreviewData.forecastUiStateForMode(
-                mode = ForecastMode.WIND,
-                isLoading = true,
-            ),
         )
     }
 }

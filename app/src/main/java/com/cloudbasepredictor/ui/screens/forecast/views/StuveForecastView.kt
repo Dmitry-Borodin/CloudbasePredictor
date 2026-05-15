@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -71,7 +70,7 @@ import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_SELECTE
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_CHART_CANVAS
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_TIME_SLIDER
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.STUVE_VIEW
-import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.ForecastReadyUiState
 import com.cloudbasepredictor.ui.screens.forecast.MAX_TOP_ALTITUDE_KM
 import com.cloudbasepredictor.ui.screens.forecast.STUVE_DRY_ADIABAT_THETAS_K
 import com.cloudbasepredictor.ui.screens.forecast.STUVE_MIXING_RATIO_VALUES_GKG
@@ -102,7 +101,7 @@ import kotlin.math.sin
 
 @Composable
 internal fun StuveForecastView(
-    uiState: ForecastUiState,
+    uiState: ForecastReadyUiState,
     modifier: Modifier = Modifier,
     onVisibleTopAltitudeChange: (Float) -> Unit = {},
     onStuveHourChanged: (Int) -> Unit = {},
@@ -170,15 +169,6 @@ internal fun StuveForecastView(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
-
-            if (uiState.isLoading) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .align(Alignment.TopCenter),
-                )
-            }
         }
 
         StuveTimeSlider(
@@ -2177,19 +2167,6 @@ private fun SkewTForecastViewDarkPreview() {
     CloudbasePredictorTheme(darkTheme = true) {
         StuveForecastView(
             uiState = PreviewData.forecastUiStateForMode(ForecastMode.STUVE),
-        )
-    }
-}
-
-@Preview(name = "Skew-T Error", showBackground = true, widthDp = 420, heightDp = 720)
-@Composable
-private fun SkewTForecastViewErrorPreview() {
-    CloudbasePredictorTheme {
-        StuveForecastView(
-            uiState = PreviewData.forecastUiStateForMode(
-                mode = ForecastMode.STUVE,
-                errorMessage = "Unable to refresh forecast layers right now.",
-            ),
         )
     }
 }

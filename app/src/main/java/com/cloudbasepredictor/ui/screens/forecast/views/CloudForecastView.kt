@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -45,14 +44,14 @@ import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_SCROLL
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_SUNSHINE_ROW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_TIME_AXIS_ROW
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.CLOUD_VIEW
-import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.ForecastReadyUiState
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.util.Locale
 import kotlin.math.max
 
 @Composable
 internal fun CloudForecastView(
-    uiState: ForecastUiState,
+    uiState: ForecastReadyUiState,
     modifier: Modifier = Modifier,
     onVisibleTopAltitudeChange: (Float) -> Unit = {},
 ) {
@@ -144,15 +143,6 @@ internal fun CloudForecastView(
                 .height(TIME_AXIS_HEIGHT)
                 .testTag(CLOUD_TIME_AXIS_ROW),
         )
-
-        if (uiState.isLoading) {
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .align(Alignment.TopCenter),
-            )
-        }
     }
 }
 
@@ -712,32 +702,6 @@ private fun CloudForecastViewPreview() {
     CloudbasePredictorTheme {
         CloudForecastView(
             uiState = PreviewData.forecastUiStateForMode(ForecastMode.CLOUD),
-        )
-    }
-}
-
-@Preview(name = "Cloud Loading", showBackground = true, widthDp = 420, heightDp = 720)
-@Composable
-private fun CloudForecastViewLoadingPreview() {
-    CloudbasePredictorTheme {
-        CloudForecastView(
-            uiState = PreviewData.forecastUiStateForMode(
-                mode = ForecastMode.CLOUD,
-                isLoading = true,
-            ),
-        )
-    }
-}
-
-@Preview(name = "Cloud Error", showBackground = true, widthDp = 420, heightDp = 720)
-@Composable
-private fun CloudForecastViewErrorPreview() {
-    CloudbasePredictorTheme {
-        CloudForecastView(
-            uiState = PreviewData.forecastUiStateForMode(
-                mode = ForecastMode.CLOUD,
-                errorMessage = "Unable to refresh cloud forecast.",
-            ),
         )
     }
 }

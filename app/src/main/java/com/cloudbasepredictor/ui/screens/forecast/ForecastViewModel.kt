@@ -2,7 +2,6 @@ package com.cloudbasepredictor.ui.screens.forecast
 
 import com.cloudbasepredictor.data.forecast.ForecastModeRepository
 import com.cloudbasepredictor.data.forecast.ForecastModelRepository
-import com.cloudbasepredictor.data.forecast.INITIAL_FORECAST_DAYS
 import com.cloudbasepredictor.data.forecast.MAX_FORECAST_DAYS
 import com.cloudbasepredictor.data.forecast.ForecastViewportRepository
 import androidx.lifecycle.ViewModel
@@ -13,6 +12,8 @@ import com.cloudbasepredictor.data.forecast.requestedForecastDaysForDayIndex
 import com.cloudbasepredictor.data.map.MapLayerPreference
 import com.cloudbasepredictor.data.map.MapLayerRepository
 import com.cloudbasepredictor.data.place.PlaceRepository
+import com.cloudbasepredictor.data.remote.HourlyForecastData
+import com.cloudbasepredictor.data.remote.HourlyPoint
 import com.cloudbasepredictor.data.units.DisplayUnits
 import com.cloudbasepredictor.data.units.UnitPreset
 import com.cloudbasepredictor.data.units.UnitSettingsRepository
@@ -29,6 +30,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
+import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -51,57 +53,101 @@ data class ForecastDayChipUiModel(
 )
 
 /**
- * Complete UI state for the forecast screen.
+ * Screen-level forecast state.
  *
- * The screen has three visual states:
- * - **Loading**: [isLoading] is true — shows progress indicator.
- * - **Error**: [errorMessage] is non-null — shows error text with retry button.
- * - **Ready**: neither loading nor error — shows the selected chart.
+ * Loading and error states intentionally do not carry chart data. Chart models are
+ * created only for [ForecastReadyUiState], after the forecast snapshot contains
+ * hourly data for the selected place and model.
  */
-data class ForecastUiState(
-    /** Currently selected place, or null when no location has been chosen. */
-    val selectedPlace: SavedPlace? = null,
+sealed interface ForecastUiState {
+    /** Currently selected place, or null while the app has no forecast location. */
+    val selectedPlace: SavedPlace?
     /** Active forecast visualisation mode (thermic / stuve / wind / cloud). */
-    val selectedForecastMode: ForecastMode = ForecastMode.THERMIC,
+    val selectedForecastMode: ForecastMode
     /** Zero-based index of the selected forecast day (0 = today). */
-    val selectedDayIndex: Int = 0,
+    val selectedDayIndex: Int
+    /** Weather model requested by the user. */
+    val selectedModel: ForecastModel
+    /** Model actually used after fallback (may differ from [selectedModel]). */
+    val resolvedModel: ForecastModel?
+    /** Favorite places to show on the forecast map panel. */
+    val favoritePlaces: List<SavedPlace>
+    /** Selected map base layer shared with the main map screen. */
+    val mapLayer: MapLayerPreference
+    /** Unit preset selected in Settings. */
+    val unitPreset: UnitPreset
+    /** Resolved display units for the active preset. */
+    val displayUnits: DisplayUnits
+}
+
+data class ForecastLoadingUiState(
+    override val selectedPlace: SavedPlace? = null,
+    override val selectedForecastMode: ForecastMode = ForecastMode.THERMIC,
+    override val selectedDayIndex: Int = 0,
+    override val selectedModel: ForecastModel = ForecastModel.ICON_SEAMLESS,
+    override val resolvedModel: ForecastModel? = null,
+    override val favoritePlaces: List<SavedPlace> = emptyList(),
+    override val mapLayer: MapLayerPreference = MapLayerPreference.OPENFREEMAP,
+    override val unitPreset: UnitPreset = UnitPreset.METRIC_KMH,
+    override val displayUnits: DisplayUnits = UnitPreset.METRIC_KMH.resolveDisplayUnits(),
+) : ForecastUiState
+
+data class ForecastNoPlaceUiState(
+    override val selectedPlace: SavedPlace? = null,
+    override val selectedForecastMode: ForecastMode = ForecastMode.THERMIC,
+    override val selectedDayIndex: Int = 0,
+    override val selectedModel: ForecastModel = ForecastModel.ICON_SEAMLESS,
+    override val resolvedModel: ForecastModel? = null,
+    override val favoritePlaces: List<SavedPlace> = emptyList(),
+    override val mapLayer: MapLayerPreference = MapLayerPreference.OPENFREEMAP,
+    override val unitPreset: UnitPreset = UnitPreset.METRIC_KMH,
+    override val displayUnits: DisplayUnits = UnitPreset.METRIC_KMH.resolveDisplayUnits(),
+) : ForecastUiState
+
+data class ForecastErrorUiState(
+    val errorMessage: String,
+    override val selectedPlace: SavedPlace? = null,
+    override val selectedForecastMode: ForecastMode = ForecastMode.THERMIC,
+    override val selectedDayIndex: Int = 0,
+    override val selectedModel: ForecastModel = ForecastModel.ICON_SEAMLESS,
+    override val resolvedModel: ForecastModel? = null,
+    override val favoritePlaces: List<SavedPlace> = emptyList(),
+    override val mapLayer: MapLayerPreference = MapLayerPreference.OPENFREEMAP,
+    override val unitPreset: UnitPreset = UnitPreset.METRIC_KMH,
+    override val displayUnits: DisplayUnits = UnitPreset.METRIC_KMH.resolveDisplayUnits(),
+) : ForecastUiState
+
+data class ForecastReadyUiState(
+    override val selectedPlace: SavedPlace? = null,
+    override val selectedForecastMode: ForecastMode = ForecastMode.THERMIC,
+    override val selectedDayIndex: Int = 0,
     /** Visible altitude range controlled by pinch-to-zoom. */
     val chartViewport: ForecastChartViewport = ForecastChartViewport(),
     /** Thermic updraft strength chart data. */
-    val thermicChart: ThermicForecastChartUiModel = buildPlaceholderThermicForecastChart(dayIndex = 0),
+    val thermicChart: ThermicForecastChartUiModel,
     /** Stüve thermodynamic diagram data for the selected hour. */
-    val stuveChart: StuveForecastChartUiModel = buildPlaceholderStuveChart(),
+    val stuveChart: StuveForecastChartUiModel,
     /** Wind speed & direction chart data. */
-    val windChart: WindForecastChartUiModel = buildPlaceholderWindForecastChart(),
+    val windChart: WindForecastChartUiModel,
     /** Cloud coverage & precipitation chart data. */
-    val cloudChart: CloudForecastChartUiModel = buildPlaceholderCloudForecastChart(),
+    val cloudChart: CloudForecastChartUiModel,
     /** Day chips for the date picker (title + subtitle). */
-    val dayChips: List<ForecastDayChipUiModel> = placeholderDayChips(INITIAL_FORECAST_DAYS),
+    val dayChips: List<ForecastDayChipUiModel>,
     /** Summary text shown at the bottom of the chart. */
-    val forecastText: String = "Select a point on the map to open a forecast.",
-    /** True while the forecast is being fetched from the network. */
-    val isLoading: Boolean = false,
-    /** Non-null when the last load attempt failed; displayed as error state. */
-    val errorMessage: String? = null,
-    /** Weather model requested by the user. */
-    val selectedModel: ForecastModel = ForecastModel.ICON_SEAMLESS,
-    /** Model actually used after fallback (may differ from [selectedModel]). */
-    val resolvedModel: ForecastModel? = null,
+    val forecastText: String,
+    override val selectedModel: ForecastModel = ForecastModel.ICON_SEAMLESS,
+    override val resolvedModel: ForecastModel? = null,
     /** Timestamp (UTC millis) when the forecast data was last updated from the server. */
     val forecastUpdatedAtMillis: Long? = null,
     /** Estimated UTC millis of the model run that produced this forecast. */
     val modelGeneratedAtMillis: Long? = null,
     /** Terrain elevation in km ASL for the selected place. */
     val elevationKm: Float = 0f,
-    /** Favorite places to show on the forecast map panel. */
-    val favoritePlaces: List<SavedPlace> = emptyList(),
-    /** Selected map base layer shared with the main map screen. */
-    val mapLayer: MapLayerPreference = MapLayerPreference.OPENFREEMAP,
-    /** Unit preset selected in Settings. */
-    val unitPreset: UnitPreset = UnitPreset.METRIC_KMH,
-    /** Resolved display units for the active preset. */
-    val displayUnits: DisplayUnits = UnitPreset.METRIC_KMH.resolveDisplayUnits(),
-)
+    override val favoritePlaces: List<SavedPlace> = emptyList(),
+    override val mapLayer: MapLayerPreference = MapLayerPreference.OPENFREEMAP,
+    override val unitPreset: UnitPreset = UnitPreset.METRIC_KMH,
+    override val displayUnits: DisplayUnits = UnitPreset.METRIC_KMH.resolveDisplayUnits(),
+) : ForecastUiState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -204,61 +250,124 @@ class ForecastViewModel @Inject constructor(
         val loading = inputs.isLoading
         val currentError = inputs.errorMessage
 
-        val loadedForecastDays = snapshot?.days?.size ?: 0
-        val availableForecastDays = (snapshot?.resolvedModel ?: currentModel).visibleForecastDays()
+        if (place == null) {
+            return@combine ForecastNoPlaceUiState(
+                selectedForecastMode = currentChartContext.selectedForecastMode,
+                selectedDayIndex = currentChartContext.selectedDayIndex.coerceAtLeast(0),
+                selectedModel = currentModel,
+                favoritePlaces = favorites,
+                mapLayer = preferences.mapLayer,
+                unitPreset = preferences.unitPreset,
+                displayUnits = preferences.displayUnits,
+            )
+        }
+
+        if (currentError != null) {
+            return@combine ForecastErrorUiState(
+                errorMessage = currentError,
+                selectedPlace = place,
+                selectedForecastMode = currentChartContext.selectedForecastMode,
+                selectedDayIndex = currentChartContext.selectedDayIndex.coerceAtLeast(0),
+                selectedModel = currentModel,
+                resolvedModel = snapshot?.resolvedModel,
+                favoritePlaces = favorites,
+                mapLayer = preferences.mapLayer,
+                unitPreset = preferences.unitPreset,
+                displayUnits = preferences.displayUnits,
+            )
+        }
+
+        if (loading || snapshot == null) {
+            return@combine ForecastLoadingUiState(
+                selectedPlace = place,
+                selectedForecastMode = currentChartContext.selectedForecastMode,
+                selectedDayIndex = currentChartContext.selectedDayIndex.coerceAtLeast(0),
+                selectedModel = currentModel,
+                resolvedModel = snapshot?.resolvedModel,
+                favoritePlaces = favorites,
+                mapLayer = preferences.mapLayer,
+                unitPreset = preferences.unitPreset,
+                displayUnits = preferences.displayUnits,
+            )
+        }
+
+        val hourlyData = snapshot.hourlyData
+        if (hourlyData == null) {
+            return@combine ForecastErrorUiState(
+                errorMessage = INCOMPLETE_FORECAST_DATA_ERROR,
+                selectedPlace = place,
+                selectedForecastMode = currentChartContext.selectedForecastMode,
+                selectedDayIndex = currentChartContext.selectedDayIndex.coerceAtLeast(0),
+                selectedModel = currentModel,
+                resolvedModel = snapshot.resolvedModel,
+                favoritePlaces = favorites,
+                mapLayer = preferences.mapLayer,
+                unitPreset = preferences.unitPreset,
+                displayUnits = preferences.displayUnits,
+            )
+        }
+
+        val loadedForecastDays = snapshot.days.size
+        val availableForecastDays = (snapshot.resolvedModel ?: currentModel).visibleForecastDays()
         val displayedForecastDays = exposedForecastDayCount(
             loadedForecastDays = loadedForecastDays,
             selectedDayIndex = currentChartContext.selectedDayIndex,
             maxForecastDays = availableForecastDays,
         )
         val dayChips = buildDisplayedDayChips(
-            loadedDays = snapshot?.days.orEmpty(),
+            loadedDays = snapshot.days,
             displayedDayCount = displayedForecastDays,
         )
         val safeDayIndex = currentChartContext.selectedDayIndex.coerceIn(0, dayChips.lastIndex)
 
-        ForecastUiState(
+        if (!hourlyData.hasRequiredForecastInputs(
+                dayIndex = safeDayIndex,
+                stuveHour = currentChartContext.stuveHour,
+            )
+        ) {
+            return@combine ForecastErrorUiState(
+                errorMessage = INCOMPLETE_FORECAST_DATA_ERROR,
+                selectedPlace = place,
+                selectedForecastMode = currentChartContext.selectedForecastMode,
+                selectedDayIndex = safeDayIndex,
+                selectedModel = currentModel,
+                resolvedModel = snapshot.resolvedModel,
+                favoritePlaces = favorites,
+                mapLayer = preferences.mapLayer,
+                unitPreset = preferences.unitPreset,
+                displayUnits = preferences.displayUnits,
+            )
+        }
+
+        ForecastReadyUiState(
             selectedPlace = place,
             selectedForecastMode = currentChartContext.selectedForecastMode,
             selectedDayIndex = safeDayIndex,
             chartViewport = currentChartContext.chartViewport,
-            thermicChart = snapshot?.hourlyData?.let {
-                buildThermicChartFromData(it, dayIndex = safeDayIndex)
-            } ?: buildPlaceholderThermicForecastChart(dayIndex = safeDayIndex),
-            stuveChart = snapshot?.hourlyData?.let {
-                buildStuveChartFromData(it, dayIndex = safeDayIndex, hour = currentChartContext.stuveHour)
-            } ?: buildPlaceholderStuveChart(
-                hour = currentChartContext.stuveHour,
+            thermicChart = buildThermicChartFromData(hourlyData, dayIndex = safeDayIndex),
+            stuveChart = buildStuveChartFromData(
+                hourlyData = hourlyData,
                 dayIndex = safeDayIndex,
+                hour = currentChartContext.stuveHour,
             ),
-            windChart = snapshot?.hourlyData?.let {
-                buildWindChartFromData(
-                    it,
-                    dayIndex = safeDayIndex,
-                    maxAltitudeKm = currentChartContext.chartViewport.visibleTopAltitudeKm,
-                )
-            } ?: buildPlaceholderWindForecastChart(
+            windChart = buildWindChartFromData(
+                hourlyData = hourlyData,
                 dayIndex = safeDayIndex,
                 maxAltitudeKm = currentChartContext.chartViewport.visibleTopAltitudeKm,
             ),
-            cloudChart = snapshot?.hourlyData?.let {
-                buildCloudChartFromData(it, dayIndex = safeDayIndex)
-            } ?: buildPlaceholderCloudForecastChart(dayIndex = safeDayIndex),
+            cloudChart = buildCloudChartFromData(hourlyData, dayIndex = safeDayIndex),
             dayChips = dayChips,
             forecastText = buildForecastText(
                 mode = currentChartContext.selectedForecastMode,
                 place = place,
                 snapshot = snapshot,
                 selectedDayIndex = safeDayIndex,
-                isLoading = loading,
             ),
-            isLoading = loading,
-            errorMessage = currentError,
             selectedModel = currentModel,
-            resolvedModel = snapshot?.resolvedModel,
-            forecastUpdatedAtMillis = snapshot?.updatedAtUtcMillis,
-            modelGeneratedAtMillis = snapshot?.modelGeneratedAtMillis,
-            elevationKm = (snapshot?.hourlyData?.elevation ?: 0.0).toFloat() / 1000f,
+            resolvedModel = snapshot.resolvedModel,
+            forecastUpdatedAtMillis = snapshot.updatedAtUtcMillis,
+            modelGeneratedAtMillis = snapshot.modelGeneratedAtMillis,
+            elevationKm = (hourlyData.elevation ?: 0.0).toFloat() / 1000f,
             favoritePlaces = favorites,
             mapLayer = preferences.mapLayer,
             unitPreset = preferences.unitPreset,
@@ -267,7 +376,7 @@ class ForecastViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = ForecastUiState(),
+        initialValue = ForecastLoadingUiState(),
     )
 
     init {
@@ -399,8 +508,8 @@ class ForecastViewModel @Inject constructor(
     ) {
         val generation = ++forecastLoadGeneration
         forecastLoadJob?.cancel()
+        isLoading.value = true
         forecastLoadJob = viewModelScope.launch {
-            isLoading.value = true
             Timber.i(
                 "Loading forecast: model=%s days=%d forceRefresh=%b",
                 model.apiName,
@@ -489,12 +598,46 @@ private data class MapAndUnitPreferences(
     val displayUnits: DisplayUnits,
 )
 
+private const val INCOMPLETE_FORECAST_DATA_ERROR = "Forecast data is incomplete."
+
+private fun HourlyForecastData.hasRequiredForecastInputs(
+    dayIndex: Int,
+    stuveHour: Int,
+): Boolean {
+    val pointsByDate = pointsByDate()
+    val dateKey = pointsByDate.keys.sorted().getOrNull(dayIndex) ?: return false
+    val dayPoints = pointsByDate[dateKey].orEmpty()
+    val daytimePoints = dayPoints.filter { it.hour in 6..22 }
+    if (daytimePoints.isEmpty()) return false
+
+    val hasThermicSurfaceInputs = daytimePoints.any { point ->
+        point.temperature2mC != null && point.dewPoint2mC != null
+    }
+    if (!hasThermicSurfaceInputs) return false
+
+    val stuvePoint = dayPoints.firstOrNull { it.hour == stuveHour }
+        ?: dayPoints.minByOrNull { point -> abs(point.hour - stuveHour) }
+        ?: return false
+    if (stuvePoint.temperature2mC == null || stuvePoint.dewPoint2mC == null) return false
+
+    return daytimePoints.any { point -> point.hasRenderableWindInputs() }
+}
+
+private fun HourlyPoint.hasRenderableWindInputs(): Boolean {
+    val hasSurfaceWind = windSpeed10mKmh != null && windDirection10mDeg != null
+    val hasPressureLevelWind = pressureLevels.any { level ->
+        level.geopotentialHeightM != null &&
+            level.windSpeedKmh != null &&
+            level.windDirectionDeg != null
+    }
+    return hasSurfaceWind || hasPressureLevelWind
+}
+
 private fun buildForecastText(
     mode: ForecastMode,
     place: SavedPlace?,
     snapshot: ForecastSnapshot?,
     selectedDayIndex: Int,
-    isLoading: Boolean,
 ): String {
     if (place == null) {
         return "Select a point on the map and open it to see the forecast here."
@@ -506,32 +649,16 @@ private fun buildForecastText(
     if (selectedDay == null) {
         return when (mode) {
             ForecastMode.THERMIC -> {
-                if (isLoading) {
-                    "Loading thermic forecast for ${place.name}."
-                } else {
-                    "Forecast content for ${place.name} will appear here."
-                }
+                "Forecast content for ${place.name} will appear here."
             }
             ForecastMode.STUVE -> {
-                if (isLoading) {
-                    "Loading stuve forecast for ${place.name}."
-                } else {
-                    "Stuve forecast content for ${place.name} will appear here."
-                }
+                "Stuve forecast content for ${place.name} will appear here."
             }
             ForecastMode.WIND -> {
-                if (isLoading) {
-                    "Loading wind forecast for ${place.name}."
-                } else {
-                    "Wind forecast content for ${place.name} will appear here."
-                }
+                "Wind forecast content for ${place.name} will appear here."
             }
             ForecastMode.CLOUD -> {
-                if (isLoading) {
-                    "Loading cloud forecast for ${place.name}."
-                } else {
-                    "Cloud forecast content for ${place.name} will appear here."
-                }
+                "Cloud forecast content for ${place.name} will appear here."
             }
         }
     }
@@ -555,7 +682,7 @@ private fun buildForecastText(
                 append(formatTemperature(selectedDay.maxTemperatureCelsius))
                 append(", low ")
                 append(formatTemperature(selectedDay.minTemperatureCelsius))
-                append(". This area can later host the full thermic forecast layout.")
+                append(". Thermic profile is ready for the selected altitude range.")
             }
         }
         ForecastMode.STUVE -> {
@@ -565,8 +692,7 @@ private fun buildForecastText(
                 append(place.name)
                 append(". ")
                 append(weather.label)
-                append(". Stuve placeholder forecast. ")
-                append("This area can later host the full stuve forecast layout.")
+                append(". Stuve diagram is ready for the selected hour.")
             }
         }
         ForecastMode.WIND -> {
@@ -576,8 +702,7 @@ private fun buildForecastText(
                 append(place.name)
                 append(". ")
                 append(weather.label)
-                append(". Wind placeholder forecast. ")
-                append("This area can later host the full wind forecast layout.")
+                append(". Wind profile is ready for the selected altitude range.")
             }
         }
         ForecastMode.CLOUD -> {
@@ -587,8 +712,7 @@ private fun buildForecastText(
                 append(place.name)
                 append(". ")
                 append(weather.label)
-                append(". Cloud forecast placeholder. ")
-                append("This area can later host the full cloud forecast layout.")
+                append(". Cloud layers, radiation, sunshine, and precipitation are ready.")
             }
         }
     }
@@ -618,10 +742,6 @@ private fun buildDisplayedDayChips(
             add(placeholderDayChip(index))
         }
     }
-}
-
-private fun placeholderDayChips(dayCount: Int = INITIAL_FORECAST_DAYS): List<ForecastDayChipUiModel> {
-    return List(dayCount, ::placeholderDayChip)
 }
 
 private fun placeholderDayChip(index: Int): ForecastDayChipUiModel {

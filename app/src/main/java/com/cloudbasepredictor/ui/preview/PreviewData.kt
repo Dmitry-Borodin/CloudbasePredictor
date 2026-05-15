@@ -10,7 +10,9 @@ import com.cloudbasepredictor.data.theme.ThemePreference
 import com.cloudbasepredictor.data.units.UnitPreset
 import com.cloudbasepredictor.ui.screens.forecast.ForecastChartViewport
 import com.cloudbasepredictor.ui.screens.forecast.ForecastDayChipUiModel
-import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.ForecastErrorUiState
+import com.cloudbasepredictor.ui.screens.forecast.ForecastLoadingUiState
+import com.cloudbasepredictor.ui.screens.forecast.ForecastReadyUiState
 import com.cloudbasepredictor.ui.screens.forecast.buildPlaceholderCloudForecastChart
 import com.cloudbasepredictor.ui.screens.forecast.buildPlaceholderStuveChart
 import com.cloudbasepredictor.ui.screens.forecast.buildPlaceholderThermicForecastChart
@@ -79,7 +81,7 @@ object PreviewData {
         }
     }
 
-    val forecastReadyUiState = ForecastUiState(
+    val forecastReadyUiState = ForecastReadyUiState(
         selectedPlace = savedPlace,
         selectedDayIndex = 2,
         thermicChart = buildPlaceholderThermicForecastChart(dayIndex = 2),
@@ -88,21 +90,15 @@ object PreviewData {
         cloudChart = buildPlaceholderCloudForecastChart(dayIndex = 2),
         dayChips = forecastDayChips(7),
         forecastText = "Sat in Interlaken. Partly cloudy. High 20.0°C, low 10.2°C.",
-        isLoading = false,
-        errorMessage = null,
         selectedModel = ForecastModel.ICON_D2,
         resolvedModel = ForecastModel.ICON_D2,
         forecastUpdatedAtMillis = 1_715_777_600_000L,
         elevationKm = 0.58f, // Interlaken ~580m ASL
     )
 
-    val forecastLoadingUiState = ForecastUiState(
+    val forecastLoadingUiState = ForecastLoadingUiState(
         selectedPlace = savedPlace,
         selectedDayIndex = 0,
-        dayChips = forecastDayChips(7),
-        forecastText = "Loading thermic forecast for Interlaken.",
-        isLoading = true,
-        errorMessage = null,
     )
 
     val forecastZoomedOutUiState = forecastReadyUiState.copy(
@@ -110,18 +106,18 @@ object PreviewData {
         forecastText = "Zoomed-out layered forecast preview with extended altitude range.",
     )
 
-    val forecastErrorUiState = forecastReadyUiState.copy(
+    val forecastErrorUiState = ForecastErrorUiState(
+        selectedPlace = savedPlace,
         selectedDayIndex = 1,
-        forecastText = "Forecast content is unavailable.",
         errorMessage = "Unable to refresh forecast layers right now.",
+        selectedModel = ForecastModel.ICON_D2,
+        resolvedModel = ForecastModel.ICON_D2,
     )
 
     fun forecastUiStateForMode(
         mode: ForecastMode,
         topAltitudeKm: Float = ForecastChartViewport().visibleTopAltitudeKm,
-        isLoading: Boolean = false,
-        errorMessage: String? = null,
-    ): ForecastUiState {
+    ): ForecastReadyUiState {
         val modeLabel = when (mode) {
             ForecastMode.THERMIC -> "Thermic"
             ForecastMode.STUVE -> "Stuve"
@@ -137,8 +133,6 @@ object PreviewData {
             windChart = buildPlaceholderWindForecastChart(dayIndex = forecastReadyUiState.selectedDayIndex),
             cloudChart = buildPlaceholderCloudForecastChart(dayIndex = forecastReadyUiState.selectedDayIndex),
             forecastText = "$modeLabel layered forecast preview for Interlaken.",
-            isLoading = isLoading,
-            errorMessage = errorMessage,
         )
     }
 

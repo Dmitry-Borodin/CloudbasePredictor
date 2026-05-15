@@ -5,14 +5,10 @@ import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -30,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
-import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.ForecastReadyUiState
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.util.Locale
 import kotlin.math.PI
@@ -41,14 +37,13 @@ import kotlin.math.sin
 
 @Composable
 internal fun ForecastGridCard(
-    uiState: ForecastUiState,
+    uiState: ForecastReadyUiState,
     mode: ForecastMode,
     minAltitudeKm: Float,
     onVisibleTopAltitudeChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     ForecastChartCard(
-        uiState = uiState,
         modifier = modifier,
     ) { chartModifier ->
         ForecastRiskGrid(
@@ -63,7 +58,6 @@ internal fun ForecastGridCard(
 
 @Composable
 internal fun ForecastChartCard(
-    uiState: ForecastUiState,
     modifier: Modifier = Modifier,
     chartContent: @Composable (Modifier) -> Unit,
 ) {
@@ -71,15 +65,6 @@ internal fun ForecastChartCard(
         modifier = modifier.fillMaxSize(),
     ) {
         chartContent(Modifier.fillMaxSize())
-
-        if (uiState.isLoading) {
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .align(Alignment.TopCenter),
-            )
-        }
     }
 }
 

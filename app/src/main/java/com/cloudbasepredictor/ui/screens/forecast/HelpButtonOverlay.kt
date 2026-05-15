@@ -57,7 +57,7 @@ import java.util.Locale
 
 @Composable
 internal fun HelpButtonOverlay(
-    uiState: ForecastUiState,
+    uiState: ForecastReadyUiState,
     modifier: Modifier = Modifier,
 ) {
     val helpContent = rememberForecastHelpContent(uiState)
@@ -163,7 +163,7 @@ internal fun HelpButtonOverlay(
 }
 
 @Composable
-private fun ForecastHelpModelInfo(uiState: ForecastUiState) {
+private fun ForecastHelpModelInfo(uiState: ForecastReadyUiState) {
     val resolvedModel = uiState.resolvedModel ?: uiState.selectedModel
     val modelText = if (uiState.resolvedModel != null && uiState.selectedModel != uiState.resolvedModel) {
         "${uiState.selectedModel.displayName} -> ${uiState.resolvedModel.displayName}"
@@ -208,7 +208,7 @@ private fun formatHelpDateTime(timestampMillis: Long): String {
 }
 
 @Composable
-private fun rememberForecastHelpContent(uiState: ForecastUiState): ForecastHelpContent {
+private fun rememberForecastHelpContent(uiState: ForecastReadyUiState): ForecastHelpContent {
     return when (uiState.selectedForecastMode) {
         ForecastMode.THERMIC -> ForecastHelpContent(
             title = stringResource(R.string.help_thermic_title),
@@ -244,12 +244,9 @@ private fun rememberForecastHelpContent(uiState: ForecastUiState): ForecastHelpC
 }
 
 @Composable
-private fun forecastStatusMessage(uiState: ForecastUiState): String {
-    val errorMessage = uiState.errorMessage
+private fun forecastStatusMessage(uiState: ForecastReadyUiState): String {
     return when {
         uiState.selectedPlace == null -> stringResource(R.string.help_status_no_place)
-        errorMessage != null -> stringResource(R.string.help_status_error, errorMessage)
-        uiState.isLoading -> stringResource(R.string.help_status_loading, uiState.selectedPlace.name)
         else -> ""
     }
 }
@@ -535,19 +532,6 @@ private fun HelpButtonOverlayPreview() {
     CloudbasePredictorTheme {
         HelpButtonOverlay(
             uiState = PreviewData.forecastUiStateForMode(ForecastMode.THERMIC),
-        )
-    }
-}
-
-@Preview(name = "Forecast Help Overlay Error", showBackground = true)
-@Composable
-private fun HelpButtonOverlayErrorPreview() {
-    CloudbasePredictorTheme {
-        HelpButtonOverlay(
-            uiState = PreviewData.forecastUiStateForMode(
-                mode = ForecastMode.CLOUD,
-                errorMessage = "Unable to refresh forecast layers right now.",
-            ),
         )
     }
 }

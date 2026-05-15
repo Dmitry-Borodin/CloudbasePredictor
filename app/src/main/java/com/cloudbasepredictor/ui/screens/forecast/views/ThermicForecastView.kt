@@ -48,7 +48,7 @@ import com.cloudbasepredictor.domain.forecast.ThermalForecastConfidence
 import com.cloudbasepredictor.domain.forecast.ThermalLimitingReason
 import com.cloudbasepredictor.model.ForecastMode
 import com.cloudbasepredictor.ui.preview.PreviewData
-import com.cloudbasepredictor.ui.screens.forecast.ForecastUiState
+import com.cloudbasepredictor.ui.screens.forecast.ForecastReadyUiState
 import com.cloudbasepredictor.ui.screens.forecast.ForecastTestTags.THERMIC_VIEW
 import com.cloudbasepredictor.ui.screens.forecast.ThermicForecastChartUiModel
 import com.cloudbasepredictor.ui.screens.forecast.ThermicSlotDiagnostics
@@ -63,12 +63,11 @@ import kotlin.math.sin
 
 @Composable
 internal fun ThermicForecastView(
-    uiState: ForecastUiState,
+    uiState: ForecastReadyUiState,
     modifier: Modifier = Modifier,
     onVisibleTopAltitudeChange: (Float) -> Unit = {},
 ) {
     ForecastChartCard(
-        uiState = uiState,
         modifier = modifier.testTag(THERMIC_VIEW),
     ) { chartModifier ->
         Box(
@@ -82,7 +81,7 @@ internal fun ThermicForecastView(
                 onVisibleTopAltitudeChange = onVisibleTopAltitudeChange,
                 modifier = Modifier.fillMaxSize(),
             )
-            if (uiState.thermicChart.cells.isEmpty() && !uiState.isLoading) {
+            if (uiState.thermicChart.cells.isEmpty()) {
                 ForecastInformationView(
                     message = stringResource(R.string.forecast_no_thermals),
                 )

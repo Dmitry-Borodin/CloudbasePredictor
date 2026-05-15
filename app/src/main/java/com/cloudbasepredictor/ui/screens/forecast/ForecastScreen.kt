@@ -2,7 +2,6 @@ package com.cloudbasepredictor.ui.screens.forecast
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -142,8 +141,8 @@ fun ForecastScreen(
             ) {
                 val forecastContentHeight = (maxHeight - mapPanelHeightDp).coerceAtLeast(0.dp)
 
-                when {
-                    uiState.isLoading -> {
+                when (uiState) {
+                    is ForecastLoadingUiState -> {
                         ForecastLoadingContent(
                             placeName = uiState.selectedPlace?.name,
                             modifier = Modifier
@@ -151,7 +150,14 @@ fun ForecastScreen(
                                 .height(forecastContentHeight),
                         )
                     }
-                    uiState.errorMessage != null -> {
+                    is ForecastNoPlaceUiState -> {
+                        ForecastNoPlaceContent(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(forecastContentHeight),
+                        )
+                    }
+                    is ForecastErrorUiState -> {
                         ForecastErrorContent(
                             errorMessage = uiState.errorMessage,
                             onRetry = onRetryLoad,
@@ -160,7 +166,7 @@ fun ForecastScreen(
                                 .height(forecastContentHeight),
                         )
                     }
-                    else -> {
+                    is ForecastReadyUiState -> {
                         ForecastReadyContent(
                             uiState = uiState,
                             onForecastViewportTopChanged = onForecastViewportTopChanged,
@@ -192,11 +198,13 @@ fun ForecastScreen(
                 )
             }
 
-            ForecastDatePicker(
-                dayChips = uiState.dayChips,
-                selectedDayIndex = uiState.selectedDayIndex,
-                onDateSelected = onDateSelected,
-            )
+            if (uiState is ForecastReadyUiState) {
+                ForecastDatePicker(
+                    dayChips = uiState.dayChips,
+                    selectedDayIndex = uiState.selectedDayIndex,
+                    onDateSelected = onDateSelected,
+                )
+            }
         }
 
         if (showFavoriteDialog) {
@@ -209,6 +217,24 @@ fun ForecastScreen(
                 onDismiss = { showFavoriteDialog = false },
             )
         }
+    }
+}
+
+@Composable
+private fun ForecastNoPlaceContent(
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = stringResource(R.string.forecast_select_place),
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
     }
 }
 
@@ -272,7 +298,7 @@ private fun ForecastErrorContent(
 
 @Composable
 private fun ForecastReadyContent(
-    uiState: ForecastUiState,
+    uiState: ForecastReadyUiState,
     onForecastViewportTopChanged: (Float) -> Unit,
     onStuveHourChanged: (Int) -> Unit,
     modifier: Modifier = Modifier,
