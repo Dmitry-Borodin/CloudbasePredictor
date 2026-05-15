@@ -72,7 +72,9 @@ import kotlin.math.roundToInt
 private const val DRAG_HANDLE_HEIGHT_DP = 24
 private const val MAP_INITIAL_ZOOM = 12.0
 private const val SNAP_THRESHOLD_FRACTION = 0.25f
-private const val LOCATION_UPDATE_RATE_LIMIT_MS = 3_000L
+internal const val FORECAST_MAP_LOCATION_UPDATE_RATE_LIMIT_MS = 3_000L
+internal const val FORECAST_MAP_LOCATION_UPDATE_MIN_DISTANCE_METERS = 200.0
+private const val CAMERA_RECENTER_EPSILON_METERS = 5.0
 private const val GEOJSON_PROPERTY_NAME = "name"
 
 /**
@@ -101,6 +103,14 @@ fun ForecastMapPanel(
     val handleHeightPx = with(density) { DRAG_HANDLE_HEIGHT_DP.dp.toPx() }
 
     val maxPanelHeightPx = parentHeightPx * maxFraction
+    val rateLimitedMessage = stringResource(
+        R.string.forecast_map_update_too_frequent,
+        (FORECAST_MAP_LOCATION_UPDATE_RATE_LIMIT_MS / 1_000L).toInt(),
+    )
+    val tooCloseMessage = stringResource(
+        R.string.forecast_map_update_too_close,
+        FORECAST_MAP_LOCATION_UPDATE_MIN_DISTANCE_METERS.roundToInt(),
+    )
 
     // Snap to expanded when initiallyExpanded is true and parent height is known
     LaunchedEffect(initiallyExpanded, maxPanelHeightPx) {
@@ -126,24 +136,35 @@ fun ForecastMapPanel(
         ),
     )
 
-    // Re-center camera when currentPlace changes
-    LaunchedEffect(currentPlace?.latitude, currentPlace?.longitude) {
-        if (currentPlace != null) {
-            cameraState.animateTo(
-                CameraPosition(
-                    target = Position(longitude = currentPlace.longitude, latitude = currentPlace.latitude),
-                    zoom = MAP_INITIAL_ZOOM,
-                ),
-            )
-        }
-    }
-
     var lastUpdateTimeMs by remember { mutableLongStateOf(0L) }
-    var isRateLimited by remember { mutableStateOf(false) }
+    var lastForecastLocation by remember {
+        mutableStateOf(currentPlace?.toForecastMapLocation())
+    }
+    var ignoredProgrammaticIdleTarget by remember { mutableStateOf<ForecastMapLocation?>(null) }
+    var blockedUpdateMessage by remember { mutableStateOf<String?>(null) }
     var mapLoadError by rememberSaveable { mutableStateOf<String?>(null) }
     val mapAttributionText = stringResource(mapLayerAttributionRes(mapLayer))
     val mapAttributionDetailText = mapLayerAttributionDetailRes(mapLayer)?.let { detailRes ->
         stringResource(detailRes)
+    }
+
+    // Re-center camera when currentPlace changes
+    LaunchedEffect(currentPlace?.latitude, currentPlace?.longitude) {
+        if (currentPlace != null) {
+            val targetLocation = currentPlace.toForecastMapLocation()
+            lastForecastLocation = targetLocation
+
+            val cameraLocation = cameraState.position.target.toForecastMapLocation()
+            if (forecastMapDistanceMeters(cameraLocation, targetLocation) > CAMERA_RECENTER_EPSILON_METERS) {
+                ignoredProgrammaticIdleTarget = targetLocation
+                cameraState.animateTo(
+                    CameraPosition(
+                        target = Position(longitude = currentPlace.longitude, latitude = currentPlace.latitude),
+                        zoom = MAP_INITIAL_ZOOM,
+                    ),
+                )
+            }
+        }
     }
 
     LaunchedEffect(mapLayer) {
@@ -166,16 +187,46 @@ fun ForecastMapPanel(
         snapshotFlow { cameraState.isCameraMoving }
             .drop(1) // skip initial value
             .collectLatest { isMoving ->
+                if (isMoving) {
+                    blockedUpdateMessage = null
+                    return@collectLatest
+                }
+
                 if (!isMoving && panelHeightAnim.value > handleHeightPx * 2) {
                     val now = System.currentTimeMillis()
-                    val elapsed = now - lastUpdateTimeMs
-                    if (elapsed >= LOCATION_UPDATE_RATE_LIMIT_MS) {
-                        lastUpdateTimeMs = now
-                        isRateLimited = false
-                        val pos = cameraState.position
-                        onLocationChanged(pos.target.latitude, pos.target.longitude)
-                    } else {
-                        isRateLimited = true
+                    val target = cameraState.position.target
+                    val targetLocation = target.toForecastMapLocation()
+                    val programmaticIdleTarget = ignoredProgrammaticIdleTarget
+                    ignoredProgrammaticIdleTarget = null
+                    if (
+                        programmaticIdleTarget != null &&
+                        forecastMapDistanceMeters(targetLocation, programmaticIdleTarget) <= CAMERA_RECENTER_EPSILON_METERS
+                    ) {
+                        return@collectLatest
+                    }
+
+                    when (
+                        forecastMapLocationUpdateDecision(
+                            nowMs = now,
+                            lastUpdateTimeMs = lastUpdateTimeMs,
+                            lastLocation = lastForecastLocation,
+                            candidate = targetLocation,
+                        )
+                    ) {
+                        ForecastMapLocationUpdateDecision.UPDATE -> {
+                            lastUpdateTimeMs = now
+                            lastForecastLocation = targetLocation
+                            blockedUpdateMessage = null
+                            onLocationChanged(target.latitude, target.longitude)
+                        }
+                        ForecastMapLocationUpdateDecision.TOO_SOON -> {
+                            blockedUpdateMessage = rateLimitedMessage
+                            Toast.makeText(context.applicationContext, rateLimitedMessage, Toast.LENGTH_SHORT).show()
+                        }
+                        ForecastMapLocationUpdateDecision.TOO_CLOSE -> {
+                            blockedUpdateMessage = tooCloseMessage
+                            Toast.makeText(context.applicationContext, tooCloseMessage, Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }
@@ -331,8 +382,8 @@ fun ForecastMapPanel(
                             mapLoadError != null -> ForecastInformationView(
                                 message = mapUnavailableMessage,
                             )
-                            isRateLimited -> ForecastInformationView(
-                                message = stringResource(R.string.forecast_map_rate_limited),
+                            blockedUpdateMessage != null -> ForecastInformationView(
+                                message = blockedUpdateMessage.orEmpty(),
                             )
                         }
                     }
@@ -340,6 +391,54 @@ fun ForecastMapPanel(
             }
         }
     }
+}
+
+internal data class ForecastMapLocation(
+    val latitude: Double,
+    val longitude: Double,
+)
+
+internal enum class ForecastMapLocationUpdateDecision {
+    UPDATE,
+    TOO_SOON,
+    TOO_CLOSE,
+}
+
+internal fun forecastMapLocationUpdateDecision(
+    nowMs: Long,
+    lastUpdateTimeMs: Long,
+    lastLocation: ForecastMapLocation?,
+    candidate: ForecastMapLocation,
+    rateLimitMs: Long = FORECAST_MAP_LOCATION_UPDATE_RATE_LIMIT_MS,
+    minDistanceMeters: Double = FORECAST_MAP_LOCATION_UPDATE_MIN_DISTANCE_METERS,
+): ForecastMapLocationUpdateDecision {
+    if (lastUpdateTimeMs > 0L && nowMs - lastUpdateTimeMs < rateLimitMs) {
+        return ForecastMapLocationUpdateDecision.TOO_SOON
+    }
+
+    if (lastLocation != null && forecastMapDistanceMeters(lastLocation, candidate) < minDistanceMeters) {
+        return ForecastMapLocationUpdateDecision.TOO_CLOSE
+    }
+
+    return ForecastMapLocationUpdateDecision.UPDATE
+}
+
+internal fun forecastMapDistanceMeters(
+    first: ForecastMapLocation,
+    second: ForecastMapLocation,
+): Double {
+    val dLat = Math.toRadians(first.latitude - second.latitude)
+    val dLon = Math.toRadians(first.longitude - second.longitude) *
+        kotlin.math.cos(Math.toRadians((first.latitude + second.latitude) / 2.0))
+    return kotlin.math.sqrt(dLat * dLat + dLon * dLon) * EARTH_RADIUS_METERS
+}
+
+private fun SavedPlace.toForecastMapLocation(): ForecastMapLocation {
+    return ForecastMapLocation(latitude = latitude, longitude = longitude)
+}
+
+private fun Position.toForecastMapLocation(): ForecastMapLocation {
+    return ForecastMapLocation(latitude = latitude, longitude = longitude)
 }
 
 private fun buildPlaceGeoJson(place: SavedPlace): String {
@@ -357,6 +456,8 @@ private fun buildPlaceGeoJson(place: SavedPlace): String {
         }
     """.trimIndent()
 }
+
+private const val EARTH_RADIUS_METERS = 6_371_000.0
 
 private fun buildFavoritesGeoJson(places: List<SavedPlace>): String {
     if (places.isEmpty()) return emptyGeoJson()
