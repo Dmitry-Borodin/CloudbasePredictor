@@ -44,16 +44,17 @@
     <string name="about_foss_label">is Free and Open Source Software</string>
     <string name="about_source_code">Source code</string>
     <string name="about_data_sources">Data sources</string>
-    <string name="about_forecast_data_label">Forecast data: </string>
+    <string name="about_forecast_data_label">Forecast data</string>
     <string name="about_open_meteo">Open-Meteo</string>
-    <string name="about_map_tiles_label">Map tiles: </string>
+    <string name="about_map_services_label">Map services and imagery</string>
     <string name="about_openfreemap">OpenFreeMap</string>
-    <string name="about_openmaptiles">OpenMapTiles</string>
+    <string name="about_openmaptiles_source">OpenMapTiles source data</string>
     <string name="about_openstreetmap">OpenStreetMap contributors</string>
     <string name="about_nasa_gibs">NASA GIBS</string>
     <string name="about_esri_world_imagery">Esri World Imagery</string>
-    <string name="about_esri_attribution">Esri attribution</string>
-    <string name="about_map_sdk_label">Map SDK: </string>
+    <string name="about_esri_world_imagery_detail">Powered by Esri\nSources: Esri, Vantor, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, © OpenStreetMap contributors, TomTom, Garmin, FAO, NOAA, and the GIS User Community</string>
+    <string name="about_technology">Technology</string>
+    <string name="about_map_sdk_label">Map SDK</string>
     <string name="about_maplibre">MapLibre</string>
 
     <!-- Forecast -->
