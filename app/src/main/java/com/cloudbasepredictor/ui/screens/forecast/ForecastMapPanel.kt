@@ -72,7 +72,7 @@ import kotlin.math.roundToInt
 private const val DRAG_HANDLE_HEIGHT_DP = 24
 private const val MAP_INITIAL_ZOOM = 12.0
 private const val SNAP_THRESHOLD_FRACTION = 0.25f
-internal const val FORECAST_MAP_LOCATION_UPDATE_RATE_LIMIT_MS = 3_000L
+internal const val FORECAST_MAP_LOCATION_UPDATE_RATE_LIMIT_MS = 1_500L
 internal const val FORECAST_MAP_LOCATION_UPDATE_MIN_DISTANCE_METERS = 200.0
 private const val CAMERA_RECENTER_EPSILON_METERS = 5.0
 private const val GEOJSON_PROPERTY_NAME = "name"
@@ -105,7 +105,7 @@ fun ForecastMapPanel(
     val maxPanelHeightPx = parentHeightPx * maxFraction
     val rateLimitedMessage = stringResource(
         R.string.forecast_map_update_too_frequent,
-        (FORECAST_MAP_LOCATION_UPDATE_RATE_LIMIT_MS / 1_000L).toInt(),
+        FORECAST_MAP_LOCATION_UPDATE_RATE_LIMIT_MS / 1_000f,
     )
     val tooCloseMessage = stringResource(
         R.string.forecast_map_update_too_close,

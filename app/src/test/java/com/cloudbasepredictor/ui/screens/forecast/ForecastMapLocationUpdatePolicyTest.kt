@@ -19,11 +19,11 @@ class ForecastMapLocationUpdatePolicyTest {
     @Test
     fun updateDecision_blocksUpdatesWithinRateLimitWindow() {
         val decision = forecastMapLocationUpdateDecision(
-            nowMs = 12_000L,
+            nowMs = 11_000L,
             lastUpdateTimeMs = 10_000L,
             lastLocation = ForecastMapLocation(latitude = 47.2692, longitude = 11.4041),
             candidate = ForecastMapLocation(latitude = 47.30, longitude = 11.45),
-            rateLimitMs = 3_000L,
+            rateLimitMs = 1_500L,
             minDistanceMeters = 200.0,
         )
 
@@ -37,7 +37,7 @@ class ForecastMapLocationUpdatePolicyTest {
             lastUpdateTimeMs = 10_000L,
             lastLocation = ForecastMapLocation(latitude = 47.2692, longitude = 11.4041),
             candidate = ForecastMapLocation(latitude = 47.2700, longitude = 11.4041),
-            rateLimitMs = 3_000L,
+            rateLimitMs = 1_500L,
             minDistanceMeters = 200.0,
         )
 
@@ -51,7 +51,7 @@ class ForecastMapLocationUpdatePolicyTest {
             lastUpdateTimeMs = 10_000L,
             lastLocation = ForecastMapLocation(latitude = 47.2692, longitude = 11.4041),
             candidate = ForecastMapLocation(latitude = 47.30, longitude = 11.45),
-            rateLimitMs = 3_000L,
+            rateLimitMs = 1_500L,
             minDistanceMeters = 200.0,
         )
 
