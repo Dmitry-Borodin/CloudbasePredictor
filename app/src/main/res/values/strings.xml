@@ -16,6 +16,8 @@
     <string name="cd_favorites">Favorites</string>
     <string name="cd_settings">Settings</string>
     <string name="cd_map_layer">Map layer</string>
+    <string name="cd_current_location">Current location</string>
+    <string name="cd_reset_north">Reset north</string>
     <string name="cd_open_map">Open map</string>
     <string name="cd_open_forecast_help">Open forecast help</string>
     <string name="cd_selected">Selected</string>
@@ -98,6 +100,8 @@
     <string name="map_attribution_esri_world_imagery_full">Sources: Esri, Vantor, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, © OpenStreetMap contributors, TomTom, Garmin, FAO, NOAA, and the GIS User Community</string>
     <string name="map_attribution_title">Map attribution</string>
     <string name="map_attribution_full">© OpenFreeMap © OpenMapTiles Data from OpenStreetMap contributors</string>
+    <string name="map_waiting_for_location">Waiting for device location…</string>
+    <string name="map_location_permission_denied">Location permission is needed to center the map on your position.</string>
 
     <!-- Help dialog - Thermic -->
     <string name="help_thermic_title">Thermic forecast help</string>

@@ -33,6 +33,25 @@ class MapScreenTest {
     }
 
     @Test
+    fun mapScreen_showsCurrentLocationButton() {
+        composeRule.setContent {
+            CloudbasePredictorTheme {
+                MapScreen(
+                    uiState = MapUiState(),
+                    onMapTapped = { _, _ -> },
+                    onFavoriteTapped = {},
+                    onOpenForecast = {},
+                    onFavoriteClick = {},
+                    onSaveCameraPosition = { _, _, _ -> },
+                    autoOpenFavoritesOnStartup = false,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(MapTestTags.CURRENT_LOCATION_BUTTON).assertIsDisplayed()
+    }
+
+    @Test
     fun mapScreen_autoOpensFavoritesDialogWhenAtLeastTwoFavoritesExist() {
         composeRule.setContent {
             CloudbasePredictorTheme {

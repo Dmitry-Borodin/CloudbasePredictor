@@ -1,6 +1,12 @@
 package com.cloudbasepredictor.ui.screens.map
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.pm.PackageManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +22,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -37,11 +45,13 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +60,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cloudbasepredictor.BuildConfig
@@ -66,6 +77,7 @@ import com.cloudbasepredictor.ui.map.mapLayerAttributionRes
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -73,6 +85,11 @@ import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.layers.CircleLayer
+import org.maplibre.compose.location.DesiredAccuracy
+import org.maplibre.compose.location.LocationPuck
+import org.maplibre.compose.location.rememberDefaultLocationProvider
+import org.maplibre.compose.location.rememberNullLocationProvider
+import org.maplibre.compose.location.rememberUserLocationState
 import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.OrnamentOptions
@@ -81,10 +98,19 @@ import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.util.ClickResult
 import org.maplibre.spatialk.geojson.Feature
 import org.maplibre.spatialk.geojson.Position
+import kotlin.math.min
+import kotlin.time.Duration.Companion.seconds
 
 private const val GEOJSON_PROPERTY_NAME = "name"
 private const val GEOJSON_PROPERTY_PLACE_ID = "placeId"
 private const val FAVORITE_POINTS_LAYER_ID = "favorite-points"
+private const val USER_LOCATION_LAYER_ID_PREFIX = "user-location"
+private const val DEVICE_LOCATION_MIN_ZOOM = 12.0
+private const val NORTH_BUTTON_VISIBILITY_THRESHOLD_DEGREES = 1.0
+private val LOCATION_PERMISSIONS = arrayOf(
+    Manifest.permission.ACCESS_FINE_LOCATION,
+    Manifest.permission.ACCESS_COARSE_LOCATION,
+)
 
 @Composable
 fun MapRoute(
@@ -115,6 +141,7 @@ fun MapRoute(
     )
 }
 
+@SuppressLint("MissingPermission")
 @Composable
 fun MapScreen(
     uiState: MapUiState,
@@ -131,8 +158,13 @@ fun MapScreen(
 ) {
     val context = LocalContext.current
     val unavailableMessage = stringResource(R.string.map_unavailable_message)
+    val waitingForLocationMessage = stringResource(R.string.map_waiting_for_location)
+    val locationPermissionDeniedMessage = stringResource(R.string.map_location_permission_denied)
+    val scope = rememberCoroutineScope()
     var mapRetryKey by rememberSaveable { mutableIntStateOf(0) }
     var mapLoadError by rememberSaveable { mutableStateOf<String?>(null) }
+    var hasLocationPermission by remember { mutableStateOf(context.hasAnyLocationPermission()) }
+    var centerOnNextLocation by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(mapLoadError) {
         val error = mapLoadError ?: return@LaunchedEffect
@@ -156,6 +188,60 @@ fun MapScreen(
             zoom = initialCamera?.zoom ?: 5.5,
         )
     )
+    val locationProvider = if (hasLocationPermission) {
+        rememberDefaultLocationProvider(
+            updateInterval = 5.seconds,
+            desiredAccuracy = DesiredAccuracy.Balanced,
+            minDistanceMeters = 5.0,
+        )
+    } else {
+        rememberNullLocationProvider()
+    }
+    val userLocationState = rememberUserLocationState(locationProvider)
+    val normalizedCameraBearing = normalizedBearingDegrees(cameraState.position.bearing)
+
+    fun centerMapOnDeviceLocation(position: Position) {
+        centerOnNextLocation = false
+        scope.launch {
+            cameraState.animateTo(cameraPositionForDeviceLocation(cameraState.position, position))
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) { permissionResults ->
+        val permissionGranted = permissionResults.hasAnyLocationPermissionGrant()
+        hasLocationPermission = permissionGranted
+
+        if (permissionGranted) {
+            val location = userLocationState.location
+            if (location != null) {
+                centerMapOnDeviceLocation(location.position)
+            } else {
+                centerOnNextLocation = true
+                Toast.makeText(
+                    context.applicationContext,
+                    waitingForLocationMessage,
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        } else {
+            centerOnNextLocation = false
+            Toast.makeText(
+                context.applicationContext,
+                locationPermissionDeniedMessage,
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    LaunchedEffect(centerOnNextLocation, userLocationState.location) {
+        if (!centerOnNextLocation) return@LaunchedEffect
+
+        val location = userLocationState.location ?: return@LaunchedEffect
+        centerOnNextLocation = false
+        cameraState.animateTo(cameraPositionForDeviceLocation(cameraState.position, location.position))
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -256,6 +342,14 @@ fun MapScreen(
                         strokeColor = const(Color.White),
                         strokeWidth = const(3.dp),
                     )
+
+                    if (hasLocationPermission && userLocationState.location != null) {
+                        LocationPuck(
+                            idPrefix = USER_LOCATION_LAYER_ID_PREFIX,
+                            locationState = userLocationState,
+                            cameraState = cameraState,
+                        )
+                    }
                 }
             }
 
@@ -310,6 +404,49 @@ fun MapScreen(
                 modifier = Modifier.testTag(MapTestTags.SETTINGS_BUTTON),
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            MapChromeIconButton(
+                onClick = {
+                    val permissionGranted = context.hasAnyLocationPermission()
+                    hasLocationPermission = permissionGranted
+
+                    if (!permissionGranted) {
+                        locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
+                        return@MapChromeIconButton
+                    }
+
+                    val location = userLocationState.location
+                    if (location != null) {
+                        centerMapOnDeviceLocation(location.position)
+                    } else {
+                        centerOnNextLocation = true
+                        Toast.makeText(
+                            context.applicationContext,
+                            waitingForLocationMessage,
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                },
+                imageVector = Icons.Outlined.MyLocation,
+                contentDescription = stringResource(R.string.cd_current_location),
+                modifier = Modifier.testTag(MapTestTags.CURRENT_LOCATION_BUTTON),
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            if (shouldShowNorthButton(cameraState.position.bearing)) {
+                MapChromeIconButton(
+                    onClick = {
+                        scope.launch {
+                            cameraState.animateTo(cameraState.position.copy(bearing = 0.0))
+                        }
+                    },
+                    imageVector = Icons.Outlined.Explore,
+                    contentDescription = stringResource(R.string.cd_reset_north),
+                    modifier = Modifier.testTag(MapTestTags.NORTH_BUTTON),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    iconModifier = Modifier.rotate(-normalizedCameraBearing.toFloat()),
+                )
+            }
 
             Box {
                 MapChromeIconButton(
@@ -407,6 +544,7 @@ private fun MapChromeIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    iconModifier: Modifier = Modifier,
 ) {
     FloatingActionButton(
         onClick = onClick,
@@ -418,6 +556,7 @@ private fun MapChromeIconButton(
         Icon(
             imageVector = imageVector,
             contentDescription = contentDescription,
+            modifier = iconModifier,
         )
     }
 }
@@ -563,6 +702,40 @@ internal fun findFavoritePlaceForFeatures(
 
         favoritePlaces.firstOrNull { favorite -> favorite.id == placeId }
     }
+}
+
+internal fun normalizedBearingDegrees(bearing: Double): Double {
+    val normalized = bearing % 360.0
+    return if (normalized < 0.0) normalized + 360.0 else normalized
+}
+
+internal fun shouldShowNorthButton(
+    bearing: Double,
+    thresholdDegrees: Double = NORTH_BUTTON_VISIBILITY_THRESHOLD_DEGREES,
+): Boolean {
+    val normalizedBearing = normalizedBearingDegrees(bearing)
+    val distanceToNorth = min(normalizedBearing, 360.0 - normalizedBearing)
+    return distanceToNorth >= thresholdDegrees
+}
+
+private fun cameraPositionForDeviceLocation(
+    currentPosition: CameraPosition,
+    devicePosition: Position,
+): CameraPosition {
+    return currentPosition.copy(
+        target = devicePosition,
+        zoom = currentPosition.zoom.coerceAtLeast(DEVICE_LOCATION_MIN_ZOOM),
+    )
+}
+
+private fun Context.hasAnyLocationPermission(): Boolean {
+    return LOCATION_PERMISSIONS.any { permission ->
+        ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    }
+}
+
+private fun Map<String, Boolean>.hasAnyLocationPermissionGrant(): Boolean {
+    return LOCATION_PERMISSIONS.any { permission -> this[permission] == true }
 }
 
 private fun String.escapeJsonString(): String {
