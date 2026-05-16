@@ -30,6 +30,8 @@ interface PlaceRepository {
 
     suspend fun saveFavorite(placeId: String, name: String)
 
+    suspend fun saveFavoritePlace(place: SavedPlace)
+
     suspend fun deleteFavorite(placeId: String)
 
     suspend fun selectPlace(place: SavedPlace)
@@ -86,6 +88,16 @@ class DefaultPlaceRepository @Inject constructor(
         savedPlaceDao.upsert(updated)
         syncFavoritePlacesToBackup()
         if (mutableSelectedPlace.value?.id == placeId) {
+            mutableSelectedPlace.value = updated.toDomainModel()
+        }
+    }
+
+    override suspend fun saveFavoritePlace(place: SavedPlace) = withContext(ioDispatcher) {
+        restoreJob.join()
+        val updated = place.toFavoriteEntity()
+        savedPlaceDao.upsert(updated)
+        syncFavoritePlacesToBackup()
+        if (mutableSelectedPlace.value?.id == place.id) {
             mutableSelectedPlace.value = updated.toDomainModel()
         }
     }

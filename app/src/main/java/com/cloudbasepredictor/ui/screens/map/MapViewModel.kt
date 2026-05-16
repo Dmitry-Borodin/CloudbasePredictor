@@ -101,6 +101,14 @@ class MapViewModel @Inject constructor(
         }
     }
 
+    fun addManualFavorite(place: SavedPlace) {
+        val favoritePlace = place.copy(isFavorite = true)
+        selectedPlaceDraft.value = favoritePlace
+        viewModelScope.launch {
+            placeRepository.saveFavoritePlace(favoritePlace)
+        }
+    }
+
     fun saveCameraPosition(latitude: Double, longitude: Double, zoom: Double) {
         prefs.edit()
             .putLong(KEY_LAT, latitude.toBits())

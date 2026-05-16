@@ -8,6 +8,7 @@
     <string name="action_close">Close</string>
     <string name="action_retry">Retry</string>
     <string name="action_open">Open</string>
+    <string name="action_add_manually">Add manually</string>
     <string name="action_about">About the App</string>
 
     <!-- Content descriptions -->
@@ -31,6 +32,16 @@
     <!-- FavoritesListDialog -->
     <string name="dialog_title_favorites">Favorites</string>
     <string name="favorites_empty_message">No favorites yet. Tap the star on the forecast screen to save a place.</string>
+    <string name="dialog_title_add_manual_favorite">Add Favorite Manually</string>
+    <string name="label_coordinates">Coordinates</string>
+    <string name="manual_favorite_coordinates_placeholder">47.3769, 8.5417</string>
+    <string name="manual_favorite_coordinates_help">Enter latitude, longitude. Decimal degrees and DMS with N/S/E/W are accepted; negative values mean south or west.</string>
+    <string name="manual_favorite_error_blank_name">Enter a name.</string>
+    <string name="manual_favorite_error_name_too_long">Use a shorter name.</string>
+    <string name="manual_favorite_error_blank_coordinates">Enter coordinates.</string>
+    <string name="manual_favorite_error_coordinates_format">Enter two coordinates, for example 47.3769, 8.5417.</string>
+    <string name="manual_favorite_error_latitude_range">Latitude must be between -90 and 90.</string>
+    <string name="manual_favorite_error_longitude_range">Longitude must be between -180 and 180.</string>
 
     <!-- Settings -->
     <string name="title_settings">Settings</string>
