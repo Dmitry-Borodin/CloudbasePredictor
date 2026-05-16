@@ -61,6 +61,8 @@
     <string name="about_open_meteo">Open-Meteo</string>
     <string name="about_map_services_label">Map services and imagery</string>
     <string name="about_openfreemap">OpenFreeMap</string>
+    <string name="about_opentopomap">OpenTopoMap</string>
+    <string name="about_opentopomap_detail">Map data: © OpenStreetMap contributors, SRTM\nMap style: © OpenTopoMap (CC-BY-SA)</string>
     <string name="about_openmaptiles_source">OpenMapTiles source data</string>
     <string name="about_openstreetmap">OpenStreetMap contributors</string>
     <string name="about_nasa_gibs">NASA GIBS</string>
@@ -92,9 +94,12 @@
     <string name="map_unavailable_message">Unable to load the map. Check network access or try again.</string>
     <string name="coordinates_lat_lon_format" formatted="false">Lat %.4f, Lon %.4f</string>
     <string name="map_layer_openfreemap">OpenFreeMap</string>
+    <string name="map_layer_opentopomap">OpenTopoMap</string>
     <string name="map_layer_nasa_gibs">NASA GIBS</string>
     <string name="map_layer_esri_world_imagery">Esri World Imagery</string>
     <string name="map_attribution_compact">© OpenMapTiles · © OpenStreetMap</string>
+    <string name="map_attribution_opentopomap_compact">© OpenTopoMap CC-BY-SA · © OpenStreetMap/SRTM</string>
+    <string name="map_attribution_opentopomap_full">Map data: © OpenStreetMap contributors, SRTM\nMap style: © OpenTopoMap (CC-BY-SA)</string>
     <string name="map_attribution_nasa_gibs_compact">NASA GIBS</string>
     <string name="map_attribution_esri_world_imagery_compact">Powered by Esri · Sources</string>
     <string name="map_attribution_esri_world_imagery_full">Sources: Esri, Vantor, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, © OpenStreetMap contributors, TomTom, Garmin, FAO, NOAA, and the GIS User Community</string>

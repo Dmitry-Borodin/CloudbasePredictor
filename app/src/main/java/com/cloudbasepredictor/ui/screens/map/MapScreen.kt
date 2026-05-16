@@ -564,6 +564,7 @@ private fun MapChromeIconButton(
 private fun MapLayerPreference.labelRes(): Int {
     return when (this) {
         MapLayerPreference.OPENFREEMAP -> R.string.map_layer_openfreemap
+        MapLayerPreference.OPENTOPOMAP -> R.string.map_layer_opentopomap
         MapLayerPreference.NASA_GIBS -> R.string.map_layer_nasa_gibs
         MapLayerPreference.ESRI_WORLD_IMAGERY -> R.string.map_layer_esri_world_imagery
     }

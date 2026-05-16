@@ -39,6 +39,7 @@ import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 private const val SOURCE_CODE_URL = "https://github.com/CloudbasePredictor/CloudbasePredictor"
 private const val OPEN_METEO_URL = "https://open-meteo.com"
 private const val OPENFREEMAP_URL = "https://openfreemap.org"
+private const val OPENTOPOMAP_URL = "https://opentopomap.org/about"
 private const val OPENMAPTILES_URL = "https://openmaptiles.org"
 private const val OPENSTREETMAP_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright"
 private const val NASA_GIBS_URL =
@@ -164,6 +165,24 @@ fun AboutScreen(
                                     title = stringResource(R.string.about_openmaptiles_source),
                                     url = OPENMAPTILES_URL,
                                 ),
+                                DataSourceLink(
+                                    title = stringResource(R.string.about_openstreetmap),
+                                    url = OPENSTREETMAP_COPYRIGHT_URL,
+                                ),
+                            ),
+                            linkColor = linkColor,
+                            onOpenUrl = ::openUrl,
+                        )
+
+                        ProviderDivider()
+
+                        ProviderBlock(
+                            primaryLink = DataSourceLink(
+                                title = stringResource(R.string.about_opentopomap),
+                                url = OPENTOPOMAP_URL,
+                            ),
+                            detail = stringResource(R.string.about_opentopomap_detail),
+                            relatedLinks = listOf(
                                 DataSourceLink(
                                     title = stringResource(R.string.about_openstreetmap),
                                     url = OPENSTREETMAP_COPYRIGHT_URL,

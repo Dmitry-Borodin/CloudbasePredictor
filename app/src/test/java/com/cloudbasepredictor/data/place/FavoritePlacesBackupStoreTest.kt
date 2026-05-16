@@ -163,6 +163,24 @@ class FavoritePlacesBackupStoreTest {
     }
 
     @Test
+    fun readMapLayer_returnsSavedOpenTopoMapLayer() {
+        prefs.edit()
+            .putString(
+                "payload",
+                """
+                    {
+                      "schemaVersion": 3,
+                      "places": [],
+                      "mapLayer": "OPENTOPOMAP"
+                    }
+                """.trimIndent(),
+            )
+            .apply()
+
+        assertEquals(MapLayerPreference.OPENTOPOMAP, store.readMapLayer())
+    }
+
+    @Test
     fun readMapLayer_missingOrUnknownValue_returnsNullWithoutBreakingFavorites() {
         prefs.edit()
             .putString(

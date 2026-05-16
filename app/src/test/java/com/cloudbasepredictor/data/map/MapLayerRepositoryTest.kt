@@ -17,6 +17,7 @@ class MapLayerRepositoryTest {
         assertEquals(
             listOf(
                 MapLayerPreference.OPENFREEMAP,
+                MapLayerPreference.OPENTOPOMAP,
                 MapLayerPreference.NASA_GIBS,
                 MapLayerPreference.ESRI_WORLD_IMAGERY,
             ),

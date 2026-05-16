@@ -15,6 +15,11 @@ import org.maplibre.compose.sources.rememberRasterSource
 import org.maplibre.compose.style.BaseStyle
 
 private const val OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
+private const val OPENTOPOMAP_LAYER_ID = "opentopomap"
+private const val OPENTOPOMAP_ATTRIBUTION_HTML =
+    "Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)"
+private const val OPENTOPOMAP_MAX_NATIVE_ZOOM = 17
+private const val OPENTOPOMAP_TILE_SIZE = 256
 private const val NASA_GIBS_LAYER_ID = "nasa-gibs-true-color"
 private const val NASA_GIBS_TILE_MATRIX_SET = "GoogleMapsCompatible_Level9"
 private const val NASA_GIBS_ATTRIBUTION_HTML = "NASA Global Imagery Browse Services (GIBS)"
@@ -32,6 +37,7 @@ private const val ESRI_WORLD_IMAGERY_TILE_SIZE = 256
 internal fun mapBaseStyle(layer: MapLayerPreference): BaseStyle {
     return when (layer) {
         MapLayerPreference.OPENFREEMAP -> BaseStyle.Uri(OPENFREEMAP_STYLE_URL)
+        MapLayerPreference.OPENTOPOMAP -> BaseStyle.Empty
         MapLayerPreference.NASA_GIBS -> BaseStyle.Empty
         MapLayerPreference.ESRI_WORLD_IMAGERY -> BaseStyle.Empty
     }
@@ -41,6 +47,21 @@ internal fun mapBaseStyle(layer: MapLayerPreference): BaseStyle {
 internal fun MapRasterBaseLayer(layer: MapLayerPreference) {
     when (layer) {
         MapLayerPreference.OPENFREEMAP -> return
+        MapLayerPreference.OPENTOPOMAP -> {
+            val source = rememberRasterSource(
+                tiles = openTopoMapTileUrls(),
+                options = TileSetOptions(
+                    minZoom = 0,
+                    maxZoom = OPENTOPOMAP_MAX_NATIVE_ZOOM,
+                    attributionHtml = OPENTOPOMAP_ATTRIBUTION_HTML,
+                ),
+                tileSize = OPENTOPOMAP_TILE_SIZE,
+            )
+            RasterLayer(
+                id = OPENTOPOMAP_LAYER_ID,
+                source = source,
+            )
+        }
         MapLayerPreference.NASA_GIBS -> {
             val tileDate = remember { nasaGibsTileDateUtc() }
             val source = rememberRasterSource(
@@ -79,6 +100,7 @@ internal fun MapRasterBaseLayer(layer: MapLayerPreference) {
 internal fun mapLayerAttributionRes(layer: MapLayerPreference): Int {
     return when (layer) {
         MapLayerPreference.OPENFREEMAP -> R.string.map_attribution_compact
+        MapLayerPreference.OPENTOPOMAP -> R.string.map_attribution_opentopomap_compact
         MapLayerPreference.NASA_GIBS -> R.string.map_attribution_nasa_gibs_compact
         MapLayerPreference.ESRI_WORLD_IMAGERY -> R.string.map_attribution_esri_world_imagery_compact
     }
@@ -88,9 +110,18 @@ internal fun mapLayerAttributionRes(layer: MapLayerPreference): Int {
 internal fun mapLayerAttributionDetailRes(layer: MapLayerPreference): Int? {
     return when (layer) {
         MapLayerPreference.OPENFREEMAP -> null
+        MapLayerPreference.OPENTOPOMAP -> R.string.map_attribution_opentopomap_full
         MapLayerPreference.NASA_GIBS -> null
         MapLayerPreference.ESRI_WORLD_IMAGERY -> R.string.map_attribution_esri_world_imagery_full
     }
+}
+
+internal fun openTopoMapTileUrls(): List<String> {
+    return listOf(
+        "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
+        "https://b.tile.opentopomap.org/{z}/{x}/{y}.png",
+        "https://c.tile.opentopomap.org/{z}/{x}/{y}.png",
+    )
 }
 
 internal fun nasaGibsTileDateUtc(nowMillis: Long = System.currentTimeMillis()): String {

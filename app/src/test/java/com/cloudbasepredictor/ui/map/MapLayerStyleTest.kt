@@ -26,6 +26,18 @@ class MapLayerStyleTest {
     }
 
     @Test
+    fun openTopoMapTileUrls_useHttpsSubdomains() {
+        assertEquals(
+            listOf(
+                "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
+                "https://b.tile.opentopomap.org/{z}/{x}/{y}.png",
+                "https://c.tile.opentopomap.org/{z}/{x}/{y}.png",
+            ),
+            openTopoMapTileUrls(),
+        )
+    }
+
+    @Test
     fun esriWorldImageryTileUrl_usesArcGisTileEndpoint() {
         assertEquals(
             "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -34,7 +46,15 @@ class MapLayerStyleTest {
     }
 
     @Test
-    fun esriWorldImageryAttribution_usesCompactPoweredByTextAndExpandableDetails() {
+    fun mapLayerAttribution_usesExpandableDetailsForAttributionHeavySources() {
+        assertEquals(
+            R.string.map_attribution_opentopomap_compact,
+            mapLayerAttributionRes(MapLayerPreference.OPENTOPOMAP),
+        )
+        assertEquals(
+            R.string.map_attribution_opentopomap_full,
+            mapLayerAttributionDetailRes(MapLayerPreference.OPENTOPOMAP),
+        )
         assertEquals(
             R.string.map_attribution_esri_world_imagery_compact,
             mapLayerAttributionRes(MapLayerPreference.ESRI_WORLD_IMAGERY),

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 enum class MapLayerPreference {
     OPENFREEMAP,
+    OPENTOPOMAP,
     NASA_GIBS,
     ESRI_WORLD_IMAGERY,
 }
