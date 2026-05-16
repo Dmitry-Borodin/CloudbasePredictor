@@ -29,6 +29,7 @@ Built with Jetpack Compose, it visualises atmospheric sounding data from [Open-M
 - **Multiple models** — ICON Seamless, ICON D2, GFS Seamless, and more via Open-Meteo
 - **Favourite places** — save your flying sites and switch between them instantly
 - **Interactive map** — pick any location on an OpenStreetMap-based map to get a forecast
+- **Selectable map layers** — switch between OpenFreeMap, NASA GIBS true-colour imagery, and Esri World Imagery
 - **Pinch-to-zoom** — adjust the visible altitude range on all chart views
 - **Dark theme** — full Material 3 dark-mode support
 
@@ -61,7 +62,8 @@ cd CloudbasePredictor
 ## Data Sources and Maps
 
 - Forecast data is provided by [Open-Meteo](https://open-meteo.com/), including pressure-level forecast profiles from models such as ICON and GFS.
-- Map tiles are loaded from the [OpenFreeMap](https://openfreemap.org/) Liberty style, using [OpenMapTiles](https://openmaptiles.org/) and data from [OpenStreetMap contributors](https://www.openstreetmap.org/copyright).
+- Map layers include the [OpenFreeMap](https://openfreemap.org/) Liberty style, [NASA GIBS](https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api) true-colour imagery, and [Esri World Imagery](https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer).
+- OpenFreeMap uses [OpenMapTiles](https://openmaptiles.org/) and data from [OpenStreetMap contributors](https://www.openstreetmap.org/copyright).
 - Maps are rendered in the app with [MapLibre Compose](https://maplibre.org/maplibre-compose/) and MapLibre for Android.
 
 ## License
