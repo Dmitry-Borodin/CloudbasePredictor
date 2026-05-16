@@ -1,0 +1,7 @@
+First stable release.
+
+- Add selectable map layers with OpenFreeMap, NASA GIBS, and Esri World Imagery.
+- Improve map layer attribution and About page data source structure.
+- Use explicit forecast loading and ready states to avoid placeholder forecast data.
+- Add rate limiting feedback for forecast map updates.
+- Restore the map favorites button on first launch and auto-open favorites when multiple saved places exist.

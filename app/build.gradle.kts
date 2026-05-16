@@ -50,8 +50,8 @@ android {
         applicationId = "com.cloudbasepredictor"
         minSdk = 25
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.0.4"
+        versionCode = 5
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "com.cloudbasepredictor.HiltTestRunner"
 
