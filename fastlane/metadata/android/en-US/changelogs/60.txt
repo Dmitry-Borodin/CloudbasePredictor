@@ -1,0 +1,5 @@
+New in 1.1.0:
+
+- Add manual favorite entry from the Favorites dialog.
+- Accept pasted decimal, labeled, N/S/E/W, and DMS coordinate formats.
+- Improve Android test CI and update build tooling.
