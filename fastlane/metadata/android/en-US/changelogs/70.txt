@@ -1,0 +1,5 @@
+New in 1.2.0:
+
+- Add OpenTopoMap as a selectable map layer.
+- Add map controls for returning to the selected location and resetting north.
+- Refresh store and project descriptions with the latest map layer details.
