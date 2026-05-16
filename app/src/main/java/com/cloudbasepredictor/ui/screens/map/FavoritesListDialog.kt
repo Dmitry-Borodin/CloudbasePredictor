@@ -1,33 +1,43 @@
-package com.cloudbasepredictor.ui.components
+package com.cloudbasepredictor.ui.screens.map
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.model.SavedPlace
+import com.cloudbasepredictor.ui.components.MapTestTags
 import com.cloudbasepredictor.ui.preview.PreviewData
 import com.cloudbasepredictor.ui.theme.CloudbasePredictorTheme
 import java.util.Locale
 
 @Composable
-fun FavoritesListDialog(
+internal fun FavoritesListDialog(
     favorites: List<SavedPlace>,
     onPlaceClick: (SavedPlace) -> Unit,
+    onAddManualClick: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -39,10 +49,8 @@ fun FavoritesListDialog(
         },
         text = {
             if (favorites.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.favorites_empty_message),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                FavoritesEmptyContent(
+                    onAddManualClick = onAddManualClick,
                 )
             } else {
                 LazyColumn(
@@ -60,6 +68,12 @@ fun FavoritesListDialog(
                         )
                         HorizontalDivider()
                     }
+                    item(key = "add_manual_favorite") {
+                        AddManualFavoriteButton(
+                            onClick = onAddManualClick,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
                 }
             }
         },
@@ -69,6 +83,46 @@ fun FavoritesListDialog(
             }
         },
     )
+}
+
+@Composable
+private fun FavoritesEmptyContent(
+    onAddManualClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.favorites_empty_message),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        AddManualFavoriteButton(onClick = onAddManualClick)
+    }
+}
+
+@Composable
+private fun AddManualFavoriteButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(MapTestTags.ADD_MANUAL_FAVORITE_BUTTON)
+            .padding(vertical = 4.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Add,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = stringResource(R.string.action_add_manually))
+    }
 }
 
 @Composable
@@ -108,6 +162,7 @@ private fun FavoritesListDialogPreview() {
         FavoritesListDialog(
             favorites = PreviewData.favoritePlaces,
             onPlaceClick = {},
+            onAddManualClick = {},
             onDismiss = {},
         )
     }
@@ -120,6 +175,7 @@ private fun FavoritesListDialogEmptyPreview() {
         FavoritesListDialog(
             favorites = emptyList(),
             onPlaceClick = {},
+            onAddManualClick = {},
             onDismiss = {},
         )
     }

@@ -171,6 +171,8 @@ private class FakePlaceRepository(initialPlace: SavedPlace) : PlaceRepository {
 
     override suspend fun saveFavorite(placeId: String, name: String) = Unit
 
+    override suspend fun saveFavoritePlace(place: SavedPlace) = Unit
+
     override suspend fun deleteFavorite(placeId: String) = Unit
 
     override suspend fun selectPlace(place: SavedPlace) {

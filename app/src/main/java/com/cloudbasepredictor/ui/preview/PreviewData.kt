@@ -57,6 +57,9 @@ object PreviewData {
         ),
     )
 
+    val manualFavoriteName = "Brauneck South"
+    val manualFavoriteCoordinates = "47.6468, 11.5216"
+
     val dailyForecasts: List<DailyForecast> = List(7) { index ->
         DailyForecast(
             date = dateOffsetByDays(index),

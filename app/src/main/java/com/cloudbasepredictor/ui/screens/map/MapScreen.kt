@@ -56,7 +56,6 @@ import com.cloudbasepredictor.BuildConfig
 import com.cloudbasepredictor.R
 import com.cloudbasepredictor.data.map.MapLayerPreference
 import com.cloudbasepredictor.model.SavedPlace
-import com.cloudbasepredictor.ui.components.FavoritesListDialog
 import com.cloudbasepredictor.ui.components.MapAttributionOverlay
 import com.cloudbasepredictor.ui.components.MapFavoriteLabelsOverlay
 import com.cloudbasepredictor.ui.components.MapTestTags
@@ -109,6 +108,7 @@ fun MapRoute(
         onFavoriteTapped = viewModel::selectFavoritePlace,
         onOpenForecast = viewModel::openSelectedForecast,
         onFavoriteClick = viewModel::openForecastForPlace,
+        onManualFavoriteSave = viewModel::addManualFavorite,
         onSaveCameraPosition = viewModel::saveCameraPosition,
         onOpenSettings = onOpenSettings,
         onMapLayerSelected = viewModel::selectMapLayer,
@@ -123,6 +123,7 @@ fun MapScreen(
     onOpenForecast: () -> Unit,
     onFavoriteClick: (SavedPlace) -> Unit,
     onSaveCameraPosition: (Double, Double, Double) -> Unit,
+    onManualFavoriteSave: (SavedPlace) -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onMapLayerSelected: (MapLayerPreference) -> Unit = {},
     autoOpenFavoritesOnStartup: Boolean = true,
@@ -171,6 +172,7 @@ fun MapScreen(
     val favoritesData = buildFavoritesFeatureCollection(uiState.favoritePlaces)
 
     var showFavoritesDialog by rememberSaveable { mutableStateOf(false) }
+    var showManualFavoriteDialog by rememberSaveable { mutableStateOf(false) }
     var didAutoOpenFavoritesDialog by rememberSaveable { mutableStateOf(false) }
     var showMapLayerMenu by rememberSaveable { mutableStateOf(false) }
     val mapAttributionText = stringResource(mapLayerAttributionRes(uiState.mapLayer))
@@ -378,8 +380,20 @@ fun MapScreen(
         FavoritesListDialog(
             favorites = uiState.favoritePlaces,
             onPlaceClick = onFavoriteClick,
+            onAddManualClick = {
+                showFavoritesDialog = false
+                showManualFavoriteDialog = true
+            },
             onDismiss = { showFavoritesDialog = false },
             modifier = Modifier.testTag(MapTestTags.FAVORITES_DIALOG),
+        )
+    }
+
+    if (showManualFavoriteDialog) {
+        ManualFavoriteDialog(
+            onSave = onManualFavoriteSave,
+            onDismiss = { showManualFavoriteDialog = false },
+            modifier = Modifier.testTag(MapTestTags.MANUAL_FAVORITE_DIALOG),
         )
     }
 }
